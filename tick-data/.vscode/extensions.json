@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "pkief.material-icon-theme",
+    "orta.vscode-twoslash-queries",
+  ]
+}
