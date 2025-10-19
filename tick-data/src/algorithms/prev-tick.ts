@@ -1,13 +1,13 @@
 import type { Tick } from '@/read-data';
-import type { Action, Algorithm } from './backtest-algorithm';
+import { Action, type Algorithm } from './backtest-algorithm';
 
-export const prevTickAlgoirthm: Algorithm = {
-  implementation: prevTickAlgoirthmImplementation,
+export const prevTickAlgorithm: Algorithm = {
+  name: 'Previous Tick',
+  implementation: prevTickAlgorithmImplementation,
   contextLength: 1,
 };
 
-export function prevTickAlgoirthmImplementation(context: Tick[], _position: number): Action {
+export function prevTickAlgorithmImplementation(context: Tick[], _position: number): Action {
   const prevTick = context[0];
-  // return prevTick[4] <= prevTick[1] ? 'buy' : 'sell';
-  return prevTick[4] <= prevTick[1] ? 'sell' : 'buy';
+  return prevTick[4] <= prevTick[1] ? Action.BUY : Action.SELL;
 }

@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "bun run ./src/index.ts",
-    "check-duplicates": "bun run ./src/check-duplicates.ts",
+    "check-duplicates": "bun run ./src/bin/check-duplicates.ts",
     "console": "bun run ./src/scripts/console.ts"
   },
   "devDependencies": {

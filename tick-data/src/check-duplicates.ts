@@ -11,7 +11,7 @@ interface DuplicateInfo {
  * Check for duplicate data in a CSV file
  * Reads line by line for memory efficiency with large files
  */
-async function checkDuplicates(filePath: string) {
+export async function checkDuplicates(filePath: string) {
   if (!fs.existsSync(filePath)) {
     console.error(`❌ Error: File not found: ${filePath}`);
     process.exit(1);
@@ -151,21 +151,3 @@ async function checkDuplicates(filePath: string) {
     process.exit(0);
   }
 }
-
-// Get filename from command line argument
-const filePath = process.argv[2];
-
-if (!filePath) {
-  console.error('❌ Error: Please specify a file to check');
-  console.log('\nUsage:');
-  console.log('  bun run check-duplicates.ts <filename>');
-  console.log('\nExample:');
-  console.log('  bun run check-duplicates.ts data/SPY_1DAY_2020-10-17_to_2025-10-17.csv');
-  process.exit(1);
-}
-
-// Run the check
-checkDuplicates(filePath).catch((error) => {
-  console.error('❌ Error:', error.message);
-  process.exit(1);
-});

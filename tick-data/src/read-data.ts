@@ -2,6 +2,7 @@ import fs from 'fs';
 import readline from 'readline';
 import z from 'zod';
 import { trySync } from './utils/errorHandling';
+import { withCommas } from './utils/number-utils';
 
 const lineOfFileSchema = z.tuple([
   z.string(),
@@ -14,7 +15,10 @@ const lineOfFileSchema = z.tuple([
 
 export type Tick = [t: string, o: number, h: number, l: number, c: number, v: number];
 
-export async function getAllAggregateData(filename: string): Promise<Tick[]> {
+export async function getAllAggregateData(
+  filename: string,
+  verboseLogging = false,
+): Promise<Tick[]> {
   const iter = readline
     .createInterface({
       input: fs.createReadStream(filename),
@@ -28,6 +32,10 @@ export async function getAllAggregateData(filename: string): Promise<Tick[]> {
   const data: Tick[] = [];
   let lineNumber = 1;
   while (!current.done) {
+    if (verboseLogging && lineNumber % 10_000 === 0) {
+      console.log(`Processed ${withCommas(lineNumber)} lines...`);
+    }
+
     const parsedLine = trySync(() => lineOfFileSchema.parse(current.value!.split(',')));
     if (!parsedLine.ok) {
       console.error(`Error parsing line ${lineNumber}: ${current.value}`, parsedLine.error);
@@ -40,7 +48,10 @@ export async function getAllAggregateData(filename: string): Promise<Tick[]> {
   return data;
 }
 
-export async function* getAggregateDataIterator(filename: string): AsyncGenerator<Tick> {
+export async function* getAggregateDataIterator(
+  filename: string,
+  verboseLogging = false,
+): AsyncGenerator<Tick> {
   const iter = readline
     .createInterface({
       input: fs.createReadStream(filename),
@@ -53,9 +64,16 @@ export async function* getAggregateDataIterator(filename: string): AsyncGenerato
 
   let lineNumber = 1;
   while (!current.done) {
+    if (verboseLogging && lineNumber % 10_000 === 0) {
+      console.log(`Processed ${withCommas(lineNumber)} lines...`);
+    }
+
     const parsedLine = trySync(() => lineOfFileSchema.parse(current.value!.split(',')));
     if (!parsedLine.ok) {
-      console.error(`Error parsing line ${lineNumber}: ${current.value}`, parsedLine.error);
+      console.error(
+        `Error parsing line ${withCommas(lineNumber)}: ${current.value}`,
+        parsedLine.error,
+      );
       throw parsedLine.error;
     }
     yield parsedLine.data;
