@@ -12,34 +12,54 @@ const lineOfFileSchema = z.tuple([
   z.coerce.number(),
 ]);
 
-type Tick = [o: number, h: number, l: number, c: number, v: number];
+export type Tick = [t: string, o: number, h: number, l: number, c: number, v: number];
 
 export async function getAllAggregateData(filename: string): Promise<Tick[]> {
-  const lines = readline.createInterface({
-    input: fs.createReadStream(filename),
-    crlfDelay: Infinity,
-  });
+  const iter = readline
+    .createInterface({
+      input: fs.createReadStream(filename),
+      crlfDelay: Infinity,
+    })
+    [Symbol.asyncIterator]();
+
+  await iter.next(); // headers
+  let current = await iter.next();
 
   const data: Tick[] = [];
-  for await (const line of lines) {
-    const parsedLine = trySync(() => lineOfFileSchema.parse(line.split(',')));
-    if (!parsedLine.ok) throw parsedLine.error;
-    const [_t, o, h, l, c, v] = parsedLine.data;
-    data.push([o, h, l, c, v]);
+  let lineNumber = 1;
+  while (!current.done) {
+    const parsedLine = trySync(() => lineOfFileSchema.parse(current.value!.split(',')));
+    if (!parsedLine.ok) {
+      console.error(`Error parsing line ${lineNumber}: ${current.value}`, parsedLine.error);
+      throw parsedLine.error;
+    }
+    data.push(parsedLine.data);
+    lineNumber++;
+    current = await iter.next();
   }
   return data;
 }
 
-export async function* getAggregateDataIterator(filename: string): AsyncIterator<Tick> {
-  const lines = readline.createInterface({
-    input: fs.createReadStream(filename),
-    crlfDelay: Infinity,
-  });
+export async function* getAggregateDataIterator(filename: string): AsyncGenerator<Tick> {
+  const iter = readline
+    .createInterface({
+      input: fs.createReadStream(filename),
+      crlfDelay: Infinity,
+    })
+    [Symbol.asyncIterator]();
 
-  for await (const line of lines) {
-    const parsedLine = trySync(() => lineOfFileSchema.parse(line.split(',')));
-    if (!parsedLine.ok) throw parsedLine.error;
-    const [_t, o, h, l, c, v] = parsedLine.data;
-    yield [o, h, l, c, v];
+  await iter.next(); // headers
+  let current = await iter.next();
+
+  let lineNumber = 1;
+  while (!current.done) {
+    const parsedLine = trySync(() => lineOfFileSchema.parse(current.value!.split(',')));
+    if (!parsedLine.ok) {
+      console.error(`Error parsing line ${lineNumber}: ${current.value}`, parsedLine.error);
+      throw parsedLine.error;
+    }
+    yield parsedLine.data;
+    lineNumber++;
+    current = await iter.next();
   }
 }
