@@ -1,4 +1,4 @@
-import type { Tick } from '@/read-data';
+import type { Bar } from '@/read-data';
 import { Action, type Algorithm } from './backtest-algorithm';
 
 export const d1d2Algorithm: Algorithm = {
@@ -9,7 +9,7 @@ export const d1d2Algorithm: Algorithm = {
 
 const epsilon = 0.00001;
 
-export function d1d2AlgorithmImplementation(context: Tick[], _position: number): Action {
+export function d1d2AlgorithmImplementation(context: Bar[], _position: number): Action {
   const [p1, p2, p3] = context;
 
   const timestamp1 = Math.floor(new Date(p1[0]).getTime() / 1000);

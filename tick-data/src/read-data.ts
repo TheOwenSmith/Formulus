@@ -13,12 +13,12 @@ const lineOfFileSchema = z.tuple([
   z.coerce.number(),
 ]);
 
-export type Tick = [t: string, o: number, h: number, l: number, c: number, v: number];
+export type Bar = [t: string, o: number, h: number, l: number, c: number, v: number];
 
 export async function getAllAggregateData(
   filename: string,
   verboseLogging = false,
-): Promise<Tick[]> {
+): Promise<Bar[]> {
   const iter = readline
     .createInterface({
       input: fs.createReadStream(filename),
@@ -29,7 +29,7 @@ export async function getAllAggregateData(
   await iter.next(); // headers
   let current = await iter.next();
 
-  const data: Tick[] = [];
+  const data: Bar[] = [];
   let lineNumber = 1;
   while (!current.done) {
     if (verboseLogging && lineNumber % 10_000 === 0) {
@@ -51,7 +51,7 @@ export async function getAllAggregateData(
 export async function* getAggregateDataIterator(
   filename: string,
   verboseLogging = false,
-): AsyncGenerator<Tick> {
+): AsyncGenerator<Bar> {
   const iter = readline
     .createInterface({
       input: fs.createReadStream(filename),

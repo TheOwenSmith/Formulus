@@ -1,4 +1,4 @@
-import { getAggregateDataIterator, type Tick } from '@/read-data';
+import { getAggregateDataIterator, type Bar } from '@/read-data';
 import { formatTable } from '@/utils/cli';
 import { trySync } from '@/utils/errorHandling';
 import { withCommasRounded } from '@/utils/number-utils';
@@ -12,7 +12,7 @@ export const enum Action {
 }
 export type Algorithm = {
   name: string;
-  implementation: (context: Tick[], position: number) => Action;
+  implementation: (context: Bar[], position: number) => Action;
   contextLength: number;
 };
 
@@ -66,7 +66,7 @@ export async function backtestAlgorithm({
   }
   const iterator = getIteratorResponse.data;
 
-  const previousTicks: Tick[] = [];
+  const previousTicks: Bar[] = [];
   let firstTick: number | null = null;
   let lastTick: number | null = null;
   for await (const tick of iterator) {
@@ -166,7 +166,7 @@ export async function backtestAlgorithmsConcurrently(
   }
   const iterator = getIteratorResponse.data;
 
-  const previousTicks: Tick[] = [];
+  const previousTicks: Bar[] = [];
   let firstTick: number | null = null;
   let lastTick: number | null = null;
   for await (const tick of iterator) {
