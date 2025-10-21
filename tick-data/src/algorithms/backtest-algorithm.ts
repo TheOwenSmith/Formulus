@@ -75,11 +75,11 @@ export async function backtestAlgorithm({
 
     if (previousTicks.length < algorithm.contextLength) {
       previousTicks.push(tick);
-      continue;
+      if (previousTicks.length < algorithm.contextLength) continue;
+    } else {
+      previousTicks.shift();
+      previousTicks.push(tick);
     }
-
-    previousTicks.shift();
-    previousTicks.push(tick);
 
     const action = algorithm.implementation(previousTicks, position);
     const closePrice = tick[4];
@@ -177,11 +177,11 @@ export async function backtestAlgorithmsConcurrently(
       const { algorithm } = strategies[i];
       if (previousTicks.length < algorithm.contextLength) {
         previousTicks.push(tick);
-        continue;
+        if (previousTicks.length < algorithm.contextLength) continue;
+      } else {
+        previousTicks.shift();
+        previousTicks.push(tick);
       }
-
-      previousTicks.shift();
-      previousTicks.push(tick);
 
       const action = algorithm.implementation(previousTicks, positions[i]);
       const closePrice = tick[4];
