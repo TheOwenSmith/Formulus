@@ -3,7 +3,7 @@
     "scope": "javascript,typescript",
     "prefix": "err",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) throw $2.error;",
       "const $4 = $2.data;",
       "$5"
@@ -14,7 +14,7 @@
     "scope": "javascript,typescript",
     "prefix": "errv",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) throw $2.error;",
       "$4"
     ],
@@ -24,7 +24,7 @@
     "scope": "typescriptreact",
     "prefix": "err",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) {",
       "\tconsole.error($2.error);",
       "\tthrow $2.error;",
@@ -38,7 +38,7 @@
     "scope": "typescriptreact",
     "prefix": "errv",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) {",
       "\tconsole.error($2.error);",
       "\tthrow $2.error;",
@@ -51,7 +51,7 @@
     "scope": "javascript,typescript",
     "prefix": "terr",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) {",
       "\tthrow new TRPCError({ code: '${4|BAD_REQUEST,UNAUTHORIZED,FORBIDDEN,NOT_FOUND,TOO_MANY_REQUEST|}', message: '$5' });",
       "}",
@@ -64,7 +64,7 @@
     "scope": "javascript,typescript",
     "prefix": "terrint",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) {",
       "\tconsole.error(`[${ctx.req.path}]`, $2.error);",
       "\tthrow new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '$4' });",
@@ -78,7 +78,7 @@
     "scope": "javascript,typescript",
     "prefix": "terrintv",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:$1});",
+      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
       "if (!$2.ok) {",
       "\tconsole.error(`[${ctx.req.path}]`, $2.error);",
       "\tthrow new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: '$4' });",

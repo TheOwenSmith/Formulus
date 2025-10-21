@@ -1,5 +1,6 @@
 import { getAggregateDataIterator, type Bar } from '@/read-data';
 import { trySync } from '@/utils/errorHandling';
+import z from 'zod';
 import { Action, type Algorithm } from './backtest-algorithm';
 
 export const sophisticatedPrevBarsAlgorithm = (
@@ -69,4 +70,21 @@ export async function createConfidenceMap(
     confidenceMap.set(historyMasked, wins / total);
   }
   return confidenceMap;
+}
+
+export function serializeContextMap(contextMap: Map<number, number>): string {
+  return JSON.stringify(Array.from(contextMap));
+}
+
+const contextMapArraySchema = z.tuple([z.number(), z.number()]).array();
+export function deserializeContextMap(serializedContextMap: string): Map<number, number> {
+  const parseJsonResponse = trySync(() => JSON.parse(serializedContextMap));
+  if (!parseJsonResponse.ok) throw parseJsonResponse.error;
+  const parsedJson = parseJsonResponse.data;
+
+  const schemaParseResponse = trySync(() => contextMapArraySchema.parse(parsedJson));
+  if (!schemaParseResponse.ok) throw schemaParseResponse.error;
+  const parsedContextArray = schemaParseResponse.data;
+
+  return new Map<number, number>(parsedContextArray);
 }

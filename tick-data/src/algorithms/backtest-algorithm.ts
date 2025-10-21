@@ -1,7 +1,7 @@
 import { getAggregateDataIterator, type Bar } from '@/read-data';
 import { formatTable } from '@/utils/cli';
 import { trySync } from '@/utils/errorHandling';
-import { withCommasRounded } from '@/utils/number-utils';
+import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -46,11 +46,13 @@ export async function backtestAlgorithm({
 
   let balance = 100;
   let position = 0;
+  let trades = 0;
   function closePosition(closePrice: number) {
     // When selling (closing long), you receive the bid price (lower)
     const bidPrice = closePrice - calculateSlippageDelta(closePrice);
     balance += position * bidPrice;
     position = 0;
+    trades++;
   }
   function openPosition(closePrice: number, isShort: boolean) {
     // When buying (opening long), you pay the ask price (higher)
@@ -113,7 +115,8 @@ export async function backtestAlgorithm({
     table.push(['Ticker return', withCommasRounded(tickerReturn) + '%']);
     table.push(['Ticker final balance', '$' + withCommasRounded(tickerFinalBalance)]);
   }
-  table.push(['Final balance', '$' + withCommasRounded(balance)]);
+  table.push(['Strategy final balance', '$' + withCommasRounded(balance)]);
+  table.push(['Trades made', withCommas(trades)]);
   table.push(['Return', withCommasRounded(balance - 100) + '%']);
   if (firstTick && lastTick) {
     table.push(['Strategy/ticker return', withCommasRounded(balance / tickerFinalBalance) + 'x']);
@@ -146,6 +149,7 @@ export async function backtestAlgorithmsConcurrently(
 
   const balances: number[] = Array(strategies.length).fill(100);
   const positions: number[] = Array(strategies.length).fill(0);
+  const trades: number[] = Array(strategies.length).fill(0);
   function closePosition(index: number, closePrice: number) {
     // When selling (closing long), you receive the bid price (lower)
     const bidPrice = closePrice - calculateSlippageDelta(index, closePrice);
@@ -158,6 +162,7 @@ export async function backtestAlgorithmsConcurrently(
     if (isShort) positions[index] -= balances[index] / askPrice;
     else positions[index] += balances[index] / askPrice;
     balances[index] = 0;
+    trades[index]++;
   }
 
   const getIteratorResponse = trySync(() => getAggregateDataIterator(filename, verboseLogging));
@@ -218,7 +223,8 @@ export async function backtestAlgorithmsConcurrently(
       table.push(['Ticker return', withCommasRounded(tickerReturn) + '%']);
       table.push(['Ticker final balance', '$' + withCommasRounded(tickerFinalBalance)]);
     }
-    table.push(['Final balance', '$' + withCommasRounded(balances[i])]);
+    table.push(['Strategy final balance', '$' + withCommasRounded(balances[i])]);
+    table.push(['Trades made', withCommas(trades[i])]);
     table.push(['Return', withCommasRounded(balances[i] - 100) + '%']);
     if (firstTick && lastTick) {
       table.push([
