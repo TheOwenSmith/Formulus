@@ -277,10 +277,55 @@ class TradingAnalyzer:
 
     def plot_cumulative(self, use_plotly: bool = True):
         df = self.analyzed_trades
+        market_df: Optional[pd.DataFrame] = None
+        if self.raw_data is not None and not df.empty:
+            price_df = self.raw_data.copy()
+            series: Optional[pd.DataFrame] = None
+            if "Timestamp" in price_df.columns:
+                price_df["Timestamp"] = pd.to_datetime(price_df["Timestamp"])
+                price_df = price_df.sort_values("Timestamp").reset_index(drop=True)
+                if "Close" in price_df.columns:
+                    series = price_df[["Timestamp", "Close"]].rename(columns={"Close": "Price"})
+                elif "Price" in price_df.columns:
+                    series = price_df[["Timestamp", "Price"]]
+                else:
+                    numeric_cols = price_df.select_dtypes(include=[np.number]).columns
+                    if len(numeric_cols) > 0:
+                        last_col = numeric_cols[-1]
+                        series = price_df[["Timestamp", last_col]].rename(columns={last_col: "Price"})
+            else:
+                price_df = price_df.reset_index()
+                if price_df.shape[1] >= 2:
+                    price_df.rename(columns={price_df.columns[0]: "Timestamp", price_df.columns[1]: "Price"}, inplace=True)
+                    price_df["Timestamp"] = pd.to_datetime(price_df["Timestamp"])
+                    series = price_df[["Timestamp", "Price"]]
+            if series is not None:
+                series = series.dropna(subset=["Price"]).copy()
+                ts_min, ts_max = df["Timestamp"].min(), df["Timestamp"].max()
+                if pd.notna(ts_min) and pd.notna(ts_max):
+                    series = series[(series["Timestamp"] >= ts_min) & (series["Timestamp"] <= ts_max)]
+                if not series.empty:
+                    series = series.sort_values("Timestamp").reset_index(drop=True)
+                    base_price = series["Price"].iloc[0]
+                    if pd.notna(base_price) and base_price != 0:
+                        series["Market_Cum_Return"] = series["Price"] / base_price - 1.0
+                        market_df = series[["Timestamp", "Market_Cum_Return"]]
+
         if use_plotly and _HAS_PLOTLY:
             fig = make_subplots(rows=2, cols=2, subplot_titles=("Equity", "Cum Return", "Drawdown", "Underwater"))
             fig.add_trace(go.Scatter(x=df["Timestamp"], y=df["Equity"], name="Equity"), row=1, col=1)
             fig.add_trace(go.Scatter(x=df["Timestamp"], y=df["Cum_Return"], name="Cum Return"), row=1, col=2)
+            if market_df is not None:
+                fig.add_trace(
+                    go.Scatter(
+                        x=market_df["Timestamp"],
+                        y=market_df["Market_Cum_Return"],
+                        name="Market Return",
+                        line=dict(color="orange", dash="dash"),
+                    ),
+                    row=1,
+                    col=2,
+                )
 
             equity = df["Equity"]
             drawdown = (equity - equity.cummax()) / equity.cummax()
@@ -295,7 +340,16 @@ class TradingAnalyzer:
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         df["Equity"].plot(ax=axes[0, 0])
         axes[0, 0].set_title("Equity")
-        df["Cum_Return"].plot(ax=axes[0, 1])
+        df["Cum_Return"].plot(ax=axes[0, 1], label="Strategy Cum Return")
+        if market_df is not None:
+            axes[0, 1].plot(
+                market_df["Timestamp"],
+                market_df["Market_Cum_Return"],
+                label="Market Return",
+                linestyle="--",
+                color="orange",
+            )
+        axes[0, 1].legend()
         axes[0, 1].set_title("Cumulative Return")
         equity = df["Equity"]
         ((equity - equity.cummax()) / equity.cummax()).plot(ax=axes[1, 0])
