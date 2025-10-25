@@ -5,7 +5,7 @@ import { Action, type Algorithm } from './backtest-algorithm';
 
 export const sophisticatedPrevBarsAlgorithm = (
   contextLength: number,
-  confidenceMap: Map<number, number>,
+  confidenceMap: Map<number, boolean>,
 ): Algorithm => ({
   name: `Sophisticated Previous Bars (${contextLength})`,
   implementation: sophisticatedPrevBarsAlgorithmImplementation(confidenceMap),
@@ -13,14 +13,12 @@ export const sophisticatedPrevBarsAlgorithm = (
 });
 
 export const sophisticatedPrevBarsAlgorithmImplementation = (
-  confidenceMap: Map<number, number>,
+  confidenceMap: Map<number, boolean>,
 ) => {
   return function (context: Bar[], _position: number): Action {
     const historyMasked: number = maskHistory(context);
     if (confidenceMap.has(historyMasked)) {
-      const chanceNextGreen = confidenceMap.get(historyMasked)!;
-      if (chanceNextGreen > 0.7) return Action.BUY;
-      if (chanceNextGreen < 0.3) return Action.SELL;
+      return confidenceMap.get(historyMasked)! ? Action.BUY : Action.SELL;
     }
     return Action.HOLD;
   };
@@ -33,11 +31,17 @@ function maskHistory(context: Bar[]): number {
   }, 0);
 }
 
-export async function createConfidenceMap(
-  filename: string,
-  contextLength: number,
+export async function createContextMap({
+  filename,
+  contextLength,
+  topP = 0.2,
   verboseLogging = false,
-): Promise<Map<number, number>> {
+}: {
+  filename: string;
+  contextLength: number;
+  topP?: number;
+  verboseLogging?: boolean;
+}): Promise<Map<number, boolean>> {
   const getIteratorResponse = trySync(() => getAggregateDataIterator(filename, verboseLogging));
   if (!getIteratorResponse.ok) {
     throw getIteratorResponse.error;
@@ -55,9 +59,9 @@ export async function createConfidenceMap(
     const historyMasked: number = maskHistory(previousTicks);
     const previousOutcome = outcomeMap.get(historyMasked) ?? [0, 0];
 
-    const isGreen = tick[4] >= tick[1];
-    if (isGreen) previousOutcome[0]++;
-
+    const prevTick = previousTicks.at(-1)![4];
+    const nextTickPercentChange = ((tick[4] - prevTick) / prevTick) * 100;
+    previousOutcome[0] += nextTickPercentChange;
     previousOutcome[1]++;
     outcomeMap.set(historyMasked, previousOutcome);
 
@@ -65,19 +69,41 @@ export async function createConfidenceMap(
     previousTicks.push(tick);
   }
 
-  const confidenceMap = new Map<number, number>();
-  for (const [historyMasked, [wins, total]] of outcomeMap.entries()) {
-    confidenceMap.set(historyMasked, wins / total);
+  const sortedOutcomeMap = [...outcomeMap.entries()].sort(
+    (
+      [_historyA, [nextTickPercentChangeSumA, totalTicksA]],
+      [_historyB, [nextTickPercentChangeSumB, totalTicksB]],
+    ) => {
+      const averagePercentChangeA = nextTickPercentChangeSumA / totalTicksA;
+      const averagePercentChangeB = nextTickPercentChangeSumB / totalTicksB;
+      return averagePercentChangeB - averagePercentChangeA;
+    },
+  );
+
+  const contextMap = new Map<number, boolean>();
+
+  let i = 0;
+  for (; i < sortedOutcomeMap.length * topP; i++) {
+    const [historyMasked, [nextTickPercentChangeSum, total]] = sortedOutcomeMap[i];
+    const averagePercentChange = nextTickPercentChangeSum / total;
+    if (averagePercentChange <= 0) {
+      break;
+    }
+    contextMap.set(historyMasked, true);
   }
-  return confidenceMap;
+  for (; i < sortedOutcomeMap.length; i++) {
+    const [historyMasked] = sortedOutcomeMap[i];
+    contextMap.set(historyMasked, false);
+  }
+  return contextMap;
 }
 
-export function serializeContextMap(contextMap: Map<number, number>): string {
+export function serializeContextMap(contextMap: Map<number, boolean>): string {
   return JSON.stringify(Array.from(contextMap));
 }
 
-const contextMapArraySchema = z.tuple([z.number(), z.number()]).array();
-export function deserializeContextMap(serializedContextMap: string): Map<number, number> {
+const contextMapArraySchema = z.tuple([z.number(), z.boolean()]).array();
+export function deserializeContextMap(serializedContextMap: string): Map<number, boolean> {
   const parseJsonResponse = trySync(() => JSON.parse(serializedContextMap));
   if (!parseJsonResponse.ok) throw parseJsonResponse.error;
   const parsedJson = parseJsonResponse.data;
@@ -86,5 +112,5 @@ export function deserializeContextMap(serializedContextMap: string): Map<number,
   if (!schemaParseResponse.ok) throw schemaParseResponse.error;
   const parsedContextArray = schemaParseResponse.data;
 
-  return new Map<number, number>(parsedContextArray);
+  return new Map<number, boolean>(parsedContextArray);
 }

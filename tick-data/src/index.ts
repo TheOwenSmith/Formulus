@@ -1,9 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { backtestAlgorithmsConcurrently, type Strategy } from './algorithms/backtest-algorithm';
-import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
-  createConfidenceMap,
+  backtestAlgorithmsConcurrently,
+  type Strategy,
+} from './algorithms/backtest-algorithms-concurrently';
+import {
+  createContextMap,
   deserializeContextMap,
   serializeContextMap,
   sophisticatedPrevBarsAlgorithm,
@@ -13,9 +15,12 @@ import { tryAsync, trySync } from './utils/errorHandling';
 
 const constantSlippage = [0, 0.005, 0.01, 0.015, 0.02, 0.025];
 const bpsSlippage = [0, 0.2, 0.5, 1, 2, 5, 10];
-const algorithms = [prevBarAlgorithm];
+const contextLengths = [3]; // [3, 5, 7, 9];
+const algorithms = [
+  /*prevBarAlgorithm*/
+];
 
-for (const contextLength of [3, 5, 7, 9]) {
+for (const contextLength of contextLengths) {
   const contextMapFilename = `./context-maps/SPY/context-map-${contextLength}.txt`;
   if (fs.existsSync(contextMapFilename)) {
     console.log(`Loading context map from ${contextMapFilename}...`);
@@ -33,8 +38,13 @@ for (const contextLength of [3, 5, 7, 9]) {
     continue;
   }
 
-  const contextMap = await createConfidenceMap(secondDataFilename, contextLength, true);
-  console.log(`Created context map for ${contextLength}...`);
+  const contextMap = await createContextMap({
+    filename: secondDataFilename,
+    contextLength,
+    topP: 0.3,
+    verboseLogging: true,
+  });
+  console.log(`Created context map for ${contextLength}`);
   algorithms.push(sophisticatedPrevBarsAlgorithm(contextLength, contextMap));
 
   const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
@@ -57,12 +67,13 @@ for (const file of tickDataFilenames) {
       algorithm,
       slippage: { bps: slippageValue },
       writeToFile: `./backtest-results/SPY/${algorithm.name}/bps-slippage/${slippageValue}bps.txt`,
+      doPlot: slippageValue === 0.2,
     }));
     strategies.push(...constantSlippageStrategies, ...bpsSlippageStrategies);
   }
 
   const backtestResponse = await tryAsync(() =>
-    backtestAlgorithmsConcurrently(file, strategies, true),
+    backtestAlgorithmsConcurrently(file, strategies, false),
   );
   if (!backtestResponse.ok) {
     console.error(backtestResponse.error);

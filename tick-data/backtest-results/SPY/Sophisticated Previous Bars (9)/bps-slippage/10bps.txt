@@ -1,0 +1,300 @@
+--- Backtest Summary (./data/SPY_1SECOND_2020-10-18_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $348.6
+Last tick close:        $661.03
+Ticker return:          89.62%
+Ticker final balance:   $189.62
+Strategy final balance: $0
+Trades made:            1,207,653
+Return:                 -100%
+Strategy/ticker return: -1.12x
+------------------------
+--- Backtest Summary (./data/SPY_1SECOND_2020-10-18_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $348.6
+Last tick close:        $661.03
+Ticker return:          89.62%
+Ticker final balance:   $189.62
+Strategy final balance: $0
+Trades made:            1,207,653
+Return:                 -100%
+Strategy/ticker return: -1.12x
+------------------------
+--- Backtest Summary (./data/SPY_15SECOND_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $660.95
+Ticker return:          92.08%
+Ticker final balance:   $192.08
+Strategy final balance: $0
+Trades made:            210,705
+Return:                 -100%
+Strategy/ticker return: -1.09x
+------------------------
+--- Backtest Summary (./data/SPY_1MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Strategy final balance: $0
+Trades made:            236,219
+Return:                 -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_15MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Strategy final balance: $0
+Trades made:            20,004
+Return:                 -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_1HOUR_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $663.91
+Ticker return:          92.94%
+Ticker final balance:   $192.94
+Strategy final balance: $12.85
+Trades made:            1,458
+Return:                 -87.15%
+Strategy/ticker return: -0.94x
+------------------------
+--- Backtest Summary (./data/SPY_1DAY_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $343.46
+Last tick close:        $664.39
+Ticker return:          93.44%
+Ticker final balance:   $193.44
+Strategy final balance: $86.69
+Trades made:            319
+Return:                 -13.31%
+Strategy/ticker return: -0.14x
+------------------------
+--- Backtest Summary (./data/SPY_1SECOND_2020-10-18_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $348.6
+Last tick close:        $661.03
+Ticker return:          89.62%
+Ticker final balance:   $189.62
+Strategy final balance: $0
+Trades made:            1,207,653
+Return:                 -100%
+Strategy/ticker return: -1.12x
+------------------------
+--- Backtest Summary (./data/SPY_15SECOND_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $660.95
+Ticker return:          92.08%
+Ticker final balance:   $192.08
+Strategy final balance: $0
+Trades made:            210,705
+Return:                 -100%
+Strategy/ticker return: -1.09x
+------------------------
+--- Backtest Summary (./data/SPY_1MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Strategy final balance: $0
+Trades made:            236,219
+Return:                 -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_15MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Strategy final balance: $0
+Trades made:            20,004
+Return:                 -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_1HOUR_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $663.91
+Ticker return:          92.94%
+Ticker final balance:   $192.94
+Strategy final balance: $12.85
+Trades made:            1,458
+Return:                 -87.15%
+Strategy/ticker return: -0.94x
+------------------------
+--- Backtest Summary (./data/SPY_1DAY_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $343.46
+Last tick close:        $664.39
+Ticker return:          93.44%
+Ticker final balance:   $193.44
+Strategy final balance: $86.69
+Trades made:            319
+Return:                 -13.31%
+Strategy/ticker return: -0.14x
+------------------------
+--- Backtest Summary (./data/SPY_1SECOND_2020-10-18_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $348.6
+Last tick close:        $661.03
+Ticker return:          89.62%
+Ticker final balance:   $189.62
+Trades made:            1,207,653
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.12x
+------------------------
+--- Backtest Summary (./data/SPY_15SECOND_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $660.95
+Ticker return:          92.08%
+Ticker final balance:   $192.08
+Trades made:            210,705
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.09x
+------------------------
+--- Backtest Summary (./data/SPY_1MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Trades made:            236,219
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_15MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Trades made:            20,004
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_1HOUR_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $663.91
+Ticker return:          92.94%
+Ticker final balance:   $192.94
+Trades made:            1,458
+Strategy final balance: $12.85
+Strategy return:        -87.15%
+Strategy/ticker return: -0.94x
+------------------------
+--- Backtest Summary (./data/SPY_1DAY_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $343.46
+Last tick close:        $664.39
+Ticker return:          93.44%
+Ticker final balance:   $193.44
+Trades made:            319
+Strategy final balance: $86.69
+Strategy return:        -13.31%
+Strategy/ticker return: -0.14x
+------------------------
+--- Backtest Summary (./data/SPY_1SECOND_2020-10-18_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $348.6
+Last tick close:        $661.03
+Ticker return:          89.62%
+Ticker final balance:   $189.62
+Trades made:            1,207,653
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.12x
+------------------------
+--- Backtest Summary (./data/SPY_15SECOND_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $660.95
+Ticker return:          92.08%
+Ticker final balance:   $192.08
+Trades made:            210,705
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.09x
+------------------------
+--- Backtest Summary (./data/SPY_1MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Trades made:            236,219
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_15MINUTE_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $665.28
+Ticker return:          93.34%
+Ticker final balance:   $193.34
+Trades made:            20,004
+Strategy final balance: $0
+Strategy return:        -100%
+Strategy/ticker return: -1.07x
+------------------------
+--- Backtest Summary (./data/SPY_1HOUR_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $344.1
+Last tick close:        $663.91
+Ticker return:          92.94%
+Ticker final balance:   $192.94
+Trades made:            1,458
+Strategy final balance: $12.85
+Strategy return:        -87.15%
+Strategy/ticker return: -0.94x
+------------------------
+--- Backtest Summary (./data/SPY_1DAY_2020-10-19_to_2025-10-19.csv) ---
+Algorithm:              Sophisticated Previous Bars (9)
+Slippage:               10bps
+First tick open:        $343.46
+Last tick close:        $664.39
+Ticker return:          93.44%
+Ticker final balance:   $193.44
+Trades made:            319
+Strategy final balance: $86.69
+Strategy return:        -13.31%
+Strategy/ticker return: -0.14x
+------------------------

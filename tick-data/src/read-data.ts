@@ -32,7 +32,7 @@ export async function getAllAggregateData(
   const data: Bar[] = [];
   let lineNumber = 1;
   while (!current.done) {
-    if (verboseLogging && lineNumber % 10_000 === 0) {
+    if (verboseLogging && lineNumber % 100_000 === 0) {
       console.log(`Processed ${withCommas(lineNumber)} lines...`);
     }
 
@@ -64,7 +64,7 @@ export async function* getAggregateDataIterator(
 
   let lineNumber = 1;
   while (!current.done) {
-    if (verboseLogging && lineNumber % 10_000 === 0) {
+    if (verboseLogging && lineNumber % 100_000 === 0) {
       console.log(`Processed ${withCommas(lineNumber)} lines...`);
     }
 
