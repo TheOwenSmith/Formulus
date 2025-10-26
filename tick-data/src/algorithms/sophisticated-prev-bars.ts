@@ -6,8 +6,9 @@ import { Action, type Algorithm } from './backtest-algorithm';
 export const sophisticatedPrevBarsAlgorithm = (
   contextLength: number,
   confidenceMap: Map<number, boolean>,
+  name?: string,
 ): Algorithm => ({
-  name: `Sophisticated Previous Bars (${contextLength})`,
+  name: name ?? `Sophisticated Previous Bars (${contextLength})`,
   implementation: sophisticatedPrevBarsAlgorithmImplementation(confidenceMap),
   contextLength,
 });

@@ -1,12 +1,13 @@
+import type { Graph, SimplePlot } from '@/lib/nodeplotlib';
 import { getAggregateDataIterator, type Bar } from '@/read-data';
-import { formatTable } from '@/utils/cli';
+import type { SelectionOption } from '@/utils/cli';
 import { trySync } from '@/utils/errorHandling';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import fs from 'fs';
-import { plot, type Plot } from 'nodeplotlib';
 import path from 'path';
 import {
   Action,
+  getStatistics,
   MAX_POINTS_PER_PLOT,
   slippageToString,
   type Algorithm,
@@ -24,7 +25,7 @@ export async function backtestAlgorithmsConcurrently(
   filename: string,
   strategies: Strategy[],
   verboseLogging = false,
-) {
+): Promise<SelectionOption<Graph>[]> {
   function calculateSlippageDelta(index: number, price: number) {
     const { slippage } = strategies[index];
     if (slippage == undefined) return 0;
@@ -149,83 +150,72 @@ export async function backtestAlgorithmsConcurrently(
   for (let i = 0; i < strategies.length; i++) {
     if (positions[i] !== 0) closePosition(i, previousTicks.at(-1)![4]);
 
-    const { algorithm, writeToFile, slippage = { bps: 0 }, doPlot = false } = strategies[i];
-    const table: [string, string][] = [];
-    table.push(['Algorithm', algorithm.name]);
-    table.push(['Slippage', slippageToString(slippage)]);
-    table.push(['First tick open', firstTick ? '$' + firstTick.toString() : 'N/A']);
-    table.push(['Last tick close', lastTick ? '$' + lastTick.toString() : 'N/A']);
-    if (firstTick && lastTick) {
-      table.push(['Ticker return', withCommasRounded(tickerReturn) + '%']);
-      table.push(['Ticker final balance', '$' + withCommasRounded(tickerFinalBalance)]);
-    }
-    table.push(['Trades made', withCommas(trades[i])]);
-    table.push(['Strategy final balance', '$' + withCommasRounded(balances[i])]);
-    table.push(['Strategy return', withCommasRounded(balances[i] - 100) + '%']);
-    if (firstTick && lastTick) {
-      table.push([
-        'Strategy/ticker return',
-        withCommasRounded((balances[i] - 100) / (tickerFinalBalance - 100)) + 'x',
-      ]);
-    }
+    const { algorithm, writeToFile, slippage = { bps: 0 } } = strategies[i];
+    const statistics = getStatistics({
+      algorithmName: algorithm.name,
+      slippage,
+      filename,
+      trades: trades[i],
+      balance: balances[i],
+      tickerReturn,
+      tickerFinalBalance,
+    });
 
-    let output = '';
-    output += `--- Backtest Summary (${filename}) ---` + '\n';
-    output += formatTable(table);
-    output += '------------------------' + '\n';
-
-    if (verboseLogging) console.log(output);
+    if (verboseLogging) console.log(statistics);
     if (writeToFile != undefined) {
       fs.mkdirSync(path.dirname(writeToFile), { recursive: true });
-      const writeFileResponse = trySync(() => fs.appendFileSync(writeToFile, output));
+      const writeFileResponse = trySync(() => fs.appendFileSync(writeToFile, statistics));
       if (!writeFileResponse.ok) throw writeFileResponse.error;
     }
+  }
 
+  const tickerXs = Array.from({ length: tickerYs.length }, (_, i) => i);
+  const tickerPlot: SimplePlot = {
+    name: 'Ticker',
+    x: tickerXs,
+    y: tickerYs,
+    type: 'scatter',
+  };
+
+  const aggregateName = filename.split('_')[1] ?? 'unknown';
+  const graphSelectionOptions: SelectionOption<Graph>[] = [];
+  for (let i = 0; i < strategies.length; i++) {
+    const { algorithm, slippage = { bps: 0 }, doPlot = false } = strategies[i];
     if (doPlot) {
-      const tickerPlot: Plot = {
-        name: 'Ticker',
-        x: Array.from({ length: tickerYs.length }, (_, i) => i),
-        y: tickerYs,
-        type: 'scatter',
-      };
-      const strategyPlot: Plot = {
+      const strategyPlot: SimplePlot = {
         name: 'Strategy',
-        x: Array.from({ length: tickerYs.length }, (_, i) => i),
+        x: tickerXs,
         y: strategyYs[i],
         type: 'scatter',
       };
 
-      const aggregateName = filename.split('_')[1] ?? 'unknown';
-      if (verboseLogging) {
-        console.log(
-          `Plotting strategy (${i + 1}/${strategies.length}):`,
-          algorithm.name + '; ' + aggregateName,
-        );
-      }
-      plot([tickerPlot, strategyPlot], {
-        title: algorithm.name,
-        xaxis: { title: 'Time Points' },
-        yaxis: { title: 'Portfolio Value ($)' },
-        annotations: [
-          {
-            x: 0.02,
-            y: 0.98,
-            xref: 'paper',
-            yref: 'paper',
-            text: [
-              `Aggregate: ${aggregateName}`,
-              `Slippage: ${slippageToString(slippage)}`,
-              `Ticker return: ${withCommasRounded(tickerReturn)}%`,
-              `Trades made: ${withCommas(trades[i])}`,
-              `Strategy return: ${withCommasRounded(balances[i] - 100)}%`,
-            ].join('<br>'),
-            showarrow: false,
-            bgcolor: 'rgba(255,255,255,0.8)',
-            bordercolor: 'rgba(0,0,0,0.3)',
-            borderwidth: 1,
-          },
-        ],
+      const strategyToTickerReturn = withCommasRounded(
+        (balances[i] - 100) / (tickerFinalBalance - 100),
+      );
+      const description: string[] = [
+        `Aggregate: ${aggregateName}`,
+        `Slippage: ${slippageToString(slippage)}`,
+        `Ticker return: ${withCommasRounded(tickerReturn)}%`,
+        `Trades made: ${withCommas(trades[i])}`,
+        `Strategy return: ${withCommasRounded(balances[i] - 100)}%`,
+        `Strategy/ticker return: ${strategyToTickerReturn}x`,
+      ];
+
+      graphSelectionOptions.push({
+        name: [
+          algorithm.name,
+          aggregateName,
+          slippageToString(slippage),
+          strategyToTickerReturn + 'x',
+        ].join('; '),
+        value: {
+          tickerPlot,
+          strategyPlot,
+          algorithmName: algorithm.name,
+          description,
+        },
       });
     }
   }
+  return graphSelectionOptions;
 }

@@ -136,34 +136,20 @@ export async function backtestAlgorithm({
   const tickerReturn = firstTick && lastTick ? ((lastTick - firstTick) / firstTick) * 100 : 0;
   const tickerFinalBalance = firstTick && lastTick ? 100 * (lastTick / firstTick) : 100;
 
-  const table: [string, string][] = [];
-  table.push(['Algorithm', algorithm.name]);
-  table.push(['Slippage', slippageToString(slippage)]);
-  table.push(['First tick open', firstTick ? '$' + firstTick.toString() : 'N/A']);
-  table.push(['Last tick close', lastTick ? '$' + lastTick.toString() : 'N/A']);
-  if (firstTick && lastTick) {
-    table.push(['Ticker return', withCommasRounded(tickerReturn) + '%']);
-    table.push(['Ticker final balance', '$' + withCommasRounded(tickerFinalBalance)]);
-  }
-  table.push(['Trades made', withCommas(trades)]);
-  table.push(['Strategy final balance', '$' + withCommasRounded(balance)]);
-  table.push(['Strategy return', withCommasRounded(balance - 100) + '%']);
-  if (firstTick && lastTick) {
-    table.push([
-      'Strategy/ticker return',
-      withCommasRounded((balance - 100) / (tickerFinalBalance - 100)) + 'x',
-    ]);
-  }
+  const statistics = getStatistics({
+    algorithmName: algorithm.name,
+    slippage,
+    filename,
+    trades,
+    balance,
+    tickerReturn,
+    tickerFinalBalance,
+  });
 
-  let output = '';
-  output += `--- Backtest Summary (${filename}) ---` + '\n';
-  output += formatTable(table);
-  output += '------------------------' + '\n';
-
-  if (verboseLogging) console.log(output);
+  if (verboseLogging) console.log(statistics);
   if (writeToFile != undefined) {
     fs.mkdirSync(path.dirname(writeToFile), { recursive: true });
-    const writeFileResponse = trySync(() => fs.appendFileSync(writeToFile, output));
+    const writeFileResponse = trySync(() => fs.appendFileSync(writeToFile, statistics));
     if (!writeFileResponse.ok) throw writeFileResponse.error;
   }
 
@@ -206,4 +192,41 @@ export async function backtestAlgorithm({
       ],
     });
   }
+}
+
+export function getStatistics({
+  algorithmName,
+  slippage = { bps: 0 },
+  filename,
+  trades,
+  balance,
+  tickerReturn,
+  tickerFinalBalance,
+}: {
+  algorithmName: string;
+  slippage?: Slippage;
+  filename: string;
+  trades: number;
+  balance: number;
+  tickerReturn: number;
+  tickerFinalBalance: number;
+}) {
+  const table: [string, string][] = [];
+  table.push(['Algorithm', algorithmName]);
+  table.push(['Slippage', slippageToString(slippage)]);
+  table.push(['Ticker return', withCommasRounded(tickerReturn) + '%']);
+  table.push(['Ticker final balance', '$' + withCommasRounded(tickerFinalBalance)]);
+  table.push(['Trades made', withCommas(trades)]);
+  table.push(['Strategy final balance', '$' + withCommasRounded(balance)]);
+  table.push(['Strategy return', withCommasRounded(balance - 100) + '%']);
+  table.push([
+    'Strategy/ticker return',
+    withCommasRounded((balance - 100) / (tickerFinalBalance - 100)) + 'x',
+  ]);
+
+  let statistics = '';
+  statistics += `--- Backtest Summary (${filename}) ---` + '\n';
+  statistics += formatTable(table);
+  statistics += '------------------------' + '\n';
+  return statistics;
 }
