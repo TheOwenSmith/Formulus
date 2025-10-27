@@ -46,6 +46,19 @@ export async function backtestAlgorithm({
   timespan?: [Date, Date];
   verboseLogging?: boolean;
 }) {
+  if (timespan != undefined) {
+    if (isNaN(timespan[0].getTime())) {
+      throw new Error('Timespan is invalid: start date is not a valid date');
+    }
+    if (isNaN(timespan[1].getTime())) {
+      throw new Error('Timespan is invalid: end date is not a valid date');
+    }
+
+    if (timespan[0] >= timespan[1]) {
+      throw new Error('Timespan is invalid: start date is after end date');
+    }
+  }
+
   function calculateSlippageDelta(price: number) {
     return 'bps' in slippage ? price * (slippage.bps / 10_000) : slippage.constant;
   }

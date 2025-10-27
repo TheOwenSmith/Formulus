@@ -98,7 +98,7 @@ for (const { filename, aggregateInMilliseconds } of [hourDataWithAggregateInMill
       aggregateInMilliseconds,
       strategies,
       timespan: bearish2,
-      verboseLogging: true,
+      verboseLogging: false,
     }),
   );
   if (!backtestResponse.ok) {

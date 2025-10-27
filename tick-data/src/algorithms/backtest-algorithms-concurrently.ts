@@ -36,6 +36,19 @@ export async function backtestAlgorithmsConcurrently({
   timespan?: [Date, Date];
   verboseLogging?: boolean;
 }): Promise<SelectionOption<Graph>[]> {
+  if (timespan != undefined) {
+    if (isNaN(timespan[0].getTime())) {
+      throw new Error('Timespan is invalid: start date is not a valid date');
+    }
+    if (isNaN(timespan[1].getTime())) {
+      throw new Error('Timespan is invalid: end date is not a valid date');
+    }
+
+    if (timespan[0] >= timespan[1]) {
+      throw new Error('Timespan is invalid: start date is after end date');
+    }
+  }
+
   function calculateSlippageDelta(index: number, price: number) {
     const { slippage } = strategies[index];
     if (slippage == undefined) return 0;
