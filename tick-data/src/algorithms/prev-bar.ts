@@ -1,5 +1,5 @@
-import type { Bar } from '@/read-data';
 import { Action, type Algorithm } from './backtest-algorithm';
+import type { Bar } from './read-data';
 
 export const prevBarAlgorithm: Algorithm = {
   name: 'Previous Bar',

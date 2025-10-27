@@ -3,7 +3,7 @@ import {
   deserializeContextMap,
   sophisticatedPrevBarsAlgorithm,
 } from '@/algorithms/sophisticated-prev-bars';
-import { hourDataFilename } from '@/tick-data-files';
+import { hourDataFilename } from '@/fetch/tick-data-files';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import fs from 'fs';
 import path from 'path';

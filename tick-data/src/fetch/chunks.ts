@@ -1,5 +1,5 @@
 import { GetStocksAggregatesTimespanEnum } from '@polygon.io/client-js';
-import { getDateChunks, getTimestampChunks } from './utils/date-utils';
+import { getDateChunks, getTimestampChunks } from '../utils/date-utils';
 
 type Chunk = { from: Date; to: Date } | { from: number; to: number };
 

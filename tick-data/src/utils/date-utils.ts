@@ -90,3 +90,46 @@ export function getTimestampChunks(
 
   return chunks;
 }
+
+const easternTimeOptions: Intl.DateTimeFormatOptions = {
+  hour: 'numeric',
+  minute: 'numeric',
+  timeZone: 'America/New_York',
+  hour12: false, // Use 24-hour format for easier comparison
+};
+
+export function isMarketOpen(date: Date): boolean {
+  // Get the hour and minute parts in Eastern Time
+  const parts = new Intl.DateTimeFormat('en-US', easternTimeOptions).formatToParts(date);
+
+  const hourAsString = parts.find((part) => part.type === 'hour')?.value;
+  const minuteAsString = parts.find((part) => part.type === 'minute')?.value;
+  if (hourAsString == undefined || minuteAsString == undefined) return false;
+
+  const hour = parseInt(hourAsString, 10);
+  const minute = parseInt(minuteAsString, 10);
+
+  // Check if the time is after 9:30 AM
+  const after930am = hour > 9 || (hour === 9 && minute >= 30);
+
+  // Check if the time is before 4:00 PM
+  const before4pm = hour < 16 || (hour === 16 && minute === 0);
+
+  return after930am && before4pm;
+}
+
+export function millisecondsToTimeString(milliseconds: number): string {
+  const days = Math.floor(milliseconds / 86_400_000)
+    .toString()
+    .padStart(2, '0');
+  const hours = Math.floor((milliseconds % 86_400_000) / 3_600_000)
+    .toString()
+    .padStart(2, '0');
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000)
+    .toString()
+    .padStart(2, '0');
+  const seconds = Math.floor((milliseconds % 60_000) / 1_000)
+    .toString()
+    .padStart(2, '0');
+  return `${days}d ${hours}:${minutes}:${seconds}`;
+}

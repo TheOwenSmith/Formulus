@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import type { Algorithm } from './algorithms/backtest-algorithm';
 import {
   backtestAlgorithmsConcurrently,
@@ -8,17 +7,17 @@ import {
 import { chooseToPlot } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
-  createContextMap,
   deserializeContextMap,
-  serializeContextMap,
   sophisticatedPrevBarsAlgorithm,
 } from './algorithms/sophisticated-prev-bars';
+import { bearish2 } from './algorithms/timespans';
+import { hourDataWithAggregateInMilliseconds } from './fetch/tick-data-files';
 import type { Graph } from './lib/nodeplotlib';
-import { secondDataFilename, tickDataFilenames } from './tick-data-files';
 import type { SelectionOption } from './utils/cli';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
+const bpsSlippages: number[] = [0.2, 0.5, 1];
 const topPs: number[] = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
 const algorithms: Algorithm[] = [prevBarAlgorithm];
 
@@ -47,40 +46,60 @@ for (const contextLength of contextLengths) {
       continue;
     }
 
-    console.log(
-      `Creating context map for context length ${contextLength} and top P ${topP * 100}%...`,
-    );
-    const contextMap = await createContextMap({
-      filename: secondDataFilename,
-      contextLength,
-      topP,
-      verboseLogging: true,
-    });
-    console.log(`Successfully created context map for context length ${contextLength}`);
-    algorithms.push(sophisticatedPrevBarsAlgorithm(contextLength, contextMap));
+    // console.log(
+    //   `Creating context map for context length ${contextLength} and top P ${topP * 100}%...`,
+    // );
+    // const [contextMap, topPMaxxed] = await createContextMap({
+    //   filename: secondDataFilename,
+    //   contextLength,
+    //   topP,
+    //   verboseLogging: true,
+    // });
+    // console.log(`Successfully created context map for context length ${contextLength}`);
+    // algorithms.push(sophisticatedPrevBarsAlgorithm(contextLength, contextMap));
 
-    const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
-    if (!serializeContextMapResponse.ok) throw serializeContextMapResponse.error;
-    const serializedContextMap = serializeContextMapResponse.data;
+    // const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
+    // if (!serializeContextMapResponse.ok) throw serializeContextMapResponse.error;
+    // const serializedContextMap = serializeContextMapResponse.data;
 
-    fs.mkdirSync(path.dirname(contextMapFilename), { recursive: true });
-    fs.writeFileSync(contextMapFilename, serializedContextMap);
+    // fs.mkdirSync(path.dirname(contextMapFilename), { recursive: true });
+    // fs.writeFileSync(contextMapFilename, serializedContextMap);
+
+    // if (topPMaxxed) break;
   }
 }
 
 console.log('Backtesting algorithms...');
 const graphSelectionOptions: SelectionOption<Graph>[] = [];
-for (const file of tickDataFilenames) {
-  console.log(`Backtesting algorithms for file ${file}...`);
-  const strategies: Strategy[] = algorithms.map((algorithm) => ({
-    algorithm,
-    slippage: { bps: 0.2 },
-    writeToFile: `./backtest-results/SPY/${algorithm.name}/bps-slippage/0.2bps.txt`,
-    doPlot: true,
-  }));
+for (const { filename, aggregateInMilliseconds } of [hourDataWithAggregateInMilliseconds]) {
+  console.log(`Backtesting algorithms for file ${filename}...`);
+  const strategies: Strategy[] = [];
+  for (const algorithm of algorithms) {
+    for (const bpsSlippage of bpsSlippages) {
+      strategies.push({
+        algorithm,
+        slippage: { bps: bpsSlippage },
+        alwaysHoldOutsideMarketHours: false,
+        doPlot: true,
+      });
+
+      strategies.push({
+        algorithm,
+        slippage: { bps: bpsSlippage },
+        alwaysHoldOutsideMarketHours: true,
+        doPlot: true,
+      });
+    }
+  }
 
   const backtestResponse = await tryAsync(() =>
-    backtestAlgorithmsConcurrently(file, strategies, true),
+    backtestAlgorithmsConcurrently({
+      filename,
+      aggregateInMilliseconds,
+      strategies,
+      timespan: bearish2,
+      verboseLogging: true,
+    }),
   );
   if (!backtestResponse.ok) {
     console.error(backtestResponse.error);

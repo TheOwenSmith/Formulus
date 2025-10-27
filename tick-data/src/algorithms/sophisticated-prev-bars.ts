@@ -1,7 +1,7 @@
-import { getAggregateDataIterator, type Bar } from '@/read-data';
 import { trySync } from '@/utils/errorHandling';
 import z from 'zod';
 import { Action, type Algorithm } from './backtest-algorithm';
+import { getAggregateDataIterator, type Bar } from './read-data';
 
 export const sophisticatedPrevBarsAlgorithm = (
   contextLength: number,
@@ -42,7 +42,7 @@ export async function createContextMap({
   contextLength: number;
   topP?: number;
   verboseLogging?: boolean;
-}): Promise<Map<number, boolean>> {
+}): Promise<[Map<number, boolean>, boolean]> {
   const getIteratorResponse = trySync(() => getAggregateDataIterator(filename, verboseLogging));
   if (!getIteratorResponse.ok) {
     throw getIteratorResponse.error;
@@ -84,10 +84,12 @@ export async function createContextMap({
   const contextMap = new Map<number, boolean>();
 
   let i = 0;
+  let topPMaxxed = false;
   for (; i < sortedOutcomeMap.length * topP; i++) {
     const [historyMasked, [nextTickPercentChangeSum, total]] = sortedOutcomeMap[i];
     const averagePercentChange = nextTickPercentChangeSum / total;
     if (averagePercentChange <= 0) {
+      topPMaxxed = true;
       break;
     }
     contextMap.set(historyMasked, true);
@@ -96,7 +98,7 @@ export async function createContextMap({
     const [historyMasked] = sortedOutcomeMap[i];
     contextMap.set(historyMasked, false);
   }
-  return contextMap;
+  return [contextMap, topPMaxxed];
 }
 
 export function serializeContextMap(contextMap: Map<number, boolean>): string {

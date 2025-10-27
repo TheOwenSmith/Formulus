@@ -3,11 +3,11 @@ import { GetStocksAggregatesTimespanEnum } from '@polygon.io/client-js';
 import fs from 'fs';
 import path from 'path';
 import z from 'zod';
+import { formatDate } from '../utils/date-utils';
+import { tryAsync, trySync } from '../utils/errorHandling';
+import { retryWithBackoffAsync, retryWithBackoffSync } from '../utils/retry';
+import type { Nullish } from '../utils/types';
 import { getChunksFromTimestamp } from './chunks';
-import { formatDate } from './utils/date-utils';
-import { tryAsync, trySync } from './utils/errorHandling';
-import { retryWithBackoffAsync, retryWithBackoffSync } from './utils/retry';
-import type { Nullish } from './utils/types';
 
 type Ticker = 'SPY';
 

@@ -1,31 +1,41 @@
 import type { Graph, SimplePlot } from '@/lib/nodeplotlib';
-import { getAggregateDataIterator, type Bar } from '@/read-data';
 import type { SelectionOption } from '@/utils/cli';
+import { isMarketOpen, millisecondsToTimeString } from '@/utils/date-utils';
 import { trySync } from '@/utils/errorHandling';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import fs from 'fs';
 import path from 'path';
 import {
   Action,
-  getStatistics,
+  getBacktestStatistics,
   MAX_POINTS_PER_PLOT,
   slippageToString,
   type Algorithm,
   type Slippage,
 } from './backtest-algorithm';
+import { getAggregateDataIterator, type Bar } from './read-data';
 
 export type Strategy = {
   algorithm: Algorithm;
   slippage?: Slippage;
+  alwaysHoldOutsideMarketHours?: boolean;
   writeToFile?: string;
   doPlot?: boolean;
 };
 
-export async function backtestAlgorithmsConcurrently(
-  filename: string,
-  strategies: Strategy[],
+export async function backtestAlgorithmsConcurrently({
+  filename,
+  aggregateInMilliseconds,
+  strategies,
+  timespan,
   verboseLogging = false,
-): Promise<SelectionOption<Graph>[]> {
+}: {
+  filename: string;
+  aggregateInMilliseconds: number;
+  strategies: Strategy[];
+  timespan?: [Date, Date];
+  verboseLogging?: boolean;
+}): Promise<SelectionOption<Graph>[]> {
   function calculateSlippageDelta(index: number, price: number) {
     const { slippage } = strategies[index];
     if (slippage == undefined) return 0;
@@ -75,15 +85,49 @@ export async function backtestAlgorithmsConcurrently(
     maxContextLength = Math.max(maxContextLength, algorithm.contextLength);
   }
 
-  for await (const tick of iterator) {
-    if (firstTick == null) firstTick = tick[1];
-    lastTick = tick[4];
+  // Buffer one tick ahead to determine market state efficiently
+  let nextTick = await iterator.next();
+  let nextTickMarketOpen = false;
+
+  // Pre-calculate market state for the first tick
+  if (!nextTick.done) {
+    const nextTickEndTimestamp = new Date(
+      new Date(nextTick.value[0]).getTime() + aggregateInMilliseconds,
+    );
+    nextTickMarketOpen = isMarketOpen(nextTickEndTimestamp);
+  }
+
+  while (!nextTick.done) {
+    const currentTick = nextTick.value;
+    const currentTickMarketOpen = nextTickMarketOpen;
+
+    // Get next tick and pre-calculate its market state
+    nextTick = await iterator.next();
+    if (!nextTick.done) {
+      const nextTickEndTimestamp = new Date(
+        new Date(nextTick.value[0]).getTime() + aggregateInMilliseconds,
+      );
+      nextTickMarketOpen = isMarketOpen(nextTickEndTimestamp);
+    } else {
+      nextTickMarketOpen = false;
+    }
+
+    const startTickTimestamp = new Date(currentTick[0]);
+    const endTickTimestamp = new Date(startTickTimestamp.getTime() + aggregateInMilliseconds);
+    if (timespan != undefined && endTickTimestamp < timespan[0]) continue;
+    if (timespan != undefined && endTickTimestamp > timespan[1]) break;
+
+    // Skip if market is closed for this tick
+    if (!currentTickMarketOpen) continue;
+
+    if (firstTick == null) firstTick = currentTick[1];
+    lastTick = currentTick[4];
 
     if (lines % plotSpacing === 0) {
-      tickerYs.push((tick[4] / firstTick!) * 100);
+      tickerYs.push((currentTick[4] / firstTick!) * 100);
       for (let i = 0; i < strategies.length; i++) {
         if (strategies[i].doPlot ?? false) {
-          strategyYs[i].push(portfolioValue(i, tick[4]));
+          strategyYs[i].push(portfolioValue(i, currentTick[4]));
         }
       }
 
@@ -110,10 +154,10 @@ export async function backtestAlgorithmsConcurrently(
     lines++;
 
     if (previousTicks.length < maxContextLength) {
-      previousTicks.push(tick);
+      previousTicks.push(currentTick);
     } else {
       previousTicks.shift();
-      previousTicks.push(tick);
+      previousTicks.push(currentTick);
     }
 
     if (previousTicks.length < maxContextLength) {
@@ -121,12 +165,13 @@ export async function backtestAlgorithmsConcurrently(
     }
 
     for (let i = 0; i < strategies.length; i++) {
-      const { algorithm } = strategies[i];
-      const action = algorithm.implementation(
-        previousTicks.slice(-algorithm.contextLength),
-        positions[i],
-      );
-      const closePrice = tick[4];
+      const { algorithm, alwaysHoldOutsideMarketHours = false } = strategies[i];
+
+      const action =
+        !nextTickMarketOpen && alwaysHoldOutsideMarketHours
+          ? Action.BUY
+          : algorithm.implementation(previousTicks.slice(-algorithm.contextLength), positions[i]);
+      const closePrice = currentTick[4];
       if (action === Action.HOLD) {
         continue;
       }
@@ -150,11 +195,18 @@ export async function backtestAlgorithmsConcurrently(
   for (let i = 0; i < strategies.length; i++) {
     if (positions[i] !== 0) closePosition(i, previousTicks.at(-1)![4]);
 
-    const { algorithm, writeToFile, slippage = { bps: 0 } } = strategies[i];
-    const statistics = getStatistics({
+    const {
+      algorithm,
+      writeToFile,
+      slippage = { bps: 0 },
+      alwaysHoldOutsideMarketHours = false,
+    } = strategies[i];
+    const statistics = getBacktestStatistics({
       algorithmName: algorithm.name,
       slippage,
+      alwaysHoldOutsideMarketHours,
       filename,
+      aggregateInMilliseconds,
       trades: trades[i],
       balance: balances[i],
       tickerReturn,
@@ -164,7 +216,7 @@ export async function backtestAlgorithmsConcurrently(
     if (verboseLogging) console.log(statistics);
     if (writeToFile != undefined) {
       fs.mkdirSync(path.dirname(writeToFile), { recursive: true });
-      const writeFileResponse = trySync(() => fs.appendFileSync(writeToFile, statistics));
+      const writeFileResponse = trySync(() => fs.writeFileSync(writeToFile, statistics));
       if (!writeFileResponse.ok) throw writeFileResponse.error;
     }
   }
@@ -177,11 +229,21 @@ export async function backtestAlgorithmsConcurrently(
     type: 'scatter',
   };
 
-  const aggregateName = filename.split('_')[1] ?? 'unknown';
+  const aggregateTimeString = millisecondsToTimeString(aggregateInMilliseconds);
   const graphSelectionOptions: SelectionOption<Graph>[] = [];
   for (let i = 0; i < strategies.length; i++) {
-    const { algorithm, slippage = { bps: 0 }, doPlot = false } = strategies[i];
+    const {
+      algorithm,
+      slippage = { bps: 0 },
+      alwaysHoldOutsideMarketHours = false,
+      doPlot = false,
+    } = strategies[i];
     if (doPlot) {
+      if (strategyYs[i].length === 0) {
+        console.error(`No strategy data for ${algorithm.name}`);
+        continue;
+      }
+
       const strategyPlot: SimplePlot = {
         name: 'Strategy',
         x: tickerXs,
@@ -193,8 +255,9 @@ export async function backtestAlgorithmsConcurrently(
         (balances[i] - 100) / (tickerFinalBalance - 100),
       );
       const description: string[] = [
-        `Aggregate: ${aggregateName}`,
+        `Aggregate: ${aggregateTimeString}`,
         `Slippage: ${slippageToString(slippage)}`,
+        `Hold after hours: ${alwaysHoldOutsideMarketHours ? 'Yes' : 'No'}`,
         `Ticker return: ${withCommasRounded(tickerReturn)}%`,
         `Trades made: ${withCommas(trades[i])}`,
         `Strategy return: ${withCommasRounded(balances[i] - 100)}%`,
@@ -204,8 +267,8 @@ export async function backtestAlgorithmsConcurrently(
       graphSelectionOptions.push({
         name: [
           algorithm.name,
-          aggregateName,
           slippageToString(slippage),
+          ...(alwaysHoldOutsideMarketHours ? ['Hold after Hours'] : []),
           strategyToTickerReturn + 'x',
         ].join('; '),
         value: {

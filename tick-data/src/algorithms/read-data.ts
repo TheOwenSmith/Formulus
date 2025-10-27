@@ -1,8 +1,8 @@
+import { trySync } from '@/utils/errorHandling';
+import { withCommas } from '@/utils/number-utils';
 import fs from 'fs';
 import readline from 'readline';
 import z from 'zod';
-import { trySync } from './utils/errorHandling';
-import { withCommas } from './utils/number-utils';
 
 const lineOfFileSchema = z.tuple([
   z.string(),
@@ -51,7 +51,7 @@ export async function getAllAggregateData(
 export async function* getAggregateDataIterator(
   filename: string,
   verboseLogging = false,
-): AsyncGenerator<Bar> {
+): AsyncGenerator<Bar, undefined> {
   const iter = readline
     .createInterface({
       input: fs.createReadStream(filename),
@@ -80,4 +80,5 @@ export async function* getAggregateDataIterator(
     lineNumber++;
     current = await iter.next();
   }
+  return undefined;
 }
