@@ -5,5 +5,5 @@ export const bearish1: [Date, Date] = [
 
 export const bearish2: [Date, Date] = [
   new Date('2025-02-14T00:00:00.000Z'),
-  new Date('2025-04-06T00:00:00:000Z'),
+  new Date('2025-04-06T00:00:00.000Z'),
 ];
