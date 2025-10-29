@@ -45,7 +45,7 @@ export async function createContextMap({
   verboseLogging?: boolean;
 }): Promise<[Map<number, boolean>, boolean]> {
   const getIteratorResponse = trySync(() =>
-    getAggregateDataIterator(tickDataFilename, false, verboseLogging),
+    getAggregateDataIterator(tickDataFilename, verboseLogging),
   );
   if (!getIteratorResponse.ok) {
     throw getIteratorResponse.error;

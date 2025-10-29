@@ -1,4 +1,5 @@
-import { DateTime } from 'luxon';
+import z from 'zod';
+import { trySync } from './errorHandling';
 
 /**
  * Helper function to format a Date object into YYYY-MM-DD string
@@ -93,31 +94,61 @@ export function getTimestampChunks(
   return chunks;
 }
 
-export function etDateStringToTimestamp(dateStr: string): number {
-  const dt = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss', {
-    zone: 'America/New_York',
-  });
+export type Day = [year: number, month: number, day: number];
+const daySchema = z.tuple([z.number(), z.number(), z.number()]);
 
-  if (!dt.isValid) {
-    throw new Error(`Invalid date string: ${dateStr}`);
-  }
-  return dt.toUTC().toMillis();
+export function compareDays(day1: Day, day2: Day) {
+  if (day1[0] !== day2[0]) return day1[0] - day2[0];
+  if (day1[1] !== day2[1]) return day1[1] - day2[1];
+  return day1[2] - day2[2];
 }
 
-const easternTimeOptions: Intl.DateTimeFormatOptions = {
-  hour: 'numeric',
-  minute: 'numeric',
-  timeZone: 'America/New_York',
-  hour12: false, // Use 24-hour format for easier comparison
-};
+export function dateToDay(dateAsString: string) {
+  const [datePart, _timePart] = dateAsString.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const zodParsedDayResponse = trySync(() => daySchema.parse([year, month, day]));
+  if (!zodParsedDayResponse.ok) throw zodParsedDayResponse.error;
+  return zodParsedDayResponse.data;
+}
 
-export function isMarketOpen(date: Date): boolean {
-  const parts = new Intl.DateTimeFormat('en-US', easternTimeOptions).formatToParts(date);
-  const hourAsString = parts.find((part) => part.type === 'hour')?.value;
-  const minuteAsString = parts.find((part) => part.type === 'minute')?.value;
-  if (hourAsString == undefined || minuteAsString == undefined) return false;
-  const hour = parseInt(hourAsString, 10);
-  const minute = parseInt(minuteAsString, 10);
+export function timespanToDays(timespan: [string, string]): [Day, Day] {
+  const timespanDates: [Day, Day] = [
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
+
+  const unparsedStartDay = timespan[0].split('-').map(Number);
+  const zodParsedStartDayResponse = trySync(() => daySchema.parse(unparsedStartDay));
+  if (!zodParsedStartDayResponse.ok) {
+    throw new Error(
+      `Timespan is invalid: start date ${timespan[0]} is not a valid date; it must be of the form YYYY-MM-DD`,
+    );
+  }
+  timespanDates[0] = zodParsedStartDayResponse.data;
+
+  const unparsedEndDay = timespan[1].split('-').map(Number);
+  const unparsedEndDayResponse = trySync(() => daySchema.parse(unparsedEndDay));
+  if (!unparsedEndDayResponse.ok) {
+    throw new Error(
+      `Timespan is invalid: start date ${timespan[1]} is not a valid date; it must be of the form YYYY-MM-DD`,
+    );
+  }
+  timespanDates[1] = unparsedEndDayResponse.data;
+
+  if (compareDays(timespanDates[0], timespanDates[1]) >= 0) {
+    throw new Error('Timespan is invalid: start date is after or equal to end date');
+  }
+  return timespanDates;
+}
+
+export function isMarketOpenByEndOfTick(
+  startOfTickAsString: string,
+  aggregateInMilliseconds: number,
+): boolean {
+  const [_datePart, timePart] = startOfTickAsString.split(' ');
+  let [hour, minute, _second] = timePart.split(':').map(Number);
+  hour = (hour + Math.floor(aggregateInMilliseconds / 3_600_000)) % 24;
+  minute = (minute + Math.floor((aggregateInMilliseconds % 3_600_000) / 60_000)) % 60;
   return (hour === 9 && minute >= 30) || (9 < hour && hour < 16);
 }
 

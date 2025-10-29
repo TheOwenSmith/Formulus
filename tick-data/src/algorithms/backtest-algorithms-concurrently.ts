@@ -1,15 +1,18 @@
 import type { Graph, SimplePlot } from '@/lib/nodeplotlib';
 import { formatTable, type SelectionOption } from '@/utils/cli';
 import {
-  etDateStringToTimestamp,
-  isMarketOpen,
+  compareDays,
+  dateToDay,
+  isMarketOpenByEndOfTick,
   millisecondsToTimeString,
+  timespanToDays,
+  type Day,
 } from '@/utils/date-utils';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { countLinesInFile } from '@/utils/file';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import cliProgress, { Presets } from 'cli-progress';
-import { getAggregateDataIterator, type Bar, type OptimizedBar } from './read-data';
+import { getAggregateDataIterator, type Bar } from './read-data';
 
 export const enum Action {
   BUY,
@@ -34,12 +37,7 @@ export type Strategy = {
   doPlot?: boolean;
 };
 
-export type TickData = [
-  tickerSymbol: string,
-  filename: string,
-  aggregateInMilliseconds: number,
-  isOptimized: boolean,
-];
+export type TickData = [tickerSymbol: string, filename: string, aggregateInMilliseconds: number];
 
 const MAX_POINTS_PER_PLOT = 1_000;
 const PROGRESS_UPDATE_INTERVAL = 1_000;
@@ -53,22 +51,12 @@ export async function backtestAlgorithmsConcurrently({
 }: {
   tickers: TickData[];
   strategies: Strategy[];
-  timespan?: [Date, Date];
+  timespan?: [string, string];
   verboseLogging?: boolean;
   trackProgress?: boolean;
 }): Promise<SelectionOption<SelectionOption<Graph>[]>[]> {
-  if (timespan != undefined) {
-    if (isNaN(timespan[0].getTime())) {
-      throw new Error('Timespan is invalid: start date is not a valid date');
-    }
-    if (isNaN(timespan[1].getTime())) {
-      throw new Error('Timespan is invalid: end date is not a valid date');
-    }
-
-    if (timespan[0] >= timespan[1]) {
-      throw new Error('Timespan is invalid: start date is after end date');
-    }
-  }
+  const timespanDates: [Day, Day] | undefined =
+    timespan != undefined ? timespanToDays(timespan) : undefined;
 
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
@@ -138,14 +126,14 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   // Fetch ticker iterators for all tickers
-  const tickerIterators: AsyncIterator<Bar | OptimizedBar, undefined>[] = [];
-  for (const [_tickerSymbol, tickDataFilename, _aggregateInMilliseconds, isOptimized] of tickers) {
+  const tickerIterators: AsyncIterator<Bar, undefined>[] = [];
+  for (const [_tickerSymbol, tickDataFilename, _aggregateInMilliseconds] of tickers) {
     if (verboseLogging) {
       console.log(`Fetching ${tickDataFilename}...`);
     }
 
     const getIteratorResponse = trySync(() =>
-      getAggregateDataIterator(tickDataFilename, isOptimized, verboseLogging),
+      getAggregateDataIterator(tickDataFilename, verboseLogging),
     );
     if (!getIteratorResponse.ok) {
       throw getIteratorResponse.error;
@@ -174,24 +162,24 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   // Buffer one tick ahead to determine market state efficiently
-  const nextBars: IteratorResult<Bar | OptimizedBar, undefined>[] = await Promise.all(
+  const nextBars: IteratorResult<Bar, undefined>[] = await Promise.all(
     tickerIterators.map((tickerIterator) => tickerIterator.next()),
   );
   const canTradeNextBar: boolean[] = Array(tickers.length).fill(false);
   for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
     // Pre-calculate market state for the first tick
     if (!nextBars[tickerIndex].done) {
-      const nextBarTimestamp = etDateStringToTimestamp(nextBars[tickerIndex].value![0]);
       const aggregateInMilliseconds = tickers[tickerIndex][2];
-      const nextBarEndDate = new Date(nextBarTimestamp + aggregateInMilliseconds);
-      canTradeNextBar[tickerIndex] = isMarketOpen(nextBarEndDate);
+      canTradeNextBar[tickerIndex] = isMarketOpenByEndOfTick(
+        nextBars[tickerIndex].value![0],
+        aggregateInMilliseconds,
+      );
     }
   }
 
   let linesProcessed = 0;
   for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
     const aggregateInMilliseconds = tickers[tickerIndex][2];
-    const isOptimized = tickers[tickerIndex][3];
 
     while (!nextBars[tickerIndex].done) {
       const currentBar = nextBars[tickerIndex].value!;
@@ -199,13 +187,11 @@ export async function backtestAlgorithmsConcurrently({
 
       // Get next tick and pre-calculate its market state
       nextBars[tickerIndex] = await tickerIterators[tickerIndex].next();
-      if (!nextBars[tickerIndex].done && isOptimized) {
-        canTradeNextBar[tickerIndex] = (currentBar as OptimizedBar)[6];
-        currentBar.pop();
-      } else if (!nextBars[tickerIndex].done) {
-        const nextTickTimestamp = etDateStringToTimestamp(nextBars[tickerIndex].value![0]);
-        const nextTickEndDate = new Date(nextTickTimestamp + aggregateInMilliseconds);
-        canTradeNextBar[tickerIndex] = isMarketOpen(nextTickEndDate);
+      if (!nextBars[tickerIndex].done) {
+        canTradeNextBar[tickerIndex] = isMarketOpenByEndOfTick(
+          nextBars[tickerIndex].value![0],
+          aggregateInMilliseconds,
+        );
       } else {
         canTradeNextBar[tickerIndex] = false;
       }
@@ -214,10 +200,15 @@ export async function backtestAlgorithmsConcurrently({
         progressBar.update(linesProcessed);
       }
 
-      const startTickTimestamp = new Date(etDateStringToTimestamp(currentBar[0]));
-      const endTickTimestamp = new Date(startTickTimestamp.getTime() + aggregateInMilliseconds);
-      if (timespan != undefined && endTickTimestamp < timespan[0]) continue;
-      if (timespan != undefined && endTickTimestamp > timespan[1]) break;
+      // const startTickTimestamp = new Date(etDateStringToTimestamp(currentBar[0]));
+      // const endTickTimestamp = new Date(startTickTimestamp.getTime() + aggregateInMilliseconds);
+      const currentBarDay = dateToDay(currentBar[0]);
+      if (timespanDates != undefined && compareDays(currentBarDay, timespanDates[0]) < 0) {
+        continue;
+      }
+      if (timespanDates != undefined && compareDays(currentBarDay, timespanDates[1]) > 0) {
+        break;
+      }
 
       // Skip if market is closed for this tick
       if (!canTradeCurrentBar) continue;
@@ -257,10 +248,10 @@ export async function backtestAlgorithmsConcurrently({
       lastTicks[tickerIndex] = currentBar[4];
 
       if (previousTicks[tickerIndex].length < maxContextLength) {
-        previousTicks[tickerIndex].push(currentBar as Bar);
+        previousTicks[tickerIndex].push(currentBar);
       } else {
         previousTicks[tickerIndex].shift();
-        previousTicks[tickerIndex].push(currentBar as Bar);
+        previousTicks[tickerIndex].push(currentBar);
       }
 
       // If context length is not met, skip the tick

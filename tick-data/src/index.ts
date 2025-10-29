@@ -91,9 +91,9 @@ for (const algorithm of algorithms) {
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     tickers: [
-      ['SPY', './data/SPY_60min.optimized.csv', 3_600_000, true],
-      ['SPUU', './data/SPUU_60min.optimized.csv', 3_600_000, true],
-      ['SPXL', './data/SPXL_60min.optimized.csv', 3_600_000, true],
+      ['SPY', './data/SPY_60min.csv', 3_600_000],
+      ['SPUU', './data/SPUU_60min.csv', 3_600_000],
+      ['SPXL', './data/SPXL_60min.csv', 3_600_000],
     ],
     strategies,
     timespan: bearish2,
