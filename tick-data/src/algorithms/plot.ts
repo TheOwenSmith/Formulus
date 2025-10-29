@@ -1,16 +1,20 @@
 import { plotStrategy, type Graph } from '@/lib/nodeplotlib';
-import { getUserSelectionInput, type SelectionOption } from '@/utils/cli';
+import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
+import { tryAsync } from '@/utils/errorHandling';
 
 export async function chooseToPlot(graphSelectionOptions: SelectionOption<Graph>[]) {
   let serverIsUp = false;
   while (graphSelectionOptions.length > 0) {
-    const strategyGraphSelection = await getUserSelectionInput({
-      options: graphSelectionOptions,
-      message: 'Select which strategy plot to display:',
-      quitMessage: 'Quit (do not display any plot)',
-      allMessage: 'All (Display all plots)',
-      errorMessage: 'User did not select a strategy to plot',
-    });
+    const strategyGraphSelectionResponse = await tryAsync(() =>
+      getUserSelectionInput({
+        options: graphSelectionOptions,
+        message: 'Select which strategy plot to display:',
+        quitMessage: 'Quit (do not display any plot)',
+        allMessage: 'All (Display all plots)',
+      }),
+    );
+    if (!strategyGraphSelectionResponse.ok) throw strategyGraphSelectionResponse.error;
+    const strategyGraphSelection = strategyGraphSelectionResponse.data;
 
     if (strategyGraphSelection == null) {
       // User chose to not display any graphs, so return early
@@ -42,12 +46,21 @@ export async function chooseToPlotByAlgorithm(
   graphSelectionOptionsByAlgorithm: SelectionOption<SelectionOption<Graph>[]>[],
 ) {
   while (graphSelectionOptionsByAlgorithm.length > 0) {
-    const graphSelectionOptions = await getUserSelectionInput({
-      options: graphSelectionOptionsByAlgorithm,
-      message: 'Select an algorithm to view backtesting results for:',
-      quitMessage: 'Quit (do not display any plot)',
-      errorMessage: 'User did not select an algorithm',
-    });
+    const graphSelectionOptionsResponse = await tryAsync(() =>
+      getUserSelectionInput({
+        options: graphSelectionOptionsByAlgorithm,
+        message: 'Select an algorithm to view backtesting results for:',
+        quitMessage: 'Quit (do not display any plot)',
+      }),
+    );
+    if (!graphSelectionOptionsResponse.ok) {
+      if (graphSelectionOptionsResponse.error instanceof UserExitEarlyError) {
+        console.error('User did not select an algorithm');
+        return;
+      }
+      throw graphSelectionOptionsResponse.error;
+    }
+    const graphSelectionOptions = graphSelectionOptionsResponse.data;
 
     if (graphSelectionOptions == null) {
       // User chose to not view backtesting results for an algorithm, so return early
@@ -62,6 +75,19 @@ export async function chooseToPlotByAlgorithm(
     const selectedAlgorithmName = selectedOption.name;
 
     console.log(`Viewing backtesting results for algorithm ${selectedAlgorithmName}`);
-    await chooseToPlot(graphSelectionOptions);
+    graphSelectionOptions.sort((a, b) => {
+      const aLastX = a.value.strategyPlot.y.at(-1) ?? 0;
+      const bLastX = b.value.strategyPlot.y.at(-1) ?? 0;
+      return bLastX - aLastX;
+    });
+
+    const chooseToPlotAlgorithmResponse = await tryAsync(() => chooseToPlot(graphSelectionOptions));
+    if (!chooseToPlotAlgorithmResponse.ok) {
+      if (chooseToPlotAlgorithmResponse.error instanceof UserExitEarlyError) {
+        console.error('User did not select a graph to plot');
+        return;
+      }
+      throw chooseToPlotAlgorithmResponse.error;
+    }
   }
 }

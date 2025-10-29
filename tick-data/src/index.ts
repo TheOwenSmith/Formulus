@@ -13,7 +13,6 @@ import {
   serializeContextMap,
   sophisticatedPrevBarsAlgorithm,
 } from './algorithms/sophisticated-prev-bars';
-import { bearish2 } from './algorithms/timespans';
 import type { Graph } from './lib/nodeplotlib';
 import type { SelectionOption } from './utils/cli';
 import { tryAsync, trySync } from './utils/errorHandling';
@@ -96,7 +95,7 @@ const backtestResponse = await tryAsync(() =>
       ['SPXL', './data/SPXL_60min.csv', 3_600_000],
     ],
     strategies,
-    timespan: bearish2,
+    timespan: undefined,
     verboseLogging: false,
     trackProgress: true,
   }),

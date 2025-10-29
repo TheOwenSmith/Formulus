@@ -12,11 +12,16 @@ export function formatTable(rows: [string, string][]): string {
 
 export type SelectionOption<T> = { name: string; value: T };
 
+export class UserExitEarlyError extends Error {
+  constructor(message?: string) {
+    super(message ?? 'User exited early');
+  }
+}
+
 export async function getUserSelectionInput<T>(input: {
   options: SelectionOption<T>[];
   message: string;
   quitMessage?: string;
-  errorMessage?: string;
 }): Promise<T | null>;
 
 export async function getUserSelectionInput<T>(input: {
@@ -24,7 +29,6 @@ export async function getUserSelectionInput<T>(input: {
   message: string;
   quitMessage?: string;
   allMessage: string;
-  errorMessage?: string;
 }): Promise<T | 'all' | null>;
 
 export async function getUserSelectionInput<T>({
@@ -32,13 +36,11 @@ export async function getUserSelectionInput<T>({
   message,
   quitMessage = 'Quit',
   allMessage,
-  errorMessage = 'Error getting user selection input',
 }: {
   options: SelectionOption<T>[];
   message: string;
   quitMessage?: string;
   allMessage?: string;
-  errorMessage?: string;
 }): Promise<T | 'all' | null> {
   const promptResponse = await tryAsync(() =>
     inquirer.prompt([
@@ -57,8 +59,7 @@ export async function getUserSelectionInput<T>({
     ]),
   );
   if (!promptResponse.ok) {
-    console.error(errorMessage);
-    return null;
+    throw new UserExitEarlyError();
   }
   const { chosen } = promptResponse.data;
 
