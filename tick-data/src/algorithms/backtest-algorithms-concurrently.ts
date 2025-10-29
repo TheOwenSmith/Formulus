@@ -23,18 +23,14 @@ export type Algorithm = {
   name: string;
   implementation: (context: Bar[], position: number) => Action;
   contextLength: number;
+  alwaysHoldOutsideMarketHours?: boolean;
+  doPlot?: boolean;
 };
 
 export type Slippage = { bps: number } | { constant: number };
 export function slippageToString(slippage: Slippage): string {
   return 'bps' in slippage ? slippage.bps.toString() + 'bps' : '$' + slippage.constant.toString();
 }
-
-export type Strategy = {
-  algorithm: Algorithm;
-  alwaysHoldOutsideMarketHours?: boolean;
-  doPlot?: boolean;
-};
 
 export type TickData = [
   tickerSymbol: string,
@@ -51,13 +47,13 @@ const PROGRESS_UPDATE_INTERVAL = 1_000;
 
 export async function backtestAlgorithmsConcurrently({
   tickers,
-  strategies,
+  algorithms,
   timespan,
   verboseLogging = false,
   trackProgress = true,
 }: {
   tickers: TickData[];
-  strategies: Strategy[];
+  algorithms: Algorithm[];
   timespan?: [string, string];
   verboseLogging?: boolean;
   trackProgress?: boolean;
@@ -77,38 +73,38 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   const balances: number[][] = Array.from({ length: tickers.length }, () =>
-    Array(strategies.length).fill(100),
+    Array(algorithms.length).fill(100),
   );
   const positions: number[][] = Array.from({ length: tickers.length }, () =>
-    Array(strategies.length).fill(0),
+    Array(algorithms.length).fill(0),
   );
   const trades: number[][] = Array.from({ length: tickers.length }, () =>
-    Array(strategies.length).fill(0),
+    Array(algorithms.length).fill(0),
   );
-  function closePosition(tickerIndex: number, strategyIndex: number, closePrice: number) {
+  function closePosition(tickerIndex: number, algorithmIndex: number, closePrice: number) {
     // When selling (closing long), you receive the bid price (lower)
     const bidPrice = closePrice - calculateSlippageDelta(tickerIndex, closePrice);
-    balances[tickerIndex][strategyIndex] += positions[tickerIndex][strategyIndex] * bidPrice;
-    positions[tickerIndex][strategyIndex] = 0;
-    trades[tickerIndex][strategyIndex]++;
+    balances[tickerIndex][algorithmIndex] += positions[tickerIndex][algorithmIndex] * bidPrice;
+    positions[tickerIndex][algorithmIndex] = 0;
+    trades[tickerIndex][algorithmIndex]++;
   }
   function openPosition(
     tickerIndex: number,
-    strategyIndex: number,
+    algorithmIndex: number,
     closePrice: number,
     isShort: boolean,
   ) {
     // When buying (opening long), you pay the ask price (higher)
     const askPrice = closePrice + calculateSlippageDelta(tickerIndex, closePrice);
     if (isShort)
-      positions[tickerIndex][strategyIndex] -= balances[tickerIndex][strategyIndex] / askPrice;
-    else positions[tickerIndex][strategyIndex] += balances[tickerIndex][strategyIndex] / askPrice;
-    balances[tickerIndex][strategyIndex] = 0;
+      positions[tickerIndex][algorithmIndex] -= balances[tickerIndex][algorithmIndex] / askPrice;
+    else positions[tickerIndex][algorithmIndex] += balances[tickerIndex][algorithmIndex] / askPrice;
+    balances[tickerIndex][algorithmIndex] = 0;
   }
 
-  function portfolioValue(tickerIndex: number, strategyIndex: number, closePrice: number): number {
+  function portfolioValue(tickerIndex: number, algorithmIndex: number, closePrice: number): number {
     return (
-      balances[tickerIndex][strategyIndex] + positions[tickerIndex][strategyIndex] * closePrice
+      balances[tickerIndex][algorithmIndex] + positions[tickerIndex][algorithmIndex] * closePrice
     );
   }
 
@@ -155,8 +151,8 @@ export async function backtestAlgorithmsConcurrently({
 
   // Plotting variables
   const tickerYs: number[][] = Array.from({ length: tickers.length }, () => []);
-  const strategyYs: number[][][] = Array.from({ length: tickers.length }, () =>
-    Array.from({ length: strategies.length }, () => []),
+  const algorithmYs: number[][][] = Array.from({ length: tickers.length }, () =>
+    Array.from({ length: algorithms.length }, () => []),
   );
   const plotSpacings: number[] = Array(tickers.length).fill(1);
   const lines: number[] = Array(tickers.length).fill(0);
@@ -164,14 +160,11 @@ export async function backtestAlgorithmsConcurrently({
     string,
     SelectionOptionWithPerformance<Graph>[]
   >();
-  const strategyPerformanceByAlgorithmNameByStrategy = new Map<
-    string,
-    Map<Strategy, [sum: number, weight: number]>
-  >();
+  const algorithmPerformanceByAlgorithmName = new Map<string, [sum: number, weight: number]>();
 
   // Calculate maximum context length for all strategies
   let maxContextLength = 0;
-  for (const { algorithm } of strategies) {
+  for (const algorithm of algorithms) {
     maxContextLength = Math.max(maxContextLength, algorithm.contextLength);
   }
 
@@ -213,8 +206,6 @@ export async function backtestAlgorithmsConcurrently({
         progressBar.update(linesProcessed);
       }
 
-      // const startTickTimestamp = new Date(etDateStringToTimestamp(currentBar[0]));
-      // const endTickTimestamp = new Date(startTickTimestamp.getTime() + aggregateInMilliseconds);
       const currentBarDay = dateToDay(currentBar[0]);
       if (timespanDates != undefined && compareDays(currentBarDay, timespanDates[0]) < 0) {
         continue;
@@ -228,9 +219,9 @@ export async function backtestAlgorithmsConcurrently({
 
       if (lines[tickerIndex] % plotSpacings[tickerIndex] === 0) {
         tickerYs[tickerIndex].push((currentBar[4] / firstTicks[tickerIndex]!) * 100);
-        for (let i = 0; i < strategies.length; i++) {
-          if (strategies[i].doPlot ?? false) {
-            strategyYs[tickerIndex][i].push(portfolioValue(tickerIndex, i, currentBar[4]));
+        for (let i = 0; i < algorithms.length; i++) {
+          if (algorithms[i].doPlot ?? false) {
+            algorithmYs[tickerIndex][i].push(portfolioValue(tickerIndex, i, currentBar[4]));
           }
         }
 
@@ -242,13 +233,13 @@ export async function backtestAlgorithmsConcurrently({
           }
           tickerYs[tickerIndex] = reducedTickerPlot;
 
-          for (let strategyIndex = 0; strategyIndex < strategies.length; strategyIndex++) {
-            if (strategies[strategyIndex].doPlot ?? false) {
-              const reducedStrategyPlot: number[] = [];
-              for (let j = 0; j < strategyYs[tickerIndex][strategyIndex].length; j += 2) {
-                reducedStrategyPlot.push(strategyYs[tickerIndex][strategyIndex][j]);
+          for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
+            if (algorithms[algorithmIndex].doPlot ?? false) {
+              const reduceAlgorithmPlot: number[] = [];
+              for (let j = 0; j < algorithmYs[tickerIndex][algorithmIndex].length; j += 2) {
+                reduceAlgorithmPlot.push(algorithmYs[tickerIndex][algorithmIndex][j]);
               }
-              strategyYs[tickerIndex][strategyIndex] = reducedStrategyPlot;
+              algorithmYs[tickerIndex][algorithmIndex] = reduceAlgorithmPlot;
             }
           }
           plotSpacings[tickerIndex] *= 2;
@@ -273,16 +264,16 @@ export async function backtestAlgorithmsConcurrently({
       }
 
       // Process each strategy
-      for (let strategyIndex = 0; strategyIndex < strategies.length; strategyIndex++) {
-        const { algorithm, alwaysHoldOutsideMarketHours = false } = strategies[strategyIndex];
+      for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
+        const algorithm = algorithms[algorithmIndex];
 
         let action: Action;
-        if (!canTradeNextBar[tickerIndex] && alwaysHoldOutsideMarketHours) {
+        if (!canTradeNextBar[tickerIndex] && (algorithm.alwaysHoldOutsideMarketHours ?? false)) {
           action = Action.BUY;
         } else {
           action = algorithm.implementation(
             previousTicks[tickerIndex].slice(-algorithm.contextLength),
-            positions[tickerIndex][strategyIndex],
+            positions[tickerIndex][algorithmIndex],
           );
         }
         const closePrice = currentBar[4];
@@ -290,15 +281,15 @@ export async function backtestAlgorithmsConcurrently({
           continue;
         }
 
-        if (positions[tickerIndex][strategyIndex] === 0 && action === Action.BUY) {
+        if (positions[tickerIndex][algorithmIndex] === 0 && action === Action.BUY) {
           // buy to open
-          openPosition(tickerIndex, strategyIndex, closePrice, false);
+          openPosition(tickerIndex, algorithmIndex, closePrice, false);
           continue;
         }
 
-        if (positions[tickerIndex][strategyIndex] !== 0 && action === Action.SELL) {
+        if (positions[tickerIndex][algorithmIndex] !== 0 && action === Action.SELL) {
           // sell to close
-          closePosition(tickerIndex, strategyIndex, closePrice);
+          closePosition(tickerIndex, algorithmIndex, closePrice);
         }
       }
     }
@@ -313,9 +304,9 @@ export async function backtestAlgorithmsConcurrently({
         ? 100 * (lastTicks[tickerIndex]! / firstTicks[tickerIndex]!)
         : 100;
 
-    for (let strategyIndex = 0; strategyIndex < strategies.length; strategyIndex++) {
-      if (positions[tickerIndex][strategyIndex] !== 0) {
-        closePosition(tickerIndex, strategyIndex, previousTicks[tickerIndex].at(-1)![4]);
+    for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
+      if (positions[tickerIndex][algorithmIndex] !== 0) {
+        closePosition(tickerIndex, algorithmIndex, previousTicks[tickerIndex].at(-1)![4]);
       }
     }
 
@@ -334,14 +325,11 @@ export async function backtestAlgorithmsConcurrently({
     const tickerWeight = tickers[tickerIndex][4] ?? 1;
 
     // Create strategy plots
-    for (let strategyIndex = 0; strategyIndex < strategies.length; strategyIndex++) {
-      const {
-        algorithm,
-        alwaysHoldOutsideMarketHours = false,
-        doPlot = false,
-      } = strategies[strategyIndex];
+    for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
+      const algorithm = algorithms[algorithmIndex];
+      const { alwaysHoldOutsideMarketHours = false, doPlot = false } = algorithm;
       if (doPlot) {
-        if (strategyYs[tickerIndex][strategyIndex].length === 0) {
+        if (algorithmYs[tickerIndex][algorithmIndex].length === 0) {
           console.error(`No strategy data for ${algorithm.name}`);
           continue;
         }
@@ -350,14 +338,14 @@ export async function backtestAlgorithmsConcurrently({
         const strategyPlot: SimplePlot = {
           name: 'Strategy',
           x: xs,
-          y: strategyYs[tickerIndex][strategyIndex],
+          y: algorithmYs[tickerIndex][algorithmIndex],
           type: 'scatter',
         };
 
         // Plotting statistics
         const tickerSymbol = tickers[tickerIndex][0];
         const strategyToTickerReturn =
-          (balances[tickerIndex][strategyIndex] - 100) / (tickerFinalBalance - 100);
+          (balances[tickerIndex][algorithmIndex] - 100) / (tickerFinalBalance - 100);
 
         const description: string[] = [
           `Ticker: ${tickers[tickerIndex][0]}`,
@@ -365,8 +353,8 @@ export async function backtestAlgorithmsConcurrently({
           `Slippage: ${slippageToString(slippage)}`,
           `Hold after hours: ${alwaysHoldOutsideMarketHours ? 'Yes' : 'No'}`,
           `Ticker return: ${withCommasRounded(tickerReturn)}%`,
-          `Trades made: ${withCommas(trades[tickerIndex][strategyIndex])}`,
-          `Strategy return: ${withCommasRounded(balances[tickerIndex][strategyIndex] - 100)}%`,
+          `Trades made: ${withCommas(trades[tickerIndex][algorithmIndex])}`,
+          `Strategy return: ${withCommasRounded(balances[tickerIndex][algorithmIndex] - 100)}%`,
           `Strategy/ticker return: ${withCommasRounded(strategyToTickerReturn)}x`,
         ];
 
@@ -394,23 +382,15 @@ export async function backtestAlgorithmsConcurrently({
         });
 
         // Update algorithm performance
-        if (!strategyPerformanceByAlgorithmNameByStrategy.has(algorithm.name)) {
-          strategyPerformanceByAlgorithmNameByStrategy.set(
-            algorithm.name,
-            new Map<Strategy, [sum: number, weight: number]>(),
-          );
-        }
-
         const currentPerformance: [sum: number, weight: number] =
-          strategyPerformanceByAlgorithmNameByStrategy
-            .get(algorithm.name)!
-            .get(strategies[strategyIndex]) ?? [0, 0];
+          algorithmPerformanceByAlgorithmName.get(algorithm.name) ?? [0, 0];
         const newPerformanceSum = currentPerformance[0] + tickerWeight * strategyToTickerReturn;
         const newPerformanceWeight = currentPerformance[1] + tickerWeight;
 
-        strategyPerformanceByAlgorithmNameByStrategy
-          .get(algorithm.name)!
-          .set(strategies[strategyIndex], [newPerformanceSum, newPerformanceWeight]);
+        algorithmPerformanceByAlgorithmName.set(algorithm.name, [
+          newPerformanceSum,
+          newPerformanceWeight,
+        ]);
       }
     }
   }
@@ -419,32 +399,18 @@ export async function backtestAlgorithmsConcurrently({
     SelectionOption<Graph>[]
   >[] = [];
   for (const algorithmName of graphSelectionOptionsByAlgorithmName.keys()) {
-    // Compile statistics
-    let strategiesPerformanceSum = 0;
-    let strategiesCount = 0;
-    let maxStrategyPerformance = 0;
-    let minStrategyPerformance = 0;
-    for (const [
-      strategyPerformanceSum,
-      strategyPerformanceWeight,
-    ] of strategyPerformanceByAlgorithmNameByStrategy.get(algorithmName)!.values()) {
-      if (strategyPerformanceWeight !== 0) {
-        const strategyPerformanceMetric = strategyPerformanceSum / strategyPerformanceWeight;
-        strategiesPerformanceSum += strategyPerformanceMetric;
-        strategiesCount++;
-        minStrategyPerformance = Math.min(minStrategyPerformance, strategyPerformanceMetric);
-        maxStrategyPerformance = Math.max(maxStrategyPerformance, strategyPerformanceMetric);
-      }
-    }
+    // Compile statistics=
+    const algorithmPerformance = algorithmPerformanceByAlgorithmName.get(algorithmName)!;
+    const algorithmPerformanceMetric = algorithmPerformance[0] / algorithmPerformance[1];
 
     // Sort graphs by performance
     const algorithmGraphOptions = graphSelectionOptionsByAlgorithmName.get(algorithmName)!;
     algorithmGraphOptions.sort((a, b) => b.performance - a.performance);
 
     graphSelectionOptionsByAlgorithmResult.push({
-      name: `${algorithmName}; ${withCommasRounded(maxStrategyPerformance)}`,
+      name: `${algorithmName}; ${withCommasRounded(algorithmPerformanceMetric)}`,
       value: algorithmGraphOptions,
-      performance: maxStrategyPerformance,
+      performance: !isNaN(algorithmPerformanceMetric) ? algorithmPerformanceMetric : -Infinity,
     });
   }
 

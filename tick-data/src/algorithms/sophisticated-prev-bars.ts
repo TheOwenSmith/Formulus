@@ -4,23 +4,31 @@ import z from 'zod';
 import { Action, type Algorithm } from './backtest-algorithms-concurrently';
 import { getAggregateDataIterator, type Bar } from './read-data';
 
-export const sophisticatedPrevBarsAlgorithm = (
-  contextLength: number,
-  confidenceMap: Map<number, boolean>,
-  name?: string,
-): Algorithm => ({
-  name: name ?? `Sophisticated Previous Bars (${contextLength})`,
-  implementation: sophisticatedPrevBarsAlgorithmImplementation(confidenceMap),
+export const sophisticatedPrevBarsAlgorithm = ({
   contextLength,
+  contextMap,
+  name,
+  alwaysHoldOutsideMarketHours,
+  doPlot,
+}: {
+  contextLength: number;
+  contextMap: Map<number, boolean>;
+  name?: string;
+  alwaysHoldOutsideMarketHours?: boolean;
+  doPlot?: boolean;
+}): Algorithm => ({
+  name: name ?? `Sophisticated Previous Bars (${contextLength})`,
+  implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
+  contextLength,
+  alwaysHoldOutsideMarketHours,
+  doPlot,
 });
 
-export const sophisticatedPrevBarsAlgorithmImplementation = (
-  confidenceMap: Map<number, boolean>,
-) => {
+export const sophisticatedPrevBarsAlgorithmImplementation = (contextMap: Map<number, boolean>) => {
   return function (context: Bar[], _position: number): Action {
     const historyMasked: number = maskHistory(context);
-    if (confidenceMap.has(historyMasked)) {
-      return confidenceMap.get(historyMasked)! ? Action.BUY : Action.SELL;
+    if (contextMap.has(historyMasked)) {
+      return contextMap.get(historyMasked)! ? Action.BUY : Action.SELL;
     }
     return Action.HOLD;
   };

@@ -97,7 +97,7 @@ export function getTimestampChunks(
 export type Day = [year: number, month: number, day: number];
 const daySchema = z.tuple([z.number(), z.number(), z.number()]);
 
-export function compareDays(day1: Day, day2: Day) {
+export function compareDays(day1: Day, day2: Day): number {
   if (day1[0] !== day2[0]) return day1[0] - day2[0];
   if (day1[1] !== day2[1]) return day1[1] - day2[1];
   return day1[2] - day2[2];

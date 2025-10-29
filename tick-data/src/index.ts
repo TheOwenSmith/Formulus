@@ -3,7 +3,6 @@ import path from 'path';
 import {
   backtestAlgorithmsConcurrently,
   type Algorithm,
-  type Strategy,
 } from './algorithms/backtest-algorithms-concurrently';
 import { chooseToPlotByAlgorithm } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
@@ -37,11 +36,20 @@ for (const contextLength of contextLengths) {
       const contextMap = contextMapResponse.data;
 
       algorithms.push(
-        sophisticatedPrevBarsAlgorithm(
+        sophisticatedPrevBarsAlgorithm({
           contextLength,
           contextMap,
-          `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-        ),
+          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+          alwaysHoldOutsideMarketHours: false,
+          doPlot: true,
+        }),
+        sophisticatedPrevBarsAlgorithm({
+          contextLength,
+          contextMap,
+          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+          alwaysHoldOutsideMarketHours: true,
+          doPlot: true,
+        }),
       );
       continue;
     }
@@ -53,7 +61,22 @@ for (const contextLength of contextLengths) {
       verboseLogging: true,
     });
     console.log(`Successfully created context map for context length ${contextLength}`);
-    algorithms.push(sophisticatedPrevBarsAlgorithm(contextLength, contextMap));
+    algorithms.push(
+      sophisticatedPrevBarsAlgorithm({
+        contextLength,
+        contextMap,
+        name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+        alwaysHoldOutsideMarketHours: false,
+        doPlot: true,
+      }),
+      sophisticatedPrevBarsAlgorithm({
+        contextLength,
+        contextMap,
+        name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+        alwaysHoldOutsideMarketHours: true,
+        doPlot: true,
+      }),
+    );
 
     const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
     if (!serializeContextMapResponse.ok) throw serializeContextMapResponse.error;
@@ -67,21 +90,6 @@ for (const contextLength of contextLengths) {
 }
 
 console.log('Backtesting algorithms...');
-const strategies: Strategy[] = [];
-for (const algorithm of algorithms) {
-  strategies.push({
-    algorithm,
-    alwaysHoldOutsideMarketHours: false,
-    doPlot: true,
-  });
-
-  strategies.push({
-    algorithm,
-    alwaysHoldOutsideMarketHours: true,
-    doPlot: true,
-  });
-}
-
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     tickers: [
@@ -89,7 +97,7 @@ const backtestResponse = await tryAsync(() =>
       ['SPUU', './data/SPUU_60min.csv', 3_600_000, { bps: 2 }],
       ['SPXL', './data/SPXL_60min.csv', 3_600_000, { bps: 5 }],
     ],
-    strategies,
+    algorithms,
     timespan: undefined,
     verboseLogging: false,
     trackProgress: true,
