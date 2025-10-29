@@ -6,8 +6,8 @@
   "scripts": {
     "start": "bun run ./src/index.ts",
     "console": "bun run ./src/scripts/console.ts",
-    "check-duplicates": "bun run ./src/bin/check-duplicates.ts",
-    "check-data-quality": "python ./src/scripts/check_data_quality.py"
+    "check-data-quality": "python ./src/bin/check_data_quality.py",
+    "correct-splits": "bun run ./src/scripts/correct-stock-splits.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

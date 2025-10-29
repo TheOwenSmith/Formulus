@@ -1,4 +1,4 @@
-import { fetchAlphaVantageData, type Ticker } from '@/fetch/alpha-vantage/fetch';
+import { fetchAlphaVantageData, type Ticker } from '@/fetch/fetch';
 
 const tickers: Ticker[] = []; //['SPY', 'SPUU', 'SPXL', 'SH', 'SDS', 'SPXU'];
 for (const ticker of tickers) {
