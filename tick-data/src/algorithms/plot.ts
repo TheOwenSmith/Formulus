@@ -8,9 +8,9 @@ export async function chooseToPlot(graphSelectionOptions: SelectionOption<Graph>
     const strategyGraphSelectionResponse = await tryAsync(() =>
       getUserSelectionInput({
         options: graphSelectionOptions,
-        message: 'Select which strategy plot to display:',
+        message: 'Select which plot to display:',
         quitMessage: 'Quit (do not display any plot)',
-        allMessage: 'All (Display all plots)',
+        allMessage: 'All (display all plots)',
       }),
     );
     if (!strategyGraphSelectionResponse.ok) throw strategyGraphSelectionResponse.error;
@@ -50,7 +50,7 @@ export async function chooseToPlotByAlgorithm(
       getUserSelectionInput({
         options: graphSelectionOptionsByAlgorithm,
         message: 'Select an algorithm to view backtesting results for:',
-        quitMessage: 'Quit (do not display any plot)',
+        quitMessage: 'Quit (do not view any backtesting results)',
       }),
     );
     if (!graphSelectionOptionsResponse.ok) {
@@ -81,13 +81,13 @@ export async function chooseToPlotByAlgorithm(
       return bLastX - aLastX;
     });
 
-    const chooseToPlotAlgorithmResponse = await tryAsync(() => chooseToPlot(graphSelectionOptions));
-    if (!chooseToPlotAlgorithmResponse.ok) {
-      if (chooseToPlotAlgorithmResponse.error instanceof UserExitEarlyError) {
+    const chooseToPlotGraphResponse = await tryAsync(() => chooseToPlot(graphSelectionOptions));
+    if (!chooseToPlotGraphResponse.ok) {
+      if (chooseToPlotGraphResponse.error instanceof UserExitEarlyError) {
         console.error('User did not select a graph to plot');
         return;
       }
-      throw chooseToPlotAlgorithmResponse.error;
+      throw chooseToPlotGraphResponse.error;
     }
   }
 }

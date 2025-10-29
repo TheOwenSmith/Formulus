@@ -160,7 +160,7 @@ export async function backtestAlgorithmsConcurrently({
     string,
     SelectionOptionWithPerformance<Graph>[]
   >();
-  const algorithmPerformanceByAlgorithmName = new Map<string, [sum: number, weight: number]>();
+  const algorithmPerformanceByAlgorithmName = new Map<string, [sum: number, totalWeight: number]>();
 
   // Calculate maximum context length for all strategies
   let maxContextLength = 0;
@@ -382,14 +382,14 @@ export async function backtestAlgorithmsConcurrently({
         });
 
         // Update algorithm performance
-        const currentPerformance: [sum: number, weight: number] =
+        const currentPerformance: [sum: number, totalWeight: number] =
           algorithmPerformanceByAlgorithmName.get(algorithm.name) ?? [0, 0];
         const newPerformanceSum = currentPerformance[0] + tickerWeight * strategyToTickerReturn;
-        const newPerformanceWeight = currentPerformance[1] + tickerWeight;
+        const newPerformanceTotalWeight = currentPerformance[1] + tickerWeight;
 
         algorithmPerformanceByAlgorithmName.set(algorithm.name, [
           newPerformanceSum,
-          newPerformanceWeight,
+          newPerformanceTotalWeight,
         ]);
       }
     }
@@ -401,16 +401,18 @@ export async function backtestAlgorithmsConcurrently({
   for (const algorithmName of graphSelectionOptionsByAlgorithmName.keys()) {
     // Compile statistics=
     const algorithmPerformance = algorithmPerformanceByAlgorithmName.get(algorithmName)!;
-    const algorithmPerformanceMetric = algorithmPerformance[0] / algorithmPerformance[1];
+    const averageStrategyToTickerReturn = algorithmPerformance[0] / algorithmPerformance[1];
 
     // Sort graphs by performance
     const algorithmGraphOptions = graphSelectionOptionsByAlgorithmName.get(algorithmName)!;
     algorithmGraphOptions.sort((a, b) => b.performance - a.performance);
 
     graphSelectionOptionsByAlgorithmResult.push({
-      name: `${algorithmName}; ${withCommasRounded(algorithmPerformanceMetric)}`,
+      name: `${algorithmName}; Avg S/T: ${withCommasRounded(averageStrategyToTickerReturn * 100)}%`,
       value: algorithmGraphOptions,
-      performance: !isNaN(algorithmPerformanceMetric) ? algorithmPerformanceMetric : -Infinity,
+      performance: !isNaN(averageStrategyToTickerReturn)
+        ? averageStrategyToTickerReturn
+        : -Infinity,
     });
   }
 
