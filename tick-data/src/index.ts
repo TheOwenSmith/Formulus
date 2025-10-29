@@ -18,7 +18,6 @@ import type { SelectionOption } from './utils/cli';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
-const bpsSlippages: number[] = [0.2, 0.5, 1];
 const topPs: number[] = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
 const algorithms: Algorithm[] = [prevBarAlgorithm];
 
@@ -70,29 +69,25 @@ for (const contextLength of contextLengths) {
 console.log('Backtesting algorithms...');
 const strategies: Strategy[] = [];
 for (const algorithm of algorithms) {
-  for (const bpsSlippage of bpsSlippages) {
-    strategies.push({
-      algorithm,
-      slippage: { bps: bpsSlippage },
-      alwaysHoldOutsideMarketHours: false,
-      doPlot: true,
-    });
+  strategies.push({
+    algorithm,
+    alwaysHoldOutsideMarketHours: false,
+    doPlot: true,
+  });
 
-    strategies.push({
-      algorithm,
-      slippage: { bps: bpsSlippage },
-      alwaysHoldOutsideMarketHours: true,
-      doPlot: true,
-    });
-  }
+  strategies.push({
+    algorithm,
+    alwaysHoldOutsideMarketHours: true,
+    doPlot: true,
+  });
 }
 
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     tickers: [
-      ['SPY', './data/SPY_60min.csv', 3_600_000],
-      ['SPUU', './data/SPUU_60min.csv', 3_600_000],
-      ['SPXL', './data/SPXL_60min.csv', 3_600_000],
+      ['SPY', './data/SPY_60min.csv', 3_600_000, { bps: 0.2 }],
+      ['SPUU', './data/SPUU_60min.csv', 3_600_000, { bps: 2 }],
+      ['SPXL', './data/SPXL_60min.csv', 3_600_000, { bps: 5 }],
     ],
     strategies,
     timespan: undefined,

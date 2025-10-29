@@ -32,7 +32,6 @@ export function slippageToString(slippage: Slippage): string {
 
 export type Strategy = {
   algorithm: Algorithm;
-  slippage?: Slippage;
   alwaysHoldOutsideMarketHours?: boolean;
   doPlot?: boolean;
 };
@@ -41,6 +40,7 @@ export type TickData = [
   tickerSymbol: string,
   filename: string,
   aggregateInMilliseconds: number,
+  slippage?: Slippage,
   weight?: number,
 ];
 
@@ -69,8 +69,8 @@ export async function backtestAlgorithmsConcurrently({
     throw new Error('Verbose logging and tracking progress cannot be used together');
   }
 
-  function calculateSlippageDelta(index: number, price: number) {
-    const { slippage } = strategies[index];
+  function calculateSlippageDelta(tickerIndex: number, price: number) {
+    const slippage = tickers[tickerIndex][3];
     if (slippage == undefined) return 0;
 
     return 'bps' in slippage ? price * (slippage.bps / 10_000) : slippage.constant;
@@ -87,7 +87,7 @@ export async function backtestAlgorithmsConcurrently({
   );
   function closePosition(tickerIndex: number, strategyIndex: number, closePrice: number) {
     // When selling (closing long), you receive the bid price (lower)
-    const bidPrice = closePrice - calculateSlippageDelta(strategyIndex, closePrice);
+    const bidPrice = closePrice - calculateSlippageDelta(tickerIndex, closePrice);
     balances[tickerIndex][strategyIndex] += positions[tickerIndex][strategyIndex] * bidPrice;
     positions[tickerIndex][strategyIndex] = 0;
     trades[tickerIndex][strategyIndex]++;
@@ -99,7 +99,7 @@ export async function backtestAlgorithmsConcurrently({
     isShort: boolean,
   ) {
     // When buying (opening long), you pay the ask price (higher)
-    const askPrice = closePrice + calculateSlippageDelta(strategyIndex, closePrice);
+    const askPrice = closePrice + calculateSlippageDelta(tickerIndex, closePrice);
     if (isShort)
       positions[tickerIndex][strategyIndex] -= balances[tickerIndex][strategyIndex] / askPrice;
     else positions[tickerIndex][strategyIndex] += balances[tickerIndex][strategyIndex] / askPrice;
@@ -194,7 +194,6 @@ export async function backtestAlgorithmsConcurrently({
   let linesProcessed = 0;
   for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
     const aggregateInMilliseconds = tickers[tickerIndex][2];
-
     while (!nextBars[tickerIndex].done) {
       const currentBar = nextBars[tickerIndex].value!;
       const canTradeCurrentBar = canTradeNextBar[tickerIndex];
@@ -320,6 +319,7 @@ export async function backtestAlgorithmsConcurrently({
       }
     }
 
+    // Create ticker plot
     const xs = Array.from({ length: tickerYs[tickerIndex].length }, (_, i) => i);
     const tickerPlot: SimplePlot = {
       name: 'Ticker',
@@ -328,12 +328,15 @@ export async function backtestAlgorithmsConcurrently({
       type: 'scatter',
     };
 
+    // Strategy plot constants
     const aggregateTimeString = millisecondsToTimeString(aggregateInMilliseconds);
-    const tickerWeight = tickers[tickerIndex][3] ?? 1;
+    const slippage = tickers[tickerIndex][3] ?? { bps: 0 };
+    const tickerWeight = tickers[tickerIndex][4] ?? 1;
+
+    // Create strategy plots
     for (let strategyIndex = 0; strategyIndex < strategies.length; strategyIndex++) {
       const {
         algorithm,
-        slippage = { bps: 0 },
         alwaysHoldOutsideMarketHours = false,
         doPlot = false,
       } = strategies[strategyIndex];
