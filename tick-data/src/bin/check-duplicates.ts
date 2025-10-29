@@ -1,4 +1,4 @@
-import { checkDuplicates } from '@/check-duplicates';
+import { checkDuplicates } from '@/fetch/polygon/check-duplicates';
 
 // Get filename from command line argument
 const filePath = process.argv[2];

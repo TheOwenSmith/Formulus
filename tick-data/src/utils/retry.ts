@@ -1,4 +1,5 @@
 import { sleep } from './misc';
+import { withCommas } from './number-utils';
 
 /**
  * Retry a synchronous function with immediate retries (no backoff delay)
@@ -51,12 +52,13 @@ export async function retryWithBackoffAsync<T>(
   initialDelayMs = 1000,
   maxDelayMs = 30000,
 ): Promise<T> {
-  let lastError: any;
+  let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
+      console.error(error);
       lastError = error;
 
       if (attempt === maxRetries) {
@@ -68,7 +70,9 @@ export async function retryWithBackoffAsync<T>(
       const jitter = Math.random() * 1000; // Random 0-1000ms
       const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
 
-      console.log(`  ⚠ Attempt ${attempt + 1} failed. Retrying in ${Math.round(delay)}ms...`);
+      console.log(
+        `  ⚠ Attempt ${attempt + 1} failed. Retrying in ${withCommas(Math.round(delay))}ms...`,
+      );
       await sleep(delay);
     }
   }

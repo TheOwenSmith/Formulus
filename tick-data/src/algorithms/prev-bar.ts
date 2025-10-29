@@ -1,4 +1,4 @@
-import { Action, type Algorithm } from './backtest-algorithm';
+import { Action, type Algorithm } from './backtest-algorithms-concurrently';
 import type { Bar } from './read-data';
 
 export const prevBarAlgorithm: Algorithm = {

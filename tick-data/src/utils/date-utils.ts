@@ -1,3 +1,5 @@
+import { DateTime } from 'luxon';
+
 /**
  * Helper function to format a Date object into YYYY-MM-DD string
  * @param date - The date object to format
@@ -91,6 +93,17 @@ export function getTimestampChunks(
   return chunks;
 }
 
+export function etDateStringToTimestamp(dateStr: string): number {
+  const dt = DateTime.fromFormat(dateStr, 'yyyy-MM-dd HH:mm:ss', {
+    zone: 'America/New_York',
+  });
+
+  if (!dt.isValid) {
+    throw new Error(`Invalid date string: ${dateStr}`);
+  }
+  return dt.toUTC().toMillis();
+}
+
 const easternTimeOptions: Intl.DateTimeFormatOptions = {
   hour: 'numeric',
   minute: 'numeric',
@@ -99,23 +112,13 @@ const easternTimeOptions: Intl.DateTimeFormatOptions = {
 };
 
 export function isMarketOpen(date: Date): boolean {
-  // Get the hour and minute parts in Eastern Time
   const parts = new Intl.DateTimeFormat('en-US', easternTimeOptions).formatToParts(date);
-
   const hourAsString = parts.find((part) => part.type === 'hour')?.value;
   const minuteAsString = parts.find((part) => part.type === 'minute')?.value;
   if (hourAsString == undefined || minuteAsString == undefined) return false;
-
   const hour = parseInt(hourAsString, 10);
   const minute = parseInt(minuteAsString, 10);
-
-  // Check if the time is after 9:30 AM
-  const after930am = hour > 9 || (hour === 9 && minute >= 30);
-
-  // Check if the time is before 4:00 PM
-  const before4pm = hour < 16 || (hour === 16 && minute === 0);
-
-  return after930am && before4pm;
+  return (hour === 9 && minute >= 30) || (9 < hour && hour < 16);
 }
 
 export function millisecondsToTimeString(milliseconds: number): string {

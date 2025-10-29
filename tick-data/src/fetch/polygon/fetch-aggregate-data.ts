@@ -1,12 +1,12 @@
 import { client } from '@/lib/polygon';
+import { formatDate } from '@/utils/date-utils';
+import { tryAsync, trySync } from '@/utils/errorHandling';
+import { retryWithBackoffAsync, retryWithBackoffSync } from '@/utils/retry';
+import type { Nullish } from '@/utils/types';
 import { GetStocksAggregatesTimespanEnum } from '@polygon.io/client-js';
 import fs from 'fs';
 import path from 'path';
 import z from 'zod';
-import { formatDate } from '../utils/date-utils';
-import { tryAsync, trySync } from '../utils/errorHandling';
-import { retryWithBackoffAsync, retryWithBackoffSync } from '../utils/retry';
-import type { Nullish } from '../utils/types';
 import { getChunksFromTimestamp } from './chunks';
 
 type Ticker = 'SPY';
@@ -107,7 +107,7 @@ export async function fetchAggregateData({
   }
 
   console.log(
-    `\n✓ Successfully retrieved ${totalBars} ${timestamp.toUpperCase()} bars for ${ticker}.`,
+    `\n✓ Successfully retrieved ${totalBars} ${timestamp.toUpperCase()} bars for ${ticker}`,
   );
   console.log(`\n✓ Data exported to ${filepath}`);
 }

@@ -5,8 +5,9 @@
   "private": true,
   "scripts": {
     "start": "bun run ./src/index.ts",
+    "console": "bun run ./src/scripts/console.ts",
     "check-duplicates": "bun run ./src/bin/check-duplicates.ts",
-    "console": "bun run ./src/scripts/console.ts"
+    "check-data-quality": "python ./src/scripts/check_data_quality.py"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -18,8 +19,12 @@
   },
   "dependencies": {
     "@polygon.io/client-js": "^8.2.0",
+    "@types/cli-progress": "^3.11.6",
+    "@types/luxon": "^3.7.1",
+    "cli-progress": "^3.12.0",
     "dotenv": "^17.2.3",
     "inquirer": "^12.10.0",
+    "luxon": "^3.7.2",
     "nodeplotlib": "^1.1.2",
     "zod": "^4.1.12"
   }

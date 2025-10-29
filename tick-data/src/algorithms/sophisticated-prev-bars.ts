@@ -1,6 +1,7 @@
 import { trySync } from '@/utils/errorHandling';
+import { withCommas } from '@/utils/number-utils';
 import z from 'zod';
-import { Action, type Algorithm } from './backtest-algorithm';
+import { Action, type Algorithm } from './backtest-algorithms-concurrently';
 import { getAggregateDataIterator, type Bar } from './read-data';
 
 export const sophisticatedPrevBarsAlgorithm = (
@@ -33,17 +34,19 @@ function maskHistory(context: Bar[]): number {
 }
 
 export async function createContextMap({
-  filename,
+  tickDataFilename,
   contextLength,
   topP = 0.2,
   verboseLogging = false,
 }: {
-  filename: string;
+  tickDataFilename: string;
   contextLength: number;
   topP?: number;
   verboseLogging?: boolean;
 }): Promise<[Map<number, boolean>, boolean]> {
-  const getIteratorResponse = trySync(() => getAggregateDataIterator(filename, verboseLogging));
+  const getIteratorResponse = trySync(() =>
+    getAggregateDataIterator(tickDataFilename, false, verboseLogging),
+  );
   if (!getIteratorResponse.ok) {
     throw getIteratorResponse.error;
   }
@@ -97,6 +100,17 @@ export async function createContextMap({
   for (; i < sortedOutcomeMap.length; i++) {
     const [historyMasked] = sortedOutcomeMap[i];
     contextMap.set(historyMasked, false);
+  }
+
+  if (verboseLogging && topPMaxxed) {
+    console.log(`Context map of context length ${contextLength} maxxed at topP ${topP * 100}%`);
+  }
+
+  const emptyEntries = 2 ** contextLength - contextMap.size;
+  if (verboseLogging && emptyEntries > 0) {
+    console.error(
+      `Context map of context length ${contextLength}, size ${withCommas(contextMap.size)}, and topP ${topP * 100}% has ${withCommas(emptyEntries)} empty entries`,
+    );
   }
   return [contextMap, topPMaxxed];
 }
