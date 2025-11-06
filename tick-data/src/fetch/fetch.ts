@@ -78,7 +78,7 @@ export async function fetchAlphaVantageData({
       const tickData = apiResponse['Time Series (60min)'];
 
       const dates: string[] = Object.keys(tickData).reverse();
-      const chunks = dates.map(([dateAsString]) => {
+      const chunks = dates.map((dateAsString) => {
         const barAsObj = tickData[dateAsString];
         const data: Bar = [
           dateAsString,
