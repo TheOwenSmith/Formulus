@@ -30,7 +30,7 @@ export async function getAllAggregateData(
   let current = await iter.next();
 
   const data: Bar[] = [];
-  let lineNumber = 1;
+  let lineNumber = 2;
   while (!current.done) {
     if (verboseLogging && lineNumber % 100_000 === 0) {
       console.log(`Processed ${withCommas(lineNumber)} lines...`);
@@ -48,41 +48,51 @@ export async function getAllAggregateData(
   return data;
 }
 
-export async function* getAggregateDataIterator(
+export function getAggregateDataIterator(
   filename: string,
   verboseLogging = false,
-): AsyncGenerator<Bar, undefined> {
+): AsyncGenerator<Bar, undefined> & { close: () => void } {
   if (!fs.existsSync(filename)) {
     throw new Error(`File ${filename} does not exist`);
   }
 
-  const iter = readline
-    .createInterface({
-      input: fs.createReadStream(filename),
-      crlfDelay: Infinity,
-    })
-    [Symbol.asyncIterator]();
+  const fileStream = fs.createReadStream(filename);
+  const rlInterface = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity,
+  });
+  const iter = rlInterface[Symbol.asyncIterator]();
 
-  await iter.next(); // headers
-  let current = await iter.next();
+  async function* generator(): AsyncGenerator<Bar, undefined> {
+    await iter.next(); // headers
+    let current = await iter.next();
 
-  let lineNumber = 1;
-  while (!current.done) {
-    if (verboseLogging && lineNumber % 100_000 === 0) {
-      console.log(`Processed ${withCommas(lineNumber)} lines...`);
+    let lineNumber = 2;
+    while (!current.done) {
+      if (verboseLogging && lineNumber % 100_000 === 0) {
+        console.log(`Processed ${withCommas(lineNumber)} lines...`);
+      }
+
+      const parsedLine = trySync(() => stringifiedBarSchema.parse(current.value!.split(',')));
+      if (!parsedLine.ok) {
+        console.error(
+          `Error parsing line ${withCommas(lineNumber)}: ${current.value}`,
+          parsedLine.error,
+        );
+        throw parsedLine.error;
+      }
+      yield parsedLine.data;
+      lineNumber++;
+      current = await iter.next();
     }
-
-    const parsedLine = trySync(() => stringifiedBarSchema.parse(current.value!.split(',')));
-    if (!parsedLine.ok) {
-      console.error(
-        `Error parsing line ${withCommas(lineNumber)}: ${current.value}`,
-        parsedLine.error,
-      );
-      throw parsedLine.error;
-    }
-    yield parsedLine.data;
-    lineNumber++;
-    current = await iter.next();
+    return undefined;
   }
-  return undefined;
+
+  const gen = generator();
+  return Object.assign(gen, {
+    close: () => {
+      rlInterface.close();
+      fileStream.destroy();
+    },
+  });
 }

@@ -35,17 +35,15 @@ export async function fetchAlphaVantageData({
   ticker: Ticker;
   years: number;
   timestamp: Timestamp;
-  writeToFile?: string;
+  writeToFile: string;
 }) {
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
 
-  // Write header if file doesn't exist
-  if (writeToFile != undefined) {
-    const writeHeaderResponse = trySync(() =>
-      fs.writeFileSync(writeToFile, 'timestamp,open,high,low,close,volume\n'),
-    );
-    if (!writeHeaderResponse.ok) throw writeHeaderResponse.error;
-  }
+  // Write header
+  const writeHeaderResponse = trySync(() =>
+    fs.writeFileSync(writeToFile, 'timestamp,open,high,low,close,volume\n'),
+  );
+  if (!writeHeaderResponse.ok) throw writeHeaderResponse.error;
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
@@ -93,11 +91,9 @@ export async function fetchAlphaVantageData({
         return data.join(',');
       });
 
-      if (writeToFile != undefined) {
-        const content = chunks.join('\n') + '\n';
-        const fileWriteResponse = trySync(() => fs.appendFileSync(writeToFile, content));
-        if (!fileWriteResponse.ok) throw fileWriteResponse.error;
-      }
+      const content = chunks.join('\n') + '\n';
+      const fileWriteResponse = trySync(() => fs.appendFileSync(writeToFile, content));
+      if (!fileWriteResponse.ok) throw fileWriteResponse.error;
     }
   }
 }

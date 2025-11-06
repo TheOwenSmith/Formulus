@@ -129,7 +129,7 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   // Fetch ticker iterators for all tickers
-  const tickerIterators: AsyncIterator<Bar, undefined>[] = [];
+  const tickerIterators: (AsyncIterator<Bar, undefined> & { close: () => void })[] = [];
   for (const [_tickerSymbol, tickDataFilename, _aggregateInMilliseconds] of tickers) {
     if (verboseLogging) {
       console.log(`Fetching ${tickDataFilename}...`);
@@ -211,6 +211,7 @@ export async function backtestAlgorithmsConcurrently({
         continue;
       }
       if (timespanDates != undefined && compareDays(currentBarDay, timespanDates[1]) > 0) {
+        tickerIterators[tickerIndex].close();
         break;
       }
 
