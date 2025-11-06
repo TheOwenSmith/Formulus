@@ -10,8 +10,8 @@ export function compareDays(day1: Day, day2: Day): number {
   return day1[2] - day2[2];
 }
 
-export function dateToDay(dateAsString: string) {
-  const [datePart, _timePart] = dateAsString.split(' ');
+export function dateToDay(timestamp: string) {
+  const [datePart, _timePart] = timestamp.split(' ');
   const [year, month, day] = datePart.split('-').map(Number);
   const zodParsedDayResponse = trySync(() => daySchema.parse([year, month, day]));
   if (!zodParsedDayResponse.ok) throw zodParsedDayResponse.error;
@@ -49,10 +49,10 @@ export function timespanToDays(timespan: [string, string]): [Day, Day] {
 }
 
 export function isMarketOpenByEndOfTick(
-  startOfTickAsString: string,
+  startOfTickTimestamp: string,
   aggregateInMilliseconds: number,
 ): boolean {
-  const [_datePart, timePart] = startOfTickAsString.split(' ');
+  const [_datePart, timePart] = startOfTickTimestamp.split(' ');
   let [hour, minute, _second] = timePart.split(':').map(Number);
   hour = (hour + Math.floor(aggregateInMilliseconds / 3_600_000)) % 24;
   minute = (minute + Math.floor((aggregateInMilliseconds % 3_600_000) / 60_000)) % 60;

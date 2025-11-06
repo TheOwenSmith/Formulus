@@ -10,6 +10,12 @@ export function formatTable(rows: [string, string][]): string {
   return output;
 }
 
+function softClear() {
+  const rows = process.stdout.rows || 24;
+  process.stdout.write('\n'.repeat(rows));
+  process.stdout.write('\x1b[H');
+}
+
 export type SelectionOption<T> = { name: string; value: T };
 
 export class UserExitEarlyError extends Error {
@@ -19,12 +25,14 @@ export class UserExitEarlyError extends Error {
 }
 
 export async function getUserSelectionInput<T>(input: {
+  header?: string;
   options: SelectionOption<T>[];
   message: string;
   quitMessage?: string;
 }): Promise<T | null>;
 
 export async function getUserSelectionInput<T>(input: {
+  header?: string;
   options: SelectionOption<T>[];
   message: string;
   quitMessage?: string;
@@ -32,16 +40,21 @@ export async function getUserSelectionInput<T>(input: {
 }): Promise<T | 'all' | null>;
 
 export async function getUserSelectionInput<T>({
+  header,
   options,
   message,
   quitMessage = 'Quit',
   allMessage,
 }: {
+  header?: string;
   options: SelectionOption<T>[];
   message: string;
   quitMessage?: string;
   allMessage?: string;
 }): Promise<T | 'all' | null> {
+  softClear();
+  if (header != undefined) console.log(header);
+
   const promptResponse = await tryAsync(() =>
     inquirer.prompt([
       {

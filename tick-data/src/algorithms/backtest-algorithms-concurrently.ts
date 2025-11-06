@@ -12,7 +12,7 @@ import { tryAsync, trySync } from '@/utils/errorHandling';
 import { countLinesInFile } from '@/utils/file';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import cliProgress, { Presets } from 'cli-progress';
-import { getAggregateDataIterator, type Bar } from './read-data';
+import { getAggregateDataIterator, type AggregateDataIterator, type Bar } from './read-data';
 
 export const enum Action {
   BUY,
@@ -148,7 +148,7 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   // Fetch ticker iterators for all tickers
-  const tickerIterators: (AsyncIterator<Bar, undefined> & { close: () => void })[] = [];
+  const tickerIterators: AggregateDataIterator[] = [];
   for (const [_tickerSymbol, tickDataFilename, _aggregateInMilliseconds] of tickers) {
     if (verboseLogging) {
       console.log(`Fetching ${tickDataFilename}...`);

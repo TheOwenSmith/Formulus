@@ -48,10 +48,12 @@ export async function getAllAggregateData(
   return data;
 }
 
+export type AggregateDataIterator = AsyncGenerator<Bar, undefined> & { close: () => void };
+
 export function getAggregateDataIterator(
   filename: string,
   verboseLogging = false,
-): AsyncGenerator<Bar, undefined> & { close: () => void } {
+): AggregateDataIterator {
   if (!fs.existsSync(filename)) {
     throw new Error(`File ${filename} does not exist`);
   }
