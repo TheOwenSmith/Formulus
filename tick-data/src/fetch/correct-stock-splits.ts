@@ -1,5 +1,6 @@
 import { getAggregateDataIterator, type Bar } from '@/algorithms/read-data';
 import { tryAsync, trySync } from '@/utils/errorHandling';
+import { withCommas } from '@/utils/number-utils';
 import fs from 'fs';
 
 type StockSplitRatio = [after: number, before: number];
@@ -40,11 +41,11 @@ export async function correctStockSplits(tickDataFilename: string, replaceFile =
   for await (const bar of iterator) {
     if (isStockSplit(prevPrice, bar[4])) {
       console.log(
-        `Found unaccounted for stock split on line ${lineNumber} of '${tickDataFilename}' from ${prevPrice} to ${bar[4]}`,
+        `Found unaccounted for stock split on line ${withCommas(lineNumber)} of '${tickDataFilename}' from ${prevPrice} to ${bar[4]}`,
       );
       const stockSplitRatio = getStockSplitRatio(prevPrice, bar[4]);
       console.log(
-        `Stock split ratio: ${stockSplitRatio[0]}:${stockSplitRatio[1]} on line ${lineNumber} of '${tickDataFilename}'`,
+        `Stock split ratio: ${stockSplitRatio[0]}:${stockSplitRatio[1]} on line ${withCommas(lineNumber)} of '${tickDataFilename}'`,
       );
 
       // if split is 2:1, e.g., then there is a 50% price drop that is unaccoutned for
@@ -149,7 +150,7 @@ async function correctStockData(tickDataFilename: string, writeToFilename: strin
 
 function isStockSplit(prevPrice: number, currentPrice: number): boolean {
   const percentChange = (currentPrice - prevPrice) / prevPrice;
-  return percentChange < -0.4 || 0.4 < percentChange;
+  return percentChange < -0.4 || 0.9 < percentChange;
 }
 
 function getStockSplitRatio(prevPrice: number, currentPrice: number): StockSplitRatio {

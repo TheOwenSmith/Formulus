@@ -38,7 +38,10 @@ export async function getAllAggregateData(
 
     const parsedLine = trySync(() => stringifiedBarSchema.parse(current.value!.split(',')));
     if (!parsedLine.ok) {
-      console.error(`Error parsing line ${lineNumber}: ${current.value}`, parsedLine.error);
+      console.error(
+        `Error parsing line ${withCommas(lineNumber)}: ${current.value}`,
+        parsedLine.error,
+      );
       throw parsedLine.error;
     }
     data.push(parsedLine.data);
