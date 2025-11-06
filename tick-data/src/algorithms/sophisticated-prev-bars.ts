@@ -1,26 +1,30 @@
 import { trySync } from '@/utils/errorHandling';
 import { withCommas } from '@/utils/number-utils';
 import z from 'zod';
-import { Action, type Algorithm } from './backtest-algorithms-concurrently';
+import {
+  Action,
+  OutsideMarketHoursAction,
+  type Algorithm,
+} from './backtest-algorithms-concurrently';
 import { getAggregateDataIterator, type Bar } from './read-data';
 
 export const sophisticatedPrevBarsAlgorithm = ({
   contextLength,
   contextMap,
   name,
-  alwaysHoldOutsideMarketHours,
+  outsideMarketHours,
   doPlot,
 }: {
   contextLength: number;
   contextMap: Map<number, boolean>;
   name?: string;
-  alwaysHoldOutsideMarketHours?: boolean;
+  outsideMarketHours?: OutsideMarketHoursAction;
   doPlot?: boolean;
 }): Algorithm => ({
   name: name ?? `Sophisticated Previous Bars (${contextLength})`,
   implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
   contextLength,
-  alwaysHoldOutsideMarketHours,
+  outsideMarketHours,
   doPlot,
 });
 

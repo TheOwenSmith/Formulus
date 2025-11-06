@@ -19,11 +19,30 @@ export const enum Action {
   SELL,
   HOLD,
 }
+
+export const enum OutsideMarketHoursAction {
+  ALWAYS_BUY,
+  ALWAYS_SELL,
+  MAINTAIN_POSITION,
+}
+function outsideMarketHoursActionToString(
+  outsideMarketHoursAction: OutsideMarketHoursAction,
+): string {
+  switch (outsideMarketHoursAction) {
+    case OutsideMarketHoursAction.ALWAYS_BUY:
+      return 'Always Buy';
+    case OutsideMarketHoursAction.ALWAYS_SELL:
+      return 'Always Sell';
+    case OutsideMarketHoursAction.MAINTAIN_POSITION:
+      return 'Maintain Position';
+  }
+}
+
 export type Algorithm = {
   name: string;
   implementation: (context: Bar[], position: number) => Action;
   contextLength: number;
-  alwaysHoldOutsideMarketHours?: boolean;
+  outsideMarketHours?: OutsideMarketHoursAction;
   doPlot?: boolean;
 };
 
@@ -267,10 +286,19 @@ export async function backtestAlgorithmsConcurrently({
       // Process each strategy
       for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
         const algorithm = algorithms[algorithmIndex];
+        const { outsideMarketHours = OutsideMarketHoursAction.MAINTAIN_POSITION } = algorithm;
 
         let action: Action;
-        if (!canTradeNextBar[tickerIndex] && (algorithm.alwaysHoldOutsideMarketHours ?? false)) {
+        if (
+          !canTradeNextBar[tickerIndex] &&
+          outsideMarketHours === OutsideMarketHoursAction.ALWAYS_BUY
+        ) {
           action = Action.BUY;
+        } else if (
+          !canTradeNextBar[tickerIndex] &&
+          outsideMarketHours === OutsideMarketHoursAction.ALWAYS_SELL
+        ) {
+          action = Action.SELL;
         } else {
           action = algorithm.implementation(
             previousTicks[tickerIndex].slice(-algorithm.contextLength),
@@ -328,7 +356,8 @@ export async function backtestAlgorithmsConcurrently({
     // Create strategy plots
     for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
       const algorithm = algorithms[algorithmIndex];
-      const { alwaysHoldOutsideMarketHours = false, doPlot = false } = algorithm;
+      const { outsideMarketHours = OutsideMarketHoursAction.MAINTAIN_POSITION, doPlot = false } =
+        algorithm;
       if (doPlot) {
         if (algorithmYs[tickerIndex][algorithmIndex].length === 0) {
           console.error(`No strategy data for ${algorithm.name}`);
@@ -352,7 +381,7 @@ export async function backtestAlgorithmsConcurrently({
           `Ticker: ${tickers[tickerIndex][0]}`,
           `Aggregate: ${aggregateTimeString}`,
           `Slippage: ${slippageToString(slippage)}`,
-          `Hold after hours: ${alwaysHoldOutsideMarketHours ? 'Yes' : 'No'}`,
+          `Hold after hours: ${outsideMarketHoursActionToString(outsideMarketHours)}`,
           `Ticker return: ${withCommasRounded(tickerReturn)}%`,
           `Trades made: ${withCommas(trades[tickerIndex][algorithmIndex])}`,
           `Strategy return: ${withCommasRounded(balances[tickerIndex][algorithmIndex] - 100)}%`,
@@ -370,7 +399,7 @@ export async function backtestAlgorithmsConcurrently({
           name: [
             tickerSymbol,
             slippageToString(slippage),
-            ...(alwaysHoldOutsideMarketHours ? ['Hold after Hours'] : []),
+            outsideMarketHoursActionToString(outsideMarketHours),
             withCommasRounded(strategyToTickerReturn) + 'x',
           ].join('; '),
           value: {

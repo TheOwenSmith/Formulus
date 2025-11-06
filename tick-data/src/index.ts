@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import {
   backtestAlgorithmsConcurrently,
+  OutsideMarketHoursAction,
   type Algorithm,
 } from './algorithms/backtest-algorithms-concurrently';
 import { chooseToPlotByAlgorithm } from './algorithms/plot';
@@ -35,22 +36,21 @@ for (const contextLength of contextLengths) {
       if (!contextMapResponse.ok) throw contextMapResponse.error;
       const contextMap = contextMapResponse.data;
 
-      algorithms.push(
-        sophisticatedPrevBarsAlgorithm({
-          contextLength,
-          contextMap,
-          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-          alwaysHoldOutsideMarketHours: false,
-          doPlot: true,
-        }),
-        sophisticatedPrevBarsAlgorithm({
-          contextLength,
-          contextMap,
-          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-          alwaysHoldOutsideMarketHours: true,
-          doPlot: true,
-        }),
-      );
+      for (const outsideMarketHours of [
+        OutsideMarketHoursAction.ALWAYS_BUY,
+        OutsideMarketHoursAction.ALWAYS_SELL,
+        OutsideMarketHoursAction.MAINTAIN_POSITION,
+      ]) {
+        algorithms.push(
+          sophisticatedPrevBarsAlgorithm({
+            contextLength,
+            contextMap,
+            name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+            outsideMarketHours,
+            doPlot: true,
+          }),
+        );
+      }
       continue;
     }
 
@@ -61,22 +61,21 @@ for (const contextLength of contextLengths) {
       verboseLogging: true,
     });
     console.log(`Successfully created context map for context length ${contextLength}`);
-    algorithms.push(
-      sophisticatedPrevBarsAlgorithm({
-        contextLength,
-        contextMap,
-        name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-        alwaysHoldOutsideMarketHours: false,
-        doPlot: true,
-      }),
-      sophisticatedPrevBarsAlgorithm({
-        contextLength,
-        contextMap,
-        name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-        alwaysHoldOutsideMarketHours: true,
-        doPlot: true,
-      }),
-    );
+    for (const outsideMarketHours of [
+      OutsideMarketHoursAction.ALWAYS_BUY,
+      OutsideMarketHoursAction.ALWAYS_SELL,
+      OutsideMarketHoursAction.MAINTAIN_POSITION,
+    ]) {
+      algorithms.push(
+        sophisticatedPrevBarsAlgorithm({
+          contextLength,
+          contextMap,
+          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+          outsideMarketHours,
+          doPlot: true,
+        }),
+      );
+    }
 
     const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
     if (!serializeContextMapResponse.ok) throw serializeContextMapResponse.error;
