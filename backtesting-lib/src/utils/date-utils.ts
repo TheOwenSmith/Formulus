@@ -1,3 +1,4 @@
+import { aggregateInMillisecondsFromTimestamp, type Timestamp } from '@/fetch/fetch';
 import z from 'zod';
 import { trySync } from './errorHandling';
 
@@ -50,8 +51,10 @@ export function timespanToDays(timespan: [string, string]): [Day, Day] {
 
 export function isMarketOpenByEndOfTick(
   startOfTickTimestamp: string,
-  aggregateInMilliseconds: number,
+  timestamp: Timestamp,
 ): boolean {
+  const aggregateInMilliseconds = aggregateInMillisecondsFromTimestamp[timestamp];
+
   const [_datePart, timePart] = startOfTickTimestamp.split(' ');
   let [hour, minute] = timePart.split(':').map(Number);
   hour = (hour + Math.floor(aggregateInMilliseconds / 3_600_000)) % 24;

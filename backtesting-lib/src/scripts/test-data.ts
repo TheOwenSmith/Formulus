@@ -1,4 +1,4 @@
-import { getAggregateDataIterator, type AggregateDataIterator } from '@/algorithms/read-data';
+import { getAggregateDataIterator, type AggregateDataIterator } from '@/backtesting/read-data';
 
 async function getLatestStartTimestamp(iters: AggregateDataIterator[]): Promise<string | null> {
   const startTimestamps: string[] = [];

@@ -1,10 +1,10 @@
+import type { Ticker, Timestamp } from '@/fetch/fetch';
 import type { Graph, SimplePlot } from '@/lib/nodeplotlib';
-import { formatTable, type SelectionOption } from '@/utils/cli';
+import { type SelectionOption } from '@/utils/cli';
 import {
   compareDays,
   dateToDay,
   isMarketOpenByEndOfTick,
-  millisecondsToTimeString,
   timespanToDays,
   type Day,
 } from '@/utils/date-utils';
@@ -12,6 +12,7 @@ import { tryAsync, trySync } from '@/utils/errorHandling';
 import { countLinesInFile } from '@/utils/file';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import cliProgress, { Presets } from 'cli-progress';
+import fs from 'fs';
 import { getAggregateDataIterator, type AggregateDataIterator, type Bar } from './read-data';
 
 export const enum Action {
@@ -51,10 +52,9 @@ export function slippageToString(slippage: Slippage): string {
   return 'bps' in slippage ? slippage.bps.toString() + 'bps' : '$' + slippage.constant.toString();
 }
 
-export type TickData = [
-  tickerSymbol: string,
-  filename: string,
-  aggregateInMilliseconds: number,
+export type TickerData = [
+  ticker: Ticker,
+  timestamp: Timestamp,
   slippage?: Slippage,
   weight?: number,
 ];
@@ -71,21 +71,30 @@ export async function backtestAlgorithmsConcurrently({
   verboseLogging = false,
   trackProgress = true,
 }: {
-  tickers: TickData[];
+  tickers: TickerData[];
   algorithms: Algorithm[];
   timespan?: [string, string];
   verboseLogging?: boolean;
   trackProgress?: boolean;
 }): Promise<SelectionOption<SelectionOption<Graph>[]>[]> {
-  const timespanDates: [Day, Day] | undefined =
-    timespan != undefined ? timespanToDays(timespan) : undefined;
-
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
   }
 
+  const tickDataFilenames: string[] = tickers.map(
+    ([ticker, timestamp]) => `./data/cleaned/${ticker}_${timestamp}.csv`,
+  );
+  for (const tickDataFilename of tickDataFilenames) {
+    if (!fs.existsSync(tickDataFilename)) {
+      throw new Error(`Tick data file '${tickDataFilename}' does not exist`);
+    }
+  }
+
+  const timespanDates: [Day, Day] | undefined =
+    timespan != undefined ? timespanToDays(timespan) : undefined;
+
   function calculateSlippageDelta(tickerIndex: number, price: number) {
-    const slippage = tickers[tickerIndex][3];
+    const slippage = tickers[tickerIndex][2];
     if (slippage == undefined) return 0;
 
     return 'bps' in slippage ? price * (slippage.bps / 10_000) : slippage.constant;
@@ -130,7 +139,7 @@ export async function backtestAlgorithmsConcurrently({
   // Count number of lines that need to be processed
   let totalLines = 0;
   console.log('Counting number of lines to process...');
-  for (const [_tickerSymbol, tickDataFilename] of tickers) {
+  for (const tickDataFilename of tickDataFilenames) {
     const getIteratorResponse = await tryAsync(() => countLinesInFile(tickDataFilename));
     if (!getIteratorResponse.ok) {
       throw getIteratorResponse.error;
@@ -149,7 +158,7 @@ export async function backtestAlgorithmsConcurrently({
 
   // Fetch ticker iterators for all tickers
   const tickerIterators: AggregateDataIterator[] = [];
-  for (const [_tickerSymbol, tickDataFilename, _aggregateInMilliseconds] of tickers) {
+  for (const tickDataFilename of tickDataFilenames) {
     if (verboseLogging) {
       console.log(`Fetching ${tickDataFilename}...`);
     }
@@ -195,17 +204,15 @@ export async function backtestAlgorithmsConcurrently({
   for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
     // Pre-calculate market state for the first tick
     if (!nextBars[tickerIndex].done) {
-      const aggregateInMilliseconds = tickers[tickerIndex][2];
       canTradeNextBar[tickerIndex] = isMarketOpenByEndOfTick(
         nextBars[tickerIndex].value![0],
-        aggregateInMilliseconds,
+        tickers[tickerIndex][1],
       );
     }
   }
 
   let linesProcessed = 0;
   for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
-    const aggregateInMilliseconds = tickers[tickerIndex][2];
     while (!nextBars[tickerIndex].done) {
       const currentBar = nextBars[tickerIndex].value!;
       const canTradeCurrentBar = canTradeNextBar[tickerIndex];
@@ -215,7 +222,7 @@ export async function backtestAlgorithmsConcurrently({
       if (!nextBars[tickerIndex].done) {
         canTradeNextBar[tickerIndex] = isMarketOpenByEndOfTick(
           nextBars[tickerIndex].value![0],
-          aggregateInMilliseconds,
+          tickers[tickerIndex][1],
         );
       } else {
         canTradeNextBar[tickerIndex] = false;
@@ -349,9 +356,9 @@ export async function backtestAlgorithmsConcurrently({
     };
 
     // Strategy plot constants
-    const aggregateTimeString = millisecondsToTimeString(aggregateInMilliseconds);
-    const slippage = tickers[tickerIndex][3] ?? { bps: 0 };
-    const tickerWeight = tickers[tickerIndex][4] ?? 1;
+    const timestamp = tickers[tickerIndex][1];
+    const slippage = tickers[tickerIndex][2] ?? { bps: 0 };
+    const tickerWeight = tickers[tickerIndex][3] ?? 1;
 
     // Create strategy plots
     for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
@@ -379,7 +386,7 @@ export async function backtestAlgorithmsConcurrently({
 
         const description: string[] = [
           `Ticker: ${tickers[tickerIndex][0]}`,
-          `Aggregate: ${aggregateTimeString}`,
+          `Timestamp: ${timestamp}`,
           `Slippage: ${slippageToString(slippage)}`,
           `Hold after hours: ${outsideMarketHoursActionToString(outsideMarketHours)}`,
           `Ticker return: ${withCommasRounded(tickerReturn)}%`,
@@ -455,47 +462,4 @@ export async function backtestAlgorithmsConcurrently({
     console.log(`Time taken: ${withCommas(Date.now() - progressStartTimestamp)}ms`);
   }
   return graphSelectionOptionsByAlgorithmResult;
-}
-
-export function getBacktestStatistics({
-  algorithmName,
-  slippage = { bps: 0 },
-  alwaysHoldOutsideMarketHours = false,
-  filename,
-  aggregateInMilliseconds,
-  trades,
-  balance,
-  tickerReturn,
-  tickerFinalBalance,
-}: {
-  algorithmName: string;
-  slippage?: Slippage;
-  alwaysHoldOutsideMarketHours?: boolean;
-  filename: string;
-  aggregateInMilliseconds: number;
-  trades: number;
-  balance: number;
-  tickerReturn: number;
-  tickerFinalBalance: number;
-}) {
-  const table: [string, string][] = [];
-  table.push(['Algorithm', algorithmName]);
-  table.push(['Aggregate', millisecondsToTimeString(aggregateInMilliseconds)]);
-  table.push(['Slippage', slippageToString(slippage)]);
-  table.push(['Hold after hours', alwaysHoldOutsideMarketHours ? 'Yes' : 'No']);
-  table.push(['Ticker return', withCommasRounded(tickerReturn) + '%']);
-  table.push(['Ticker final balance', '$' + withCommasRounded(tickerFinalBalance)]);
-  table.push(['Trades made', withCommas(trades)]);
-  table.push(['Strategy final balance', '$' + withCommasRounded(balance)]);
-  table.push(['Strategy return', withCommasRounded(balance - 100) + '%']);
-  table.push([
-    'Strategy/ticker return',
-    withCommasRounded((balance - 100) / (tickerFinalBalance - 100)) + 'x',
-  ]);
-
-  let statistics = '';
-  statistics += `--- Backtest Summary (${filename}) ---` + '\n';
-  statistics += formatTable(table);
-  statistics += '------------------------' + '\n';
-  return statistics;
 }

@@ -1,12 +1,12 @@
-import { trySync } from '@/utils/errorHandling';
-import { withCommas } from '@/utils/number-utils';
-import z from 'zod';
 import {
   Action,
   OutsideMarketHoursAction,
   type Algorithm,
-} from './backtest-algorithms-concurrently';
-import { getAggregateDataIterator, type Bar } from './read-data';
+} from '@/backtesting/backtest-algorithms-concurrently';
+import { getAggregateDataIterator, type Bar } from '@/backtesting/read-data';
+import { trySync } from '@/utils/errorHandling';
+import { withCommas } from '@/utils/number-utils';
+import z from 'zod';
 
 export const sophisticatedPrevBarsAlgorithm = ({
   contextLength,

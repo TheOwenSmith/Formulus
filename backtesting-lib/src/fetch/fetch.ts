@@ -1,4 +1,4 @@
-import type { Bar } from '@/algorithms/read-data';
+import type { Bar } from '@/backtesting/read-data';
 import { config } from '@/lib/config';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { retryWithBackoffAsync } from '@/utils/retry';
@@ -26,6 +26,14 @@ const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
 
 export type Ticker = 'SPY' | 'SPUU' | 'SPXL' | 'SPX' | 'SH' | 'SDS' | 'SPXU' | (string & {});
 export type Timestamp = '1min' | '5min' | '15min' | '30min' | '60min';
+
+export const aggregateInMillisecondsFromTimestamp: Record<Timestamp, number> = {
+  '1min': 60_000,
+  '5min': 300_000,
+  '15min': 900_000,
+  '30min': 1_800_000,
+  '60min': 3_600_000,
+};
 
 export async function fetchAlphaVantageData({
   ticker,

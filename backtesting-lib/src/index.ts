@@ -1,10 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import {
-  backtestAlgorithmsConcurrently,
-  OutsideMarketHoursAction,
-  type Algorithm,
-} from './algorithms/backtest-algorithms-concurrently';
 import { chooseToPlotByAlgorithm } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
@@ -13,6 +8,11 @@ import {
   serializeContextMap,
   sophisticatedPrevBarsAlgorithm,
 } from './algorithms/sophisticated-prev-bars';
+import {
+  backtestAlgorithmsConcurrently,
+  OutsideMarketHoursAction,
+  type Algorithm,
+} from './backtesting/backtest-algorithms-concurrently';
 import type { Graph } from './lib/nodeplotlib';
 import type { SelectionOption } from './utils/cli';
 import { tryAsync, trySync } from './utils/errorHandling';
@@ -93,9 +93,9 @@ const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
     tickers: [
-      ['SPY', './data/SPY_60min.csv', 3_600_000, { bps: 0.2 }, 0.9],
-      ['SPUU', './data/SPUU_60min.csv', 3_600_000, { bps: 2 }, 0.05],
-      ['SPXL', './data/SPXL_60min.csv', 3_600_000, { bps: 5 }, 0.05],
+      ['SPY', '60min', { bps: 0.2 }, 0.9],
+      ['SPUU', '60min', { bps: 2 }, 0.05],
+      ['SPXL', '60min', { bps: 5 }, 0.05],
     ],
     timespan: undefined,
     trackProgress: true,
