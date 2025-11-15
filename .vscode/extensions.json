@@ -1,7 +1,8 @@
 {
   "recommendations": [
     "esbenp.prettier-vscode",
+    "ms-python.black-formatter",
     "pkief.material-icon-theme",
-    "orta.vscode-twoslash-queries",
+    "orta.vscode-twoslash-queries"
   ]
 }

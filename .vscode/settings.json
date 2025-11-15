@@ -2,4 +2,9 @@
   // Prettier configuration
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
+
+  // Black configuration
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
 }
