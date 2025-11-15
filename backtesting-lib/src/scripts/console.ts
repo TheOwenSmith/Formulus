@@ -1,6 +1,4 @@
-import { correctStockSplits } from '@/fetch/correct-stock-splits';
-import fs from 'fs';
-import path from 'path';
+import { testData } from './test-data';
 
 // const tickers: Ticker[] = [
 //   'SPY',
@@ -27,21 +25,14 @@ import path from 'path';
 //     ticker,
 //     years: 20,
 //     timestamp: '60min',
-//     writeToFile: `./data/${ticker}_60min.csv`,
 //   });
 // }
 
-const filenames = fs.readdirSync('./data');
-for (const filename of filenames) {
-  const filepath = path.resolve('./data', filename);
-  await correctStockSplits(filepath, false);
-}
-
-// await testData([
-//   './data/SPY_60min.csv',
-//   './data/SPUU_60min.csv',
-//   './data/SPXL_60min.csv',
-//   './data/SH_60min.csv',
-//   './data/SDS_60min.csv',
-//   './data/SPXU_60min.csv',
-// ]);
+await testData([
+  './data/uncleaned/SPY_60min.csv',
+  './data/uncleaned/SPUU_60min.csv',
+  './data/uncleaned/SPXL_60min.csv',
+  './data/uncleaned/SH_60min.csv',
+  './data/uncleaned/SDS_60min.csv',
+  './data/uncleaned/SPXU_60min.csv',
+]);

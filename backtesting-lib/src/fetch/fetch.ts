@@ -6,22 +6,23 @@ import { zodSafeFetch } from '@/utils/zod-safe-fetch';
 import fs from 'fs';
 import z from 'zod';
 
-const apiResponseSchema = z.union([
-  z.object({
-    'Meta Data': z.object(),
-    'Time Series (60min)': z.record(
-      z.string(),
-      z.object({
-        '1. open': z.coerce.number(),
-        '2. high': z.coerce.number(),
-        '3. low': z.coerce.number(),
-        '4. close': z.coerce.number(),
-        '5. volume': z.coerce.number(),
-      }),
-    ),
-  }),
-  z.object({ 'Error Message': z.string() }),
-]);
+const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
+  z.union([
+    z.object({
+      'Meta Data': z.object(),
+      [`Time Series (${timestamp})`]: z.record(
+        z.string(),
+        z.object({
+          '1. open': z.coerce.number(),
+          '2. high': z.coerce.number(),
+          '3. low': z.coerce.number(),
+          '4. close': z.coerce.number(),
+          '5. volume': z.coerce.number(),
+        }),
+      ),
+    }),
+    z.object({ 'Error Message': z.string() }),
+  ]);
 
 export type Ticker = 'SPY' | 'SPUU' | 'SPXL' | 'SPX' | 'SH' | 'SDS' | 'SPXU' | (string & {});
 export type Timestamp = '1min' | '5min' | '15min' | '30min' | '60min';
@@ -30,14 +31,19 @@ export async function fetchAlphaVantageData({
   ticker,
   years,
   timestamp,
-  writeToFile,
 }: {
   ticker: Ticker;
   years: number;
   timestamp: Timestamp;
-  writeToFile: string;
 }) {
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
+  const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
+
+  const writeToFile = `./data/cleaned/${ticker}_${timestamp}.csv`;
+  if (!fs.existsSync(writeToFile)) {
+    const makeDirResponse = trySync(() => fs.mkdirSync('./data/cleaned', { recursive: true }));
+    if (!makeDirResponse.ok) throw makeDirResponse.error;
+  }
 
   // Write header
   const writeHeaderResponse = trySync(() =>
@@ -75,7 +81,7 @@ export async function fetchAlphaVantageData({
         console.log(`No data found for ${ticker} (${timestamp}) in ${month}`);
         continue;
       }
-      const tickData = apiResponse['Time Series (60min)'];
+      const tickData = apiResponse[`Time Series (${timestamp})`];
 
       const dates: string[] = Object.keys(tickData).reverse();
       const chunks = dates.map((dateAsString) => {
