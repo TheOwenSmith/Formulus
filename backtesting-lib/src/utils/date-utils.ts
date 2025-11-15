@@ -53,7 +53,7 @@ export function isMarketOpenByEndOfTick(
   aggregateInMilliseconds: number,
 ): boolean {
   const [_datePart, timePart] = startOfTickTimestamp.split(' ');
-  let [hour, minute, _second] = timePart.split(':').map(Number);
+  let [hour, minute] = timePart.split(':').map(Number);
   hour = (hour + Math.floor(aggregateInMilliseconds / 3_600_000)) % 24;
   minute = (minute + Math.floor((aggregateInMilliseconds % 3_600_000) / 60_000)) % 60;
   return (hour === 9 && minute >= 30) || (9 < hour && hour < 16);

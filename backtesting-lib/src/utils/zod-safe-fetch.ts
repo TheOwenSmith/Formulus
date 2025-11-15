@@ -1,6 +1,6 @@
 import type { ZodType } from 'zod';
 
-export default async function zodSafeFetch<T>({
+export async function zodSafeFetch<T>({
   url,
   method = 'GET',
   body,

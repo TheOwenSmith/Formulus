@@ -10,11 +10,11 @@ export async function chooseToPlot(
   while (graphSelectionOptions.length > 0) {
     const strategyGraphSelectionResponse = await tryAsync(() =>
       getUserSelectionInput({
-        header,
-        options: graphSelectionOptions,
-        message: 'Select which plot to display:',
-        quitMessage: 'Quit (do not display any plot)',
         allMessage: 'All (display all plots)',
+        header,
+        message: 'Select which plot to display:',
+        options: graphSelectionOptions,
+        quitMessage: 'Quit (do not display any plot)',
       }),
     );
     if (!strategyGraphSelectionResponse.ok) throw strategyGraphSelectionResponse.error;
@@ -27,7 +27,7 @@ export async function chooseToPlot(
 
     if (strategyGraphSelection === 'all') {
       for (const graphOption of graphSelectionOptions) {
-        plotStrategy(graphOption.value);
+        await plotStrategy(graphOption.value);
       }
       return;
     }
@@ -38,7 +38,7 @@ export async function chooseToPlot(
     );
     graphSelectionOptions.splice(removeIndex, 1);
 
-    plotStrategy(strategyGraphSelection);
+    await plotStrategy(strategyGraphSelection);
     if (!serverIsUp) {
       await new Promise((resolve) => setTimeout(resolve, 2_500));
       serverIsUp = true;

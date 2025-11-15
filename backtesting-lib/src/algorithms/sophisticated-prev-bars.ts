@@ -21,11 +21,11 @@ export const sophisticatedPrevBarsAlgorithm = ({
   outsideMarketHours?: OutsideMarketHoursAction;
   doPlot?: boolean;
 }): Algorithm => ({
-  name: name ?? `Sophisticated Previous Bars (${contextLength})`,
-  implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
   contextLength,
-  outsideMarketHours,
   doPlot,
+  implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
+  name: name ?? `Sophisticated Previous Bars (${contextLength})`,
+  outsideMarketHours,
 });
 
 export const sophisticatedPrevBarsAlgorithmImplementation = (contextMap: Map<number, boolean>) => {

@@ -1,4 +1,17 @@
 {
+  // Eslint configuration
+  "eslint.nodePath": "./node_modules",
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.run": "onSave",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
   // Prettier configuration
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,

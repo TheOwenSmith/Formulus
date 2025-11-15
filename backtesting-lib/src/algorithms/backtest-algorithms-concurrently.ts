@@ -268,7 +268,7 @@ export async function backtestAlgorithmsConcurrently({
       lines[tickerIndex]++;
 
       // Update tracking variables
-      if (firstTicks[tickerIndex] == null) firstTicks[tickerIndex] = currentBar[1];
+      firstTicks[tickerIndex] ??= currentBar[1];
       lastTicks[tickerIndex] = currentBar[4];
 
       if (previousTicks[tickerIndex].length < maxContextLength) {

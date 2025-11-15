@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { deserializeContextMap } from '@/algorithms/sophisticated-prev-bars';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { trySync } from '@/utils/errorHandling';
@@ -17,7 +19,7 @@ export function simulateFromContextMap(
   if (!contextMapResponse.ok) throw contextMapResponse.error;
   const contextMap = contextMapResponse.data;
 
-  let balance = 100;
+  const balance = 100;
   const xs: number[] = [];
   const ys: number[] = [];
   for (let i = 0; i < timespanLength; i++) {
@@ -39,14 +41,14 @@ export function simulateFromContextMap(
     yaxis: { title: 'Portfolio Value ($)' },
     annotations: [
       {
-        x: 0.02,
-        y: 0.98,
-        xref: 'paper',
-        yref: 'paper',
-        showarrow: false,
         bgcolor: 'rgba(255,255,255,0.8)',
         bordercolor: 'rgba(0,0,0,0.3)',
         borderwidth: 1,
+        showarrow: false,
+        x: 0.02,
+        xref: 'paper',
+        y: 0.98,
+        yref: 'paper',
       },
     ],
   });

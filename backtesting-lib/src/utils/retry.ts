@@ -13,7 +13,7 @@ export async function retryWithBackoffSync<T>(
   initialDelayMs = 1000,
   maxDelayMs = 30000,
 ): Promise<T> {
-  let lastError: any;
+  let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

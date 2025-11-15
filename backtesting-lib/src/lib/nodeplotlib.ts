@@ -26,15 +26,15 @@ export async function plotStrategy({
     yaxis: { title: 'Portfolio Value ($)' },
     annotations: [
       {
-        x: 0.02,
-        y: 0.98,
-        xref: 'paper',
-        yref: 'paper',
-        text: description.join('<br>'),
-        showarrow: false,
         bgcolor: 'rgba(255,255,255,0.8)',
         bordercolor: 'rgba(0,0,0,0.3)',
         borderwidth: 1,
+        showarrow: false,
+        text: description.join('<br>'),
+        x: 0.02,
+        xref: 'paper',
+        y: 0.98,
+        yref: 'paper',
       },
     ],
   });

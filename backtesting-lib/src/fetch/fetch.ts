@@ -2,7 +2,7 @@ import type { Bar } from '@/algorithms/read-data';
 import { config } from '@/lib/config';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { retryWithBackoffAsync } from '@/utils/retry';
-import zodSafeFetch from '@/utils/zod-safe-fetch';
+import { zodSafeFetch } from '@/utils/zod-safe-fetch';
 import fs from 'fs';
 import z from 'zod';
 

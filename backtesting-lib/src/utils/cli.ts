@@ -58,9 +58,6 @@ export async function getUserSelectionInput<T>({
   const promptResponse = await tryAsync(() =>
     inquirer.prompt([
       {
-        type: 'list',
-        name: 'chosen',
-        message,
         choices: [
           ...options,
           ...(allMessage != undefined ? [{ name: allMessage, value: 'all' }] : []),
@@ -68,6 +65,9 @@ export async function getUserSelectionInput<T>({
           new inquirer.Separator(),
         ],
         default: options[0].value,
+        message,
+        name: 'chosen',
+        type: 'list',
       },
     ]),
   );

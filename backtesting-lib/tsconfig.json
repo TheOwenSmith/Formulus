@@ -32,5 +32,5 @@
       "@/*": ["./src/*"],
     },
   },
-  "exclude": ["node_modules", "vendor"]
+  "exclude": ["node_modules", "vendor", "eslint.config.mjs"]
 }

@@ -45,9 +45,9 @@ for (const contextLength of contextLengths) {
           sophisticatedPrevBarsAlgorithm({
             contextLength,
             contextMap,
+            doPlot: true,
             name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
             outsideMarketHours,
-            doPlot: true,
           }),
         );
       }
@@ -70,9 +70,9 @@ for (const contextLength of contextLengths) {
         sophisticatedPrevBarsAlgorithm({
           contextLength,
           contextMap,
+          doPlot: true,
           name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
           outsideMarketHours,
-          doPlot: true,
         }),
       );
     }
@@ -91,15 +91,15 @@ for (const contextLength of contextLengths) {
 console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
+    algorithms,
     tickers: [
       ['SPY', './data/SPY_60min.csv', 3_600_000, { bps: 0.2 }, 0.9],
       ['SPUU', './data/SPUU_60min.csv', 3_600_000, { bps: 2 }, 0.05],
       ['SPXL', './data/SPXL_60min.csv', 3_600_000, { bps: 5 }, 0.05],
     ],
-    algorithms,
     timespan: undefined,
-    verboseLogging: false,
     trackProgress: true,
+    verboseLogging: false,
   }),
 );
 if (!backtestResponse.ok) {
