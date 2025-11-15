@@ -1,5 +1,5 @@
 {
-  "name": "tick-data",
+  "name": "backtesting-lib",
   "module": "index.ts",
   "type": "module",
   "private": true,

@@ -1,4 +1,4 @@
-# tick-data
+# backtesting-lib
 
 To install dependencies:
 
