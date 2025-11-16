@@ -47,6 +47,7 @@ export async function fetchAlphaVantageData({
   timestamp: Timestamp;
   verboseLogging?: boolean;
 }) {
+  console.log(`Fetching data for ${ticker} (${timestamp})...`);
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
   const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
 
@@ -85,7 +86,11 @@ export async function fetchAlphaVantageData({
         console.log(`Fetching ${ticker} (${timestamp}) data for ${month}...`);
       }
       const fetchWithRetryResponse = await tryAsync(() =>
-        retryWithBackoffAsync(() => zodSafeFetch({ url, schema: apiResponseSchema }), 6),
+        retryWithBackoffAsync({
+          fn: () => zodSafeFetch({ url, schema: apiResponseSchema }),
+          maxRetries: 6,
+          verboseLogging,
+        }),
       );
       if (!fetchWithRetryResponse.ok) throw fetchWithRetryResponse.error;
       const apiResponse = fetchWithRetryResponse.data;

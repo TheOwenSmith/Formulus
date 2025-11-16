@@ -7,12 +7,19 @@ import { withCommas } from './number-utils';
  * @param maxRetries - Maximum number of retries (default: 3)
  * @returns The result of the function
  */
-export async function retryWithBackoffSync<T>(
-  fn: () => T,
+export async function retryWithBackoffSync<T>({
+  fn,
   maxRetries = 3,
   initialDelayMs = 1000,
   maxDelayMs = 30000,
-): Promise<T> {
+  verboseLogging = false,
+}: {
+  fn: () => T;
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  verboseLogging?: boolean;
+}): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -30,7 +37,9 @@ export async function retryWithBackoffSync<T>(
       const jitter = Math.random() * 1000; // Random 0-1000ms
       const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
 
-      console.log(`  ⚠ Attempt ${attempt + 1} failed. Retrying in ${Math.round(delay)}ms...`);
+      if (verboseLogging) {
+        console.log(`  ⚠ Attempt ${attempt + 1} failed. Retrying in ${Math.round(delay)}ms...`);
+      }
       await sleep(delay);
     }
   }
@@ -46,12 +55,19 @@ export async function retryWithBackoffSync<T>(
  * @param maxDelayMs - Maximum delay in milliseconds (default: 30000)
  * @returns Promise with the result of the function
  */
-export async function retryWithBackoffAsync<T>(
-  fn: () => Promise<T>,
+export async function retryWithBackoffAsync<T>({
+  fn,
   maxRetries = 3,
-  initialDelayMs = 1000,
-  maxDelayMs = 30000,
-): Promise<T> {
+  initialDelayMs = 1_000,
+  maxDelayMs = 30_000,
+  verboseLogging = false,
+}: {
+  fn: () => Promise<T>;
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  verboseLogging?: boolean;
+}): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -70,9 +86,11 @@ export async function retryWithBackoffAsync<T>(
       const jitter = Math.random() * 1000; // Random 0-1000ms
       const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
 
-      console.log(
-        `  ⚠ Attempt ${attempt + 1} failed. Retrying in ${withCommas(Math.round(delay))}ms...`,
-      );
+      if (verboseLogging) {
+        console.log(
+          `  ⚠ Attempt ${attempt + 1} failed. Retrying in ${withCommas(Math.round(delay))}ms...`,
+        );
+      }
       await sleep(delay);
     }
   }
