@@ -3,6 +3,7 @@ import { config } from '@/lib/config';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { retryWithBackoffAsync } from '@/utils/retry';
 import { zodSafeFetch } from '@/utils/zod-safe-fetch';
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import z from 'zod';
 
@@ -39,17 +40,20 @@ export async function fetchAlphaVantageData({
   ticker,
   years,
   timestamp,
+  verboseLogging = false,
 }: {
   ticker: Ticker;
   years: number;
   timestamp: Timestamp;
+  verboseLogging?: boolean;
 }) {
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
   const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
 
-  const writeToFile = `./data/cleaned/${ticker}_${timestamp}.csv`;
+  const writeToFilename = `${ticker}_${timestamp}.csv`;
+  const writeToFile = `./data/uncleaned/${writeToFilename}`;
   if (!fs.existsSync(writeToFile)) {
-    const makeDirResponse = trySync(() => fs.mkdirSync('./data/cleaned', { recursive: true }));
+    const makeDirResponse = trySync(() => fs.mkdirSync('./data/uncleaned', { recursive: true }));
     if (!makeDirResponse.ok) throw makeDirResponse.error;
   }
 
@@ -77,7 +81,9 @@ export async function fetchAlphaVantageData({
           `apikey=${apiKey}`,
         ].join('&');
 
-      console.log(`Fetching ${ticker} (${timestamp}) data for ${month}...`);
+      if (verboseLogging) {
+        console.log(`Fetching ${ticker} (${timestamp}) data for ${month}...`);
+      }
       const fetchWithRetryResponse = await tryAsync(() =>
         retryWithBackoffAsync(() => zodSafeFetch({ url, schema: apiResponseSchema }), 6),
       );
@@ -86,7 +92,9 @@ export async function fetchAlphaVantageData({
 
       if ('Error Message' in apiResponse) {
         // Data does not exist for this ticker, so skip this month
-        console.log(`No data found for ${ticker} (${timestamp}) in ${month}`);
+        if (verboseLogging) {
+          console.log(`No data found for ${ticker} (${timestamp}) in ${month}`);
+        }
         continue;
       }
       const tickData = apiResponse[`Time Series (${timestamp})`];
@@ -109,5 +117,15 @@ export async function fetchAlphaVantageData({
       const fileWriteResponse = trySync(() => fs.appendFileSync(writeToFile, content));
       if (!fileWriteResponse.ok) throw fileWriteResponse.error;
     }
+  }
+
+  const pythonScriptResponse = trySync(() =>
+    spawnSync('python', ['../clean-data/clean-data.py', writeToFilename, timestamp], {
+      stdio: 'inherit',
+    }),
+  );
+  if (!pythonScriptResponse.ok) {
+    console.error('Error running python script to clean data');
+    throw pythonScriptResponse.error;
   }
 }
