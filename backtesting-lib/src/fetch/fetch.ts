@@ -119,6 +119,7 @@ export async function fetchAlphaVantageData({
     }
   }
 
+  console.log(`Cleaning data for ${ticker} (${timestamp})...`);
   const pythonScriptResponse = trySync(() =>
     spawnSync('python', ['../clean-data/clean-data.py', writeToFilename, timestamp], {
       stdio: 'inherit',
