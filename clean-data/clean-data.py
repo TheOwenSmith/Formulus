@@ -135,7 +135,6 @@ full_index = full_index.tz_localize(
 
 # Reindex only RTH
 df = df.reindex(full_index)
-df.iloc[:15]
 
 
 ## Linearly Interpolate Missing Data
@@ -158,6 +157,12 @@ print(
 )
 
 df = df.interpolate(method="linear")
+
+
+## Front Fill and Back Fill
+
+df = df.ffill().bfill()
+
 
 ## Save data to file
 
