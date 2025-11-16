@@ -1,9 +1,8 @@
 import { fetchAlphaVantageData, type Ticker } from '@/fetch/fetch';
-import { testData } from './test-data';
 
 const tickers: Ticker[] = [
   'SPY',
-  'SPUU',
+  'SSO',
   'SPXL',
   'SH',
   'SDS',
@@ -29,11 +28,11 @@ for (const ticker of tickers) {
   });
 }
 
-await testData([
-  './data/uncleaned/SPY_60min.csv',
-  './data/uncleaned/SPUU_60min.csv',
-  './data/uncleaned/SPXL_60min.csv',
-  './data/uncleaned/SH_60min.csv',
-  './data/uncleaned/SDS_60min.csv',
-  './data/uncleaned/SPXU_60min.csv',
-]);
+// await testData([
+//   './data/cleaned/SPY_60min.csv',
+//   './data/cleaned/SSO_60min.csv',
+//   './data/cleaned/SPXL_60min.csv',
+//   './data/cleaned/SH_60min.csv',
+//   './data/cleaned/SDS_60min.csv',
+//   './data/cleaned/SPXU_60min.csv',
+// ]);

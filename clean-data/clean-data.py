@@ -169,10 +169,8 @@ df = df.ffill().bfill()
 output_dir = "./data/cleaned"
 os.makedirs(output_dir, exist_ok=True)
 
-# Round to cents and integer volume
-df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].round(
-    2
-)  # cents
+# Round to 4 decimals and integer volume
+df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].round(4)
 df["volume"] = df["volume"].round(0).astype(int)
 
 # Save cleaned data

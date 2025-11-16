@@ -1,7 +1,7 @@
 import type { Bar } from '@/backtesting/read-data';
 import { config } from '@/lib/config';
 import { tryAsync, trySync } from '@/utils/errorHandling';
-import { retryWithBackoffAsync } from '@/utils/retry';
+import { retryWithBackoff } from '@/utils/retry';
 import { zodSafeFetch } from '@/utils/zod-safe-fetch';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
@@ -23,6 +23,7 @@ const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
       ),
     }),
     z.object({ 'Error Message': z.string() }),
+    z.object({ Information: z.string() }),
   ]);
 
 export type Ticker = 'SPY' | 'SPUU' | 'SPXL' | 'SPX' | 'SH' | 'SDS' | 'SPXU' | (string & {});
@@ -65,7 +66,7 @@ export async function fetchAlphaVantageData({
   if (!writeHeaderResponse.ok) throw writeHeaderResponse.error;
 
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
+  const currentMonth = new Date().getMonth() + 1;
   for (let y = currentYear - years; y <= currentYear; y++) {
     const endMonth = y === currentYear ? currentMonth - 1 : 12;
     for (let m = 1; m <= endMonth; m++) {
@@ -86,8 +87,14 @@ export async function fetchAlphaVantageData({
         console.log(`Fetching ${ticker} (${timestamp}) data for ${month}...`);
       }
       const fetchWithRetryResponse = await tryAsync(() =>
-        retryWithBackoffAsync({
-          fn: () => zodSafeFetch({ url, schema: apiResponseSchema }),
+        retryWithBackoff({
+          fn: async () => {
+            const response = await zodSafeFetch({ url, schema: apiResponseSchema });
+            if ('Information' in response) {
+              throw new Error('Rate limit reached');
+            }
+            return response;
+          },
           maxRetries: 6,
           verboseLogging,
         }),
@@ -125,6 +132,10 @@ export async function fetchAlphaVantageData({
   }
 
   console.log(`Cleaning data for ${ticker} (${timestamp})...`);
+  cleanData(writeToFilename, timestamp);
+}
+
+export function cleanData(writeToFilename: string, timestamp: Timestamp) {
   const pythonScriptResponse = trySync(() =>
     spawnSync('python', ['../clean-data/clean-data.py', writeToFilename, timestamp], {
       stdio: 'inherit',
