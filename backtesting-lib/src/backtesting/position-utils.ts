@@ -90,7 +90,6 @@ export function updatePosition({
   // Update trades and balances
   tradesByAlgorithm[algorithmIndex] += th.length + h.length + b.length;
   balancesByAlgorithm[algorithmIndex] += changeInBalance;
-  console.log({ changeInBalance });
 }
 
 function computeK({

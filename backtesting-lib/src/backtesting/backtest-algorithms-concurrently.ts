@@ -75,9 +75,16 @@ export async function backtestAlgorithmsConcurrently({
   const timespanDates: [Day, Day] | undefined =
     timespan != undefined ? timespanToDays(timespan) : undefined;
 
-  const algorithmsByAggregate: Record<Timestamp, Algorithm[]> = groupBy(
+  const algorithmsByAggregatePartial: Partial<Record<Timestamp, Algorithm[]>> = groupBy(
     algorithms,
     (algorithm) => algorithm.aggregate,
+  );
+  const algorithmsByAggregate: Record<Timestamp, Algorithm[]> = aggregateTimestamps.reduce(
+    (acc, aggregate) => {
+      acc[aggregate] = algorithmsByAggregatePartial[aggregate] ?? [];
+      return acc;
+    },
+    {} as Record<Timestamp, Algorithm[]>,
   );
 
   const distinctTickersByAggregate: Record<Timestamp, Ticker[]> =

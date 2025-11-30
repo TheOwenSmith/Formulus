@@ -23,6 +23,7 @@ export function createIndexByAggregateByTicker<T>(
   fillFn: (aggregate: Timestamp, ticker: Ticker) => T,
 ): IndexedByAggregateByTicker<T> {
   return aggregateTimestamps.reduce((acc, aggregate) => {
+    acc[aggregate] = {} as Record<Ticker, T>;
     for (const ticker of distinctTickersByAggregate[aggregate]) {
       acc[aggregate][ticker] = fillFn(aggregate, ticker);
     }
@@ -129,7 +130,8 @@ export async function matchAggregateDataIterators(
   tickerIteratorByAggregateByTicker: IndexedByAggregateByTicker<AggregateDataIterator>,
   startDay?: Day,
 ): Promise<[startDay: Day, firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>]> {
-  const firstBarByAggregateByTicker = {} as IndexedByAggregateByTicker<Bar>;
+  const firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar> =
+    emptyIndexByAggregateByTicker();
 
   // Get latest first bar timestamp off all iterator
   let latestFirstBarTimestamp = '';

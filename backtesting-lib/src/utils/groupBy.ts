@@ -1,7 +1,7 @@
 export function groupBy<K extends PropertyKey, T>(
   arr: T[],
   groupByFn: (val: T) => K,
-): Record<K, T[]> {
+): Partial<Record<K, T[]>> {
   return arr.reduce(
     (acc, val) => {
       const mappedKey = groupByFn(val);
