@@ -9,18 +9,18 @@ export type SimplePlot = {
 
 export type Graph = {
   tickerPlot: SimplePlot;
-  strategyPlot: SimplePlot;
+  algorithmPlot: SimplePlot;
   algorithmName: string;
   description: string[];
 };
 
-export async function plotStrategy({
+export async function plotAlgorithm({
   tickerPlot,
-  strategyPlot,
+  algorithmPlot,
   algorithmName,
   description,
 }: Graph) {
-  plot([tickerPlot, strategyPlot], {
+  plot([tickerPlot, algorithmPlot], {
     title: algorithmName,
     xaxis: { title: 'Time Points' },
     yaxis: { title: 'Portfolio Value ($)' },

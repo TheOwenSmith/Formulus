@@ -1,6 +1,7 @@
+import { type Algorithm } from '@/algorithms/create-simple-algorithm';
 import fs from 'fs';
 import path from 'path';
-import { chooseToPlotByAlgorithm } from './algorithms/plot';
+import { chooseToPlot } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
   createContextMap,
@@ -8,18 +9,12 @@ import {
   serializeContextMap,
   sophisticatedPrevBarsAlgorithm,
 } from './algorithms/sophisticated-prev-bars';
-import {
-  backtestAlgorithmsConcurrently,
-  OutsideMarketHoursAction,
-  type Algorithm,
-} from './backtesting/backtest-algorithms-concurrently';
-import type { Graph } from './lib/nodeplotlib';
-import type { SelectionOption } from './utils/cli';
+import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
 const topPs: number[] = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
-const algorithms: Algorithm[] = [prevBarAlgorithm];
+const algorithms: Algorithm[] = [prevBarAlgorithm('60min', 'SPY')];
 
 console.log('Loading context maps...');
 for (const contextLength of contextLengths) {
@@ -36,21 +31,15 @@ for (const contextLength of contextLengths) {
       if (!contextMapResponse.ok) throw contextMapResponse.error;
       const contextMap = contextMapResponse.data;
 
-      for (const outsideMarketHours of [
-        OutsideMarketHoursAction.ALWAYS_BUY,
-        OutsideMarketHoursAction.ALWAYS_SELL,
-        OutsideMarketHoursAction.MAINTAIN_POSITION,
-      ]) {
-        algorithms.push(
-          sophisticatedPrevBarsAlgorithm({
-            contextLength,
-            contextMap,
-            doPlot: true,
-            name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-            outsideMarketHours,
-          }),
-        );
-      }
+      algorithms.push(
+        sophisticatedPrevBarsAlgorithm({
+          aggregate: '60min',
+          contextLength,
+          contextMap,
+          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+          ticker: 'SPY',
+        }),
+      );
       continue;
     }
 
@@ -61,21 +50,15 @@ for (const contextLength of contextLengths) {
       verboseLogging: true,
     });
     console.log(`Successfully created context map for context length ${contextLength}`);
-    for (const outsideMarketHours of [
-      OutsideMarketHoursAction.ALWAYS_BUY,
-      OutsideMarketHoursAction.ALWAYS_SELL,
-      OutsideMarketHoursAction.MAINTAIN_POSITION,
-    ]) {
-      algorithms.push(
-        sophisticatedPrevBarsAlgorithm({
-          contextLength,
-          contextMap,
-          doPlot: true,
-          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-          outsideMarketHours,
-        }),
-      );
-    }
+    algorithms.push(
+      sophisticatedPrevBarsAlgorithm({
+        aggregate: '60min',
+        contextLength,
+        contextMap,
+        name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
+        ticker: 'SPY',
+      }),
+    );
 
     const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
     if (!serializeContextMapResponse.ok) throw serializeContextMapResponse.error;
@@ -92,20 +75,14 @@ console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
-    tickers: [
-      ['SPY', '60min', { bps: 0.2 }, 0.9],
-      ['SPUU', '60min', { bps: 2 }, 0.05],
-      ['SPXL', '60min', { bps: 5 }, 0.05],
-    ],
-    timespan: undefined,
-    trackProgress: true,
-    verboseLogging: false,
+    tickerData: [{ ticker: 'SPY', aggregate: '60min', slippage: 0.2 }],
+    timespan: undefined, // bearish1
   }),
 );
 if (!backtestResponse.ok) {
   throw backtestResponse.error;
 }
-const graphSelectionOptionsByAlgorithm: SelectionOption<SelectionOption<Graph>[]>[] =
-  backtestResponse.data;
 
-await chooseToPlotByAlgorithm(graphSelectionOptionsByAlgorithm);
+const [algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate] =
+  backtestResponse.data;
+await chooseToPlot(algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate);

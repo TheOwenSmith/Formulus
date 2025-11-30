@@ -1,63 +1,44 @@
-import type { Ticker, Timestamp } from '@/fetch/fetch';
-import type { Graph, SimplePlot } from '@/lib/nodeplotlib';
-import { type SelectionOption } from '@/utils/cli';
 import {
-  compareDays,
-  dateToDay,
-  isMarketOpenByEndOfTick,
-  timespanToDays,
-  type Day,
-} from '@/utils/date-utils';
+  DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
+  type Algorithm,
+} from '@/algorithms/create-simple-algorithm';
+import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
+import type { SimplePlot } from '@/lib/nodeplotlib';
+import { type SelectionOption } from '@/utils/cli';
+import { dateToDay, timespanToDays, yearsBetween, type Day } from '@/utils/date-utils';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { countLinesInFile } from '@/utils/file';
+import { groupBy } from '@/utils/groupBy';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import cliProgress, { Presets } from 'cli-progress';
-import fs from 'fs';
+import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { getAggregateDataIterator, type AggregateDataIterator, type Bar } from './read-data';
+import {
+  createIndexByAggregateByAlgorithm,
+  createIndexByAggregateByTicker,
+  emptyIndexByAggregateByTicker,
+  getDistinctTickersByAggregate,
+  getTickerDataByAggregateByTicker,
+  matchAggregateDataIterators,
+  tickersToString,
+  type IndexedByAggregateByAlgorithm,
+  type IndexedByAggregateByTicker,
+  type TickerDataIndexed,
+} from './ticker-utils';
 
-export const enum Action {
-  BUY,
-  SELL,
-  HOLD,
-}
-
-export const enum OutsideMarketHoursAction {
-  ALWAYS_BUY,
-  ALWAYS_SELL,
-  MAINTAIN_POSITION,
-}
-function outsideMarketHoursActionToString(
-  outsideMarketHoursAction: OutsideMarketHoursAction,
-): string {
-  switch (outsideMarketHoursAction) {
-    case OutsideMarketHoursAction.ALWAYS_BUY:
-      return 'Always Buy';
-    case OutsideMarketHoursAction.ALWAYS_SELL:
-      return 'Always Sell';
-    case OutsideMarketHoursAction.MAINTAIN_POSITION:
-      return 'Maintain Position';
-  }
-}
-
-export type Algorithm = {
-  name: string;
-  implementation: (context: Bar[], position: number) => Action;
-  contextLength: number;
-  outsideMarketHours?: OutsideMarketHoursAction;
-  doPlot?: boolean;
-};
-
-export type Slippage = { bps: number } | { constant: number };
-export function slippageToString(slippage: Slippage): string {
-  return 'bps' in slippage ? slippage.bps.toString() + 'bps' : '$' + slippage.constant.toString();
-}
-
-export type TickerData = [
-  ticker: Ticker,
-  timestamp: Timestamp,
-  slippage?: Slippage,
-  weight?: number,
-];
+export type TickerData =
+  | {
+      ticker: Ticker;
+      aggregate: Timestamp;
+      slippage: number;
+      filename?: string;
+    }
+  | {
+      ticker: Ticker;
+      aggregate: Timestamp;
+      slippage?: number;
+      filename: string;
+    };
 
 type SelectionOptionWithPerformance<T> = SelectionOption<T> & { performance: number };
 
@@ -65,87 +46,76 @@ const MAX_POINTS_PER_PLOT = 1_000;
 const PROGRESS_UPDATE_INTERVAL = 1_000;
 
 export async function backtestAlgorithmsConcurrently({
-  tickers,
   algorithms,
+  tickerData = [],
   timespan,
-  verboseLogging = false,
   trackProgress = true,
+  verboseLogging = false,
 }: {
-  tickers: TickerData[];
   algorithms: Algorithm[];
+  tickerData?: TickerData[];
   timespan?: [string, string];
-  verboseLogging?: boolean;
   trackProgress?: boolean;
-}): Promise<SelectionOption<SelectionOption<Graph>[]>[]> {
+  verboseLogging?: boolean;
+}): Promise<
+  [
+    SelectionOption<{
+      name: string;
+      aggregate: Timestamp;
+      description: string[];
+      algorithmPlot: SimplePlot;
+    }>[],
+    Record<Timestamp, SelectionOption<SimplePlot>[]>,
+  ]
+> {
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
-  }
-
-  const tickDataFilenames: string[] = tickers.map(
-    ([ticker, timestamp]) => `./data/cleaned/${ticker}_${timestamp}.csv`,
-  );
-  for (const tickDataFilename of tickDataFilenames) {
-    if (!fs.existsSync(tickDataFilename)) {
-      throw new Error(`Tick data file '${tickDataFilename}' does not exist`);
-    }
   }
 
   const timespanDates: [Day, Day] | undefined =
     timespan != undefined ? timespanToDays(timespan) : undefined;
 
-  function calculateSlippageDelta(tickerIndex: number, price: number) {
-    const slippage = tickers[tickerIndex][2];
-    if (slippage == undefined) return 0;
-
-    return 'bps' in slippage ? price * (slippage.bps / 10_000) : slippage.constant;
-  }
-
-  const balances: number[][] = Array.from({ length: tickers.length }, () =>
-    Array(algorithms.length).fill(100),
+  const algorithmsByAggregate: Record<Timestamp, Algorithm[]> = groupBy(
+    algorithms,
+    (algorithm) => algorithm.aggregate,
   );
-  const positions: number[][] = Array.from({ length: tickers.length }, () =>
-    Array(algorithms.length).fill(0),
-  );
-  const trades: number[][] = Array.from({ length: tickers.length }, () =>
-    Array(algorithms.length).fill(0),
-  );
-  function closePosition(tickerIndex: number, algorithmIndex: number, closePrice: number) {
-    // When selling (closing long), you receive the bid price (lower)
-    const bidPrice = closePrice - calculateSlippageDelta(tickerIndex, closePrice);
-    balances[tickerIndex][algorithmIndex] += positions[tickerIndex][algorithmIndex] * bidPrice;
-    positions[tickerIndex][algorithmIndex] = 0;
-    trades[tickerIndex][algorithmIndex]++;
-  }
-  function openPosition(
-    tickerIndex: number,
-    algorithmIndex: number,
-    closePrice: number,
-    isShort: boolean,
-  ) {
-    // When buying (opening long), you pay the ask price (higher)
-    const askPrice = closePrice + calculateSlippageDelta(tickerIndex, closePrice);
-    if (isShort)
-      positions[tickerIndex][algorithmIndex] -= balances[tickerIndex][algorithmIndex] / askPrice;
-    else positions[tickerIndex][algorithmIndex] += balances[tickerIndex][algorithmIndex] / askPrice;
-    balances[tickerIndex][algorithmIndex] = 0;
-  }
 
-  function portfolioValue(tickerIndex: number, algorithmIndex: number, closePrice: number): number {
-    return (
-      balances[tickerIndex][algorithmIndex] + positions[tickerIndex][algorithmIndex] * closePrice
-    );
-  }
+  const distinctTickersByAggregate: Record<Timestamp, Ticker[]> =
+    getDistinctTickersByAggregate(algorithmsByAggregate);
+
+  const tickerDataByAggregateByTicker: TickerDataIndexed = getTickerDataByAggregateByTicker(
+    tickerData,
+    distinctTickersByAggregate,
+    verboseLogging,
+  );
+
+  const balancesByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => 100);
+  const tradesByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => 0);
+  const positionsByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<Record<Ticker, number>> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, (aggregate, algorithmIndex) => {
+      return algorithmsByAggregate[aggregate][algorithmIndex].tickers.reduce(
+        (acc, ticker) => {
+          acc[ticker] = 0;
+          return acc;
+        },
+        {} as Record<Ticker, number>,
+      );
+    });
 
   // Count number of lines that need to be processed
   let totalLines = 0;
   console.log('Counting number of lines to process...');
-  for (const tickDataFilename of tickDataFilenames) {
-    const getIteratorResponse = await tryAsync(() => countLinesInFile(tickDataFilename));
-    if (!getIteratorResponse.ok) {
-      throw getIteratorResponse.error;
+  for (const aggregate of aggregateTimestamps) {
+    for (const [tickDataFilename] of Object.values(tickerDataByAggregateByTicker[aggregate])) {
+      const getIteratorResponse = await tryAsync(() => countLinesInFile(tickDataFilename));
+      if (!getIteratorResponse.ok) {
+        throw getIteratorResponse.error;
+      }
+      const linesInFile = getIteratorResponse.data;
+      totalLines += linesInFile;
     }
-    const linesInFile = getIteratorResponse.data;
-    totalLines += linesInFile;
   }
   console.log(`Total lines to process: ${withCommas(totalLines)}`);
 
@@ -157,309 +127,329 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   // Fetch ticker iterators for all tickers
-  const tickerIterators: AggregateDataIterator[] = [];
-  for (const tickDataFilename of tickDataFilenames) {
-    if (verboseLogging) {
-      console.log(`Fetching ${tickDataFilename}...`);
-    }
+  const tickerIteratorByAggregateByTicker: IndexedByAggregateByTicker<AggregateDataIterator> =
+    createIndexByAggregateByTicker(distinctTickersByAggregate, (aggregate, ticker) => {
+      const tickDataFilename = tickerDataByAggregateByTicker[aggregate][ticker][0];
+      if (verboseLogging) {
+        console.log(`Fetching '${tickDataFilename}'...`);
+      }
 
-    const getIteratorResponse = trySync(() =>
-      getAggregateDataIterator(tickDataFilename, verboseLogging),
+      const getIteratorResponse = trySync(() =>
+        getAggregateDataIterator(tickDataFilename, verboseLogging),
+      );
+      if (!getIteratorResponse.ok) {
+        throw getIteratorResponse.error;
+      }
+      return getIteratorResponse.data;
+    });
+
+  // Plotting variables
+  const tickerYsByAggregateByTicker: IndexedByAggregateByTicker<number[]> =
+    createIndexByAggregateByTicker(distinctTickersByAggregate, () => []);
+  const tickerGraphSelectionOptionsByAggregate: Record<Timestamp, SelectionOption<SimplePlot>[]> =
+    aggregateTimestamps.reduce(
+      (acc, aggregate) => {
+        acc[aggregate] = [];
+        return acc;
+      },
+      {} as Record<Timestamp, SelectionOption<SimplePlot>[]>,
     );
-    if (!getIteratorResponse.ok) {
-      throw getIteratorResponse.error;
+  const algorithmYsByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number[]> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => []);
+  const algorithmGraphSelectionOptionsWithPerformance: SelectionOptionWithPerformance<{
+    name: string;
+    aggregate: Timestamp;
+    description: string[];
+    algorithmPlot: SimplePlot;
+  }>[] = [];
+
+  // Calculate maximum context length for all algorithms
+  const maxContextLengthByAggregateByTicker: IndexedByAggregateByTicker<number> =
+    emptyIndexByAggregateByTicker();
+  for (const aggregate of aggregateTimestamps) {
+    for (const algorithm of algorithmsByAggregate[aggregate]) {
+      for (const ticker of algorithm.tickers) {
+        maxContextLengthByAggregateByTicker[aggregate][ticker] = Math.max(
+          maxContextLengthByAggregateByTicker[aggregate][ticker] ?? 1,
+          algorithm.contextLength,
+        );
+      }
     }
-    tickerIterators.push(getIteratorResponse.data);
+  }
+
+  // Match all iterators buffer one bar ahead to determine market state efficiently
+  const [startDay, nextBarByAggregateByTicker] = await matchAggregateDataIterators(
+    tickerIteratorByAggregateByTicker,
+    timespanDates?.[0],
+  );
+  if (verboseLogging) {
+    console.log(`Starting on day ${startDay.join('-')}`);
   }
 
   // Tracking variables
-  const previousTicks: Bar[][] = Array.from({ length: tickers.length }, () => []);
-  const firstTicks: (number | null)[] = Array(tickers.length).fill(null);
-  const lastTicks: (number | null)[] = Array(tickers.length).fill(null);
-
-  // Plotting variables
-  const tickerYs: number[][] = Array.from({ length: tickers.length }, () => []);
-  const algorithmYs: number[][][] = Array.from({ length: tickers.length }, () =>
-    Array.from({ length: algorithms.length }, () => []),
-  );
-  const plotSpacings: number[] = Array(tickers.length).fill(1);
-  const lines: number[] = Array(tickers.length).fill(0);
-  const graphSelectionOptionsByAlgorithmName = new Map<
-    string,
-    SelectionOptionWithPerformance<Graph>[]
-  >();
-  const algorithmPerformanceByAlgorithmName = new Map<string, [sum: number, totalWeight: number]>();
-
-  // Calculate maximum context length for all strategies
-  let maxContextLength = 0;
-  for (const algorithm of algorithms) {
-    maxContextLength = Math.max(maxContextLength, algorithm.contextLength);
-  }
-
-  // Buffer one tick ahead to determine market state efficiently
-  const nextBars: IteratorResult<Bar, undefined>[] = await Promise.all(
-    tickerIterators.map((tickerIterator) => tickerIterator.next()),
-  );
-  const canTradeNextBar: boolean[] = Array(tickers.length).fill(false);
-  for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
-    // Pre-calculate market state for the first tick
-    if (!nextBars[tickerIndex].done) {
-      canTradeNextBar[tickerIndex] = isMarketOpenByEndOfTick(
-        nextBars[tickerIndex].value![0],
-        tickers[tickerIndex][1],
-      );
-    }
-  }
+  const contextByAggregateByTicker: IndexedByAggregateByTicker<Bar[]> =
+    createIndexByAggregateByTicker(distinctTickersByAggregate, () => []);
+  const firstPriceByAggregateByTicker: IndexedByAggregateByTicker<number> =
+    createIndexByAggregateByTicker(
+      distinctTickersByAggregate,
+      (aggregate, ticker) => nextBarByAggregateByTicker[aggregate][ticker][1],
+    );
+  const lastPriceByAggregateByTicker: IndexedByAggregateByTicker<number> =
+    createIndexByAggregateByTicker(
+      distinctTickersByAggregate,
+      (aggregate, ticker) => nextBarByAggregateByTicker[aggregate][ticker][4],
+    );
 
   let linesProcessed = 0;
-  for (let tickerIndex = 0; tickerIndex < tickers.length; tickerIndex++) {
-    while (!nextBars[tickerIndex].done) {
-      const currentBar = nextBars[tickerIndex].value!;
-      const canTradeCurrentBar = canTradeNextBar[tickerIndex];
+  for (const aggregate of aggregateTimestamps) {
+    // Backtest algorithms
+    if (Object.keys(tickerIteratorByAggregateByTicker[aggregate]).length === 0) {
+      continue;
+    }
+    if (verboseLogging) {
+      console.log(`Processing ${aggregate} aggregate data...`);
+    }
 
-      // Get next tick and pre-calculate its market state
-      nextBars[tickerIndex] = await tickerIterators[tickerIndex].next();
-      if (!nextBars[tickerIndex].done) {
-        canTradeNextBar[tickerIndex] = isMarketOpenByEndOfTick(
-          nextBars[tickerIndex].value![0],
-          tickers[tickerIndex][1],
-        );
-      } else {
-        canTradeNextBar[tickerIndex] = false;
-      }
+    // Plotting variables
+    let ticks = 0;
+    let plotSpacing = 1;
+    let updatePlotSpacing = false;
 
-      if (trackProgress && ++linesProcessed % PROGRESS_UPDATE_INTERVAL === 0) {
-        progressBar.update(linesProcessed);
-      }
-
-      const currentBarDay = dateToDay(currentBar[0]);
-      if (timespanDates != undefined && compareDays(currentBarDay, timespanDates[0]) < 0) {
-        continue;
-      }
-      if (timespanDates != undefined && compareDays(currentBarDay, timespanDates[1]) > 0) {
-        tickerIterators[tickerIndex].close();
-        break;
-      }
-
-      // Skip if market is closed for this tick
-      if (!canTradeCurrentBar) continue;
-
-      if (lines[tickerIndex] % plotSpacings[tickerIndex] === 0) {
-        tickerYs[tickerIndex].push((currentBar[4] / firstTicks[tickerIndex]!) * 100);
-        for (let i = 0; i < algorithms.length; i++) {
-          if (algorithms[i].doPlot ?? false) {
-            algorithmYs[tickerIndex][i].push(portfolioValue(tickerIndex, i, currentBar[4]));
-          }
+    let hasNextBar = true;
+    let endDay: Day | null = null;
+    while (hasNextBar) {
+      // Get next bars
+      let nextBarTimestamp = '';
+      const currentBarByTicker: Record<Ticker, Bar> = nextBarByAggregateByTicker[aggregate];
+      for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
+        const nextBarIteratorResult =
+          await tickerIteratorByAggregateByTicker[aggregate][ticker].next();
+        if (nextBarIteratorResult.done) {
+          hasNextBar = false;
+          break;
         }
 
-        if (tickerYs[tickerIndex].length > MAX_POINTS_PER_PLOT) {
-          // Reduce the number of points in the plot by half
-          const reducedTickerPlot: number[] = [];
-          for (let j = 0; j < tickerYs[tickerIndex].length; j += 2) {
-            reducedTickerPlot.push(tickerYs[tickerIndex][j]);
-          }
-          tickerYs[tickerIndex] = reducedTickerPlot;
+        const nextBar = nextBarIteratorResult.value;
+        nextBarByAggregateByTicker[aggregate][ticker] = nextBar;
+        if (nextBarTimestamp === '') nextBarTimestamp = nextBar[0];
+        else if (nextBar[0] !== nextBarTimestamp) throw new Error('Iterator timestamp mismatch');
+      }
 
-          for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
-            if (algorithms[algorithmIndex].doPlot ?? false) {
-              const reduceAlgorithmPlot: number[] = [];
-              for (let j = 0; j < algorithmYs[tickerIndex][algorithmIndex].length; j += 2) {
-                reduceAlgorithmPlot.push(algorithmYs[tickerIndex][algorithmIndex][j]);
-              }
-              algorithmYs[tickerIndex][algorithmIndex] = reduceAlgorithmPlot;
-            }
-          }
-          plotSpacings[tickerIndex] *= 2;
+      // Update plotting variables
+      for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
+        // Update progress bar
+        if (trackProgress && ++linesProcessed % PROGRESS_UPDATE_INTERVAL === 0) {
+          progressBar.update(linesProcessed);
         }
-      }
-      lines[tickerIndex]++;
 
-      // Update tracking variables
-      firstTicks[tickerIndex] ??= currentBar[1];
-      lastTicks[tickerIndex] = currentBar[4];
+        // Update tracking variable
+        lastPriceByAggregateByTicker[aggregate][ticker] = currentBarByTicker[ticker][4];
 
-      if (previousTicks[tickerIndex].length < maxContextLength) {
-        previousTicks[tickerIndex].push(currentBar);
-      } else {
-        previousTicks[tickerIndex].shift();
-        previousTicks[tickerIndex].push(currentBar);
-      }
-
-      // If context length is not met, skip the tick
-      if (previousTicks[tickerIndex].length < maxContextLength) {
-        continue;
-      }
-
-      // Process each strategy
-      for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
-        const algorithm = algorithms[algorithmIndex];
-        const { outsideMarketHours = OutsideMarketHoursAction.MAINTAIN_POSITION } = algorithm;
-
-        let action: Action;
+        // Update context
         if (
-          !canTradeNextBar[tickerIndex] &&
-          outsideMarketHours === OutsideMarketHoursAction.ALWAYS_BUY
+          contextByAggregateByTicker[aggregate][ticker].length <
+          maxContextLengthByAggregateByTicker[aggregate][ticker]
         ) {
-          action = Action.BUY;
-        } else if (
-          !canTradeNextBar[tickerIndex] &&
-          outsideMarketHours === OutsideMarketHoursAction.ALWAYS_SELL
-        ) {
-          action = Action.SELL;
+          contextByAggregateByTicker[aggregate][ticker].push(currentBarByTicker[ticker]);
         } else {
-          action = algorithm.implementation(
-            previousTicks[tickerIndex].slice(-algorithm.contextLength),
-            positions[tickerIndex][algorithmIndex],
+          contextByAggregateByTicker[aggregate][ticker].shift();
+          contextByAggregateByTicker[aggregate][ticker].push(currentBarByTicker[ticker]);
+        }
+
+        // Update plotting variables
+        const tickerYs = tickerYsByAggregateByTicker[aggregate][ticker];
+        if (ticks % plotSpacing === 0) {
+          tickerYs.push(
+            (currentBarByTicker[ticker][4] / firstPriceByAggregateByTicker[aggregate][ticker]) *
+              100,
           );
-        }
-        const closePrice = currentBar[4];
-        if (action === Action.HOLD) {
-          continue;
-        }
 
-        if (positions[tickerIndex][algorithmIndex] === 0 && action === Action.BUY) {
-          // buy to open
-          openPosition(tickerIndex, algorithmIndex, closePrice, false);
-          continue;
-        }
-
-        if (positions[tickerIndex][algorithmIndex] !== 0 && action === Action.SELL) {
-          // sell to close
-          closePosition(tickerIndex, algorithmIndex, closePrice);
+          if (tickerYs.length > MAX_POINTS_PER_PLOT) {
+            // Reduce the number of points in the plot by half
+            const reducedTickerPlot: number[] = [];
+            for (let j = 0; j < tickerYs.length; j += 2) {
+              reducedTickerPlot.push(tickerYs[j]);
+            }
+            tickerYsByAggregateByTicker[aggregate][ticker] = reducedTickerPlot;
+            updatePlotSpacing = true;
+          }
         }
       }
-    }
 
-    // Calculate ticker return and final balance
-    const tickerReturn =
-      firstTicks[tickerIndex] && lastTicks[tickerIndex]
-        ? ((lastTicks[tickerIndex]! - firstTicks[tickerIndex]!) / firstTicks[tickerIndex]!) * 100
-        : 0;
-    const tickerFinalBalance =
-      firstTicks[tickerIndex] && lastTicks[tickerIndex]
-        ? 100 * (lastTicks[tickerIndex]! / firstTicks[tickerIndex]!)
-        : 100;
+      // Execute algorithm trades
+      for (
+        let algorithmIndex = 0;
+        algorithmIndex < algorithmsByAggregate[aggregate].length;
+        algorithmIndex++
+      ) {
+        const algorithm = algorithmsByAggregate[aggregate][algorithmIndex];
+        const {
+          tickers,
+          contextLength,
+          algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
+        } = algorithm;
 
-    for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
-      if (positions[tickerIndex][algorithmIndex] !== 0) {
-        closePosition(tickerIndex, algorithmIndex, previousTicks[tickerIndex].at(-1)![4]);
-      }
-    }
-
-    // Create ticker plot
-    const xs = Array.from({ length: tickerYs[tickerIndex].length }, (_, i) => i);
-    const tickerPlot: SimplePlot = {
-      name: 'Ticker',
-      x: xs,
-      y: tickerYs[tickerIndex],
-      type: 'scatter',
-    };
-
-    // Strategy plot constants
-    const timestamp = tickers[tickerIndex][1];
-    const slippage = tickers[tickerIndex][2] ?? { bps: 0 };
-    const tickerWeight = tickers[tickerIndex][3] ?? 1;
-
-    // Create strategy plots
-    for (let algorithmIndex = 0; algorithmIndex < algorithms.length; algorithmIndex++) {
-      const algorithm = algorithms[algorithmIndex];
-      const { outsideMarketHours = OutsideMarketHoursAction.MAINTAIN_POSITION, doPlot = false } =
-        algorithm;
-      if (doPlot) {
-        if (algorithmYs[tickerIndex][algorithmIndex].length === 0) {
-          console.error(`No strategy data for ${algorithm.name}`);
-          continue;
-        }
-
-        // Construct plot
-        const strategyPlot: SimplePlot = {
-          name: 'Strategy',
-          x: xs,
-          y: algorithmYs[tickerIndex][algorithmIndex],
-          type: 'scatter',
-        };
-
-        // Plotting statistics
-        const tickerSymbol = tickers[tickerIndex][0];
-        const strategyToTickerReturn =
-          (balances[tickerIndex][algorithmIndex] - 100) / (tickerFinalBalance - 100);
-
-        const description: string[] = [
-          `Ticker: ${tickers[tickerIndex][0]}`,
-          `Timestamp: ${timestamp}`,
-          `Slippage: ${slippageToString(slippage)}`,
-          `Hold after hours: ${outsideMarketHoursActionToString(outsideMarketHours)}`,
-          `Ticker return: ${withCommasRounded(tickerReturn)}%`,
-          `Trades made: ${withCommas(trades[tickerIndex][algorithmIndex])}`,
-          `Strategy return: ${withCommasRounded(balances[tickerIndex][algorithmIndex] - 100)}%`,
-          `Strategy/ticker return: ${withCommasRounded(strategyToTickerReturn)}x`,
-        ];
-
-        if (!graphSelectionOptionsByAlgorithmName.has(algorithm.name)) {
-          graphSelectionOptionsByAlgorithmName.set(algorithm.name, []);
-        }
-        const algorithmGraphOptions: SelectionOptionWithPerformance<Graph>[] =
-          graphSelectionOptionsByAlgorithmName.get(algorithm.name)!;
-
-        // Add plot to selection options indexed by algorithm
-        algorithmGraphOptions.push({
-          name: [
-            tickerSymbol,
-            slippageToString(slippage),
-            outsideMarketHoursActionToString(outsideMarketHours),
-            withCommasRounded(strategyToTickerReturn) + 'x',
-          ].join('; '),
-          value: {
-            tickerPlot,
-            strategyPlot,
-            algorithmName: algorithm.name,
-            description,
+        const positions = positionsByAggregateByAlgorithm[aggregate][algorithmIndex];
+        const priceByTicker: Record<Ticker, number> = tickers.reduce(
+          (acc, ticker) => {
+            acc[ticker] = contextByAggregateByTicker[aggregate][ticker].at(-1)![4];
+            return acc;
           },
-          performance: strategyToTickerReturn,
-        });
+          {} as Record<Ticker, number>,
+        );
 
-        // Update algorithm performance
-        const currentPerformance: [sum: number, totalWeight: number] =
-          algorithmPerformanceByAlgorithmName.get(algorithm.name) ?? [0, 0];
-        const newPerformanceSum = currentPerformance[0] + tickerWeight * strategyToTickerReturn;
-        const newPerformanceTotalWeight = currentPerformance[1] + tickerWeight;
+        // Ensure enough context to execute algorithm
+        if (hasNextBar && ticks + 1 >= contextLength) {
+          const context = algorithm.tickers.reduce(
+            (acc, ticker) => {
+              acc[ticker] = contextByAggregateByTicker[aggregate][ticker].slice(-contextLength);
+              return acc;
+            },
+            {} as Record<Ticker, Bar[]>,
+          );
 
-        algorithmPerformanceByAlgorithmName.set(algorithm.name, [
-          newPerformanceSum,
-          newPerformanceTotalWeight,
-        ]);
+          // Get actions from implementation
+          const actions = algorithm.implementation(context, positions);
+
+          updatePosition({
+            actions,
+            algorithmIndex,
+            algorithmMaxHoldingProportion,
+            algorithmPositions: positions,
+            algorithmTickers: tickers,
+            balancesByAlgorithm: balancesByAggregateByAlgorithm[aggregate],
+            priceByTicker,
+            tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
+            tradesByAlgorithm: tradesByAggregateByAlgorithm[aggregate],
+          });
+        } else if (!hasNextBar) {
+          closeAllPositions({
+            algorithmIndex,
+            algorithmPositions: positions,
+            balancesByAlgorithm: balancesByAggregateByAlgorithm[aggregate],
+            priceByTicker,
+            tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
+            tradesByAlgorithm: tradesByAggregateByAlgorithm[aggregate],
+          });
+        }
+
+        // Update plotting variables
+        const algorithmYs = algorithmYsByAggregateByAlgorithm[aggregate][algorithmIndex];
+        if (ticks % plotSpacing === 0) {
+          const portfolioValue = getPortfolioValue({
+            algorithmPositions: positions,
+            priceByTicker,
+            balance: balancesByAggregateByAlgorithm[aggregate][algorithmIndex],
+          });
+          algorithmYs.push(portfolioValue);
+
+          if (algorithmYs.length > MAX_POINTS_PER_PLOT) {
+            // Reduce the number of points in the plot by half
+            const reducedAlgorithmPlot: number[] = [];
+            for (let j = 0; j < algorithmYs.length; j += 2) {
+              reducedAlgorithmPlot.push(algorithmYs[j]);
+            }
+            algorithmYsByAggregateByAlgorithm[aggregate][algorithmIndex] = reducedAlgorithmPlot;
+            updatePlotSpacing = true;
+          }
+        }
+
+        if (!hasNextBar) {
+          const endTimestamp = Object.values(currentBarByTicker)[0][0];
+          endDay = dateToDay(endTimestamp);
+        }
+      }
+
+      // Update plotting variables
+      ticks++;
+      if (updatePlotSpacing) {
+        plotSpacing *= 2;
+        updatePlotSpacing = false;
       }
     }
-  }
 
-  const graphSelectionOptionsByAlgorithmResult: SelectionOptionWithPerformance<
-    SelectionOption<Graph>[]
-  >[] = [];
-  for (const algorithmName of graphSelectionOptionsByAlgorithmName.keys()) {
-    // Compile statistics=
-    const algorithmPerformance = algorithmPerformanceByAlgorithmName.get(algorithmName)!;
-    const averageStrategyToTickerReturn = algorithmPerformance[0] / algorithmPerformance[1];
+    for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
+      tickerIteratorByAggregateByTicker[aggregate][ticker].close();
+    }
+    if (verboseLogging) {
+      console.log(`Finished processing ${aggregate} aggregate data`);
+    }
 
-    // Sort graphs by performance
-    const algorithmGraphOptions = graphSelectionOptionsByAlgorithmName.get(algorithmName)!;
-    algorithmGraphOptions.sort((a, b) => b.performance - a.performance);
+    // Compile ticker plots
+    const pointsPlotted = algorithmYsByAggregateByAlgorithm[aggregate][0].length;
+    const xs = Array.from({ length: pointsPlotted }, (_, i) => i);
 
-    graphSelectionOptionsByAlgorithmResult.push({
-      name: `${algorithmName}; Avg S/T: ${withCommasRounded(averageStrategyToTickerReturn * 100)}%`,
-      value: algorithmGraphOptions,
-      performance: !isNaN(averageStrategyToTickerReturn)
-        ? averageStrategyToTickerReturn
-        : -Infinity,
-    });
+    for (const ticker in tickerYsByAggregateByTicker[aggregate]) {
+      const tickerYs = tickerYsByAggregateByTicker[aggregate][ticker];
+      const tickerPlot: SimplePlot = {
+        name: 'Ticker',
+        x: xs,
+        y: tickerYs,
+        type: 'scatter',
+      };
+      tickerGraphSelectionOptionsByAggregate[aggregate].push({
+        name: `${ticker} (${aggregate})`,
+        value: tickerPlot,
+      });
+    }
+
+    // Compile algorithm plots
+    const yearsBetweenStartAndEnd = yearsBetween(endDay!, startDay);
+    for (
+      let algorithmIndex = 0;
+      algorithmIndex < algorithmsByAggregate[aggregate].length;
+      algorithmIndex++
+    ) {
+      const algorithm = algorithmsByAggregate[aggregate][algorithmIndex];
+      const {
+        name,
+        tickers,
+        algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
+      } = algorithm;
+
+      const algorithmYs = algorithmYsByAggregateByAlgorithm[aggregate][algorithmIndex];
+      const algorithmPlot: SimplePlot = {
+        name: 'Algorithm',
+        x: xs,
+        y: algorithmYs,
+        type: 'scatter',
+      };
+
+      const balance = balancesByAggregateByAlgorithm[aggregate][algorithmIndex];
+      const returnPercentage = balance - 100;
+      const growthRatePercentage = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
+      const trades = tradesByAggregateByAlgorithm[aggregate][algorithmIndex];
+
+      const description: string[] = [
+        `Aggregate: ${aggregate}`,
+        `Timespan: ${startDay.join('-')} to ${endDay!.join('-')}`,
+        `Tickers: ${tickersToString(tickers)}`,
+        `Max holding proportion: ${algorithmMaxHoldingProportion}`,
+        `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
+        `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
+        `Trades made: ${withCommas(trades)}`,
+      ];
+
+      algorithmGraphSelectionOptionsWithPerformance.push({
+        name: `${name}; Return: ${withCommasRounded(returnPercentage)}% (${withCommasRounded(growthRatePercentage)}% APY) - ${aggregate}`,
+        value: {
+          name,
+          aggregate,
+          description,
+          algorithmPlot,
+        },
+        performance: growthRatePercentage,
+      });
+    }
   }
 
   // Sort algorithms by performance
-  graphSelectionOptionsByAlgorithmResult.sort((a, b) => b.performance - a.performance);
+  algorithmGraphSelectionOptionsWithPerformance.sort((a, b) => b.performance - a.performance);
 
   if (trackProgress) {
     progressBar.update(totalLines);
     progressBar.stop();
     console.log(`Time taken: ${withCommas(Date.now() - progressStartTimestamp)}ms`);
   }
-  return graphSelectionOptionsByAlgorithmResult;
+  return [algorithmGraphSelectionOptionsWithPerformance, tickerGraphSelectionOptionsByAggregate];
 }

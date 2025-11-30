@@ -1,4 +1,3 @@
-import { aggregateInMillisecondsFromTimestamp, type Timestamp } from '@/fetch/fetch';
 import z from 'zod';
 import { trySync } from './errorHandling';
 
@@ -38,7 +37,7 @@ export function timespanToDays(timespan: [string, string]): [Day, Day] {
   const unparsedEndDayResponse = trySync(() => daySchema.parse(unparsedEndDay));
   if (!unparsedEndDayResponse.ok) {
     throw new Error(
-      `Timespan is invalid: start date ${timespan[1]} is not a valid date; it must be of the form YYYY-MM-DD`,
+      `Timespan is invalid: end date ${timespan[1]} is not a valid date; it must be of the form YYYY-MM-DD`,
     );
   }
   timespanDates[1] = unparsedEndDayResponse.data;
@@ -49,31 +48,15 @@ export function timespanToDays(timespan: [string, string]): [Day, Day] {
   return timespanDates;
 }
 
-export function isMarketOpenByEndOfTick(
-  startOfTickTimestamp: string,
-  timestamp: Timestamp,
-): boolean {
-  const aggregateInMilliseconds = aggregateInMillisecondsFromTimestamp[timestamp];
+export function yearsBetween(day1: Day, day2: Day): number {
+  // Convert both days to Date objects for accurate calculation
+  const date1 = new Date(day1[0], day1[1] - 1, day1[2]); // month is 0-indexed in Date
+  const date2 = new Date(day2[0], day2[1] - 1, day2[2]);
 
-  const [_datePart, timePart] = startOfTickTimestamp.split(' ');
-  let [hour, minute] = timePart.split(':').map(Number);
-  hour = (hour + Math.floor(aggregateInMilliseconds / 3_600_000)) % 24;
-  minute = (minute + Math.floor((aggregateInMilliseconds % 3_600_000) / 60_000)) % 60;
-  return (hour === 9 && minute >= 30) || (9 < hour && hour < 16);
-}
+  // Calculate difference in milliseconds
+  const diffMs = date1.getTime() - date2.getTime();
 
-export function millisecondsToTimeString(milliseconds: number): string {
-  const days = Math.floor(milliseconds / 86_400_000)
-    .toString()
-    .padStart(2, '0');
-  const hours = Math.floor((milliseconds % 86_400_000) / 3_600_000)
-    .toString()
-    .padStart(2, '0');
-  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000)
-    .toString()
-    .padStart(2, '0');
-  const seconds = Math.floor((milliseconds % 60_000) / 1_000)
-    .toString()
-    .padStart(2, '0');
-  return `${days}d ${hours}:${minutes}:${seconds}`;
+  // Convert to years (365.25 days per year accounts for leap years)
+  const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
+  return diffMs / msPerYear;
 }

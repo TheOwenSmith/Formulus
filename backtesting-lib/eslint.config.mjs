@@ -35,7 +35,7 @@ export default defineConfig([
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
       '@typescript-eslint/no-unused-vars': [
-        'error',
+        'warn',
         {
           vars: 'all', // check all variables
           args: 'after-used', // check function arguments after used ones
@@ -43,6 +43,7 @@ export default defineConfig([
           argsIgnorePattern: '^_', // ignore function args starting with _
         },
       ],
+      // 'capitalized-comments': ['warn', 'always', { ignoreInlineComments: true }],
 
       // Import/Export rules
       'import/no-default-export': 'error',

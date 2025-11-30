@@ -58,7 +58,7 @@ export function getAggregateDataIterator(
   verboseLogging = false,
 ): AggregateDataIterator {
   if (!fs.existsSync(filename)) {
-    throw new Error(`File ${filename} does not exist`);
+    throw new Error(`File '${filename}' does not exist`);
   }
 
   const fileStream = fs.createReadStream(filename);

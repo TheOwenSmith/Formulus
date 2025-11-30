@@ -27,7 +27,9 @@ const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
   ]);
 
 export type Ticker = 'SPY' | 'SPUU' | 'SPXL' | 'SPX' | 'SH' | 'SDS' | 'SPXU' | (string & {});
-export type Timestamp = '1min' | '5min' | '15min' | '30min' | '60min';
+
+export const aggregateTimestamps = ['1min', '5min', '15min', '30min', '60min'] as const;
+export type Timestamp = (typeof aggregateTimestamps)[number];
 
 export const aggregateInMillisecondsFromTimestamp: Record<Timestamp, number> = {
   '1min': 60_000,
@@ -48,7 +50,7 @@ export async function fetchAlphaVantageData({
   timestamp: Timestamp;
   verboseLogging?: boolean;
 }) {
-  console.log(`Fetching data for ${ticker} (${timestamp})...`);
+  console.log(`Fetching data for '${ticker}' (${timestamp})...`);
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
   const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
 
@@ -70,7 +72,7 @@ export async function fetchAlphaVantageData({
   for (let y = currentYear - years; y <= currentYear; y++) {
     const endMonth = y === currentYear ? currentMonth - 1 : 12;
     for (let m = 1; m <= endMonth; m++) {
-      // in YYYY-MM format
+      // In YYYY-MM format
       const month = `${y}-${m.toString().padStart(2, '0')}`;
       const url =
         'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&' +
@@ -84,7 +86,7 @@ export async function fetchAlphaVantageData({
         ].join('&');
 
       if (verboseLogging) {
-        console.log(`Fetching ${ticker} (${timestamp}) data for ${month}...`);
+        console.log(`Fetching '${ticker}' (${timestamp}) data for ${month}...`);
       }
       const fetchWithRetryResponse = await tryAsync(() =>
         retryWithBackoff({
@@ -105,7 +107,7 @@ export async function fetchAlphaVantageData({
       if ('Error Message' in apiResponse) {
         // Data does not exist for this ticker, so skip this month
         if (verboseLogging) {
-          console.log(`No data found for ${ticker} (${timestamp}) in ${month}`);
+          console.log(`No data found for '${ticker}' (${timestamp}) in ${month}`);
         }
         continue;
       }
@@ -131,7 +133,7 @@ export async function fetchAlphaVantageData({
     }
   }
 
-  console.log(`Cleaning data for ${ticker} (${timestamp})...`);
+  console.log(`Cleaning data for '${ticker}' (${timestamp})...`);
   cleanData(writeToFilename, timestamp);
 }
 

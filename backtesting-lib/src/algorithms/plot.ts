@@ -1,101 +1,91 @@
-import { plotStrategy, type Graph } from '@/lib/nodeplotlib';
+import type { Timestamp } from '@/fetch/fetch';
+import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
 import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
 import { tryAsync } from '@/utils/errorHandling';
 
+let serverIsUp = false;
 export async function chooseToPlot(
-  header: string,
-  graphSelectionOptions: SelectionOption<Graph>[],
+  algorithmGraphSelectionOptions: SelectionOption<{
+    name: string;
+    aggregate: Timestamp;
+    description: string[];
+    algorithmPlot: SimplePlot;
+  }>[],
+  tickerGraphSelectionOptionsByAggregate: Record<Timestamp, SelectionOption<SimplePlot>[]>,
 ) {
-  let serverIsUp = false;
-  while (graphSelectionOptions.length > 0) {
-    const strategyGraphSelectionResponse = await tryAsync(() =>
+  while (algorithmGraphSelectionOptions.length > 0) {
+    const algorithmSelectionResponse = await tryAsync(() =>
       getUserSelectionInput({
-        allMessage: 'All (display all plots)',
-        header,
-        message: 'Select which plot to display:',
-        options: graphSelectionOptions,
-        quitMessage: 'Quit (do not display any plot)',
-      }),
-    );
-    if (!strategyGraphSelectionResponse.ok) throw strategyGraphSelectionResponse.error;
-    const strategyGraphSelection = strategyGraphSelectionResponse.data;
-
-    if (strategyGraphSelection == null) {
-      // User chose to not display any graphs, so return early
-      return;
-    }
-
-    if (strategyGraphSelection === 'all') {
-      for (const graphOption of graphSelectionOptions) {
-        await plotStrategy(graphOption.value);
-      }
-      return;
-    }
-
-    // Remove the selected strategy graph from the list of options
-    const removeIndex = graphSelectionOptions.findIndex(
-      (option) => option.value === strategyGraphSelection,
-    );
-    graphSelectionOptions.splice(removeIndex, 1);
-
-    await plotStrategy(strategyGraphSelection);
-    if (!serverIsUp) {
-      await new Promise((resolve) => setTimeout(resolve, 2_500));
-      serverIsUp = true;
-    }
-  }
-}
-
-export async function chooseToPlotByAlgorithm(
-  graphSelectionOptionsByAlgorithm: SelectionOption<SelectionOption<Graph>[]>[],
-) {
-  while (graphSelectionOptionsByAlgorithm.length > 0) {
-    const graphSelectionOptionsResponse = await tryAsync(() =>
-      getUserSelectionInput({
-        options: graphSelectionOptionsByAlgorithm,
+        options: algorithmGraphSelectionOptions,
         message: 'Select an algorithm to view backtesting results for:',
         quitMessage: 'Quit (do not view any backtesting results)',
       }),
     );
-    if (!graphSelectionOptionsResponse.ok) {
-      if (graphSelectionOptionsResponse.error instanceof UserExitEarlyError) {
+    if (!algorithmSelectionResponse.ok) {
+      if (algorithmSelectionResponse.error instanceof UserExitEarlyError) {
         console.error('User did not select an algorithm');
         return;
       }
-      throw graphSelectionOptionsResponse.error;
+      throw algorithmSelectionResponse.error;
     }
-    const graphSelectionOptions = graphSelectionOptionsResponse.data;
+    const selectedAlgorithm = algorithmSelectionResponse.data;
 
-    if (graphSelectionOptions == null) {
+    if (selectedAlgorithm == null) {
       // User chose to not view backtesting results for an algorithm, so return early
       return;
     }
 
-    // Remove the selected algorithm from the list of options
-    const removeIndex = graphSelectionOptionsByAlgorithm.findIndex(
-      (option) => option.value === graphSelectionOptions,
-    );
-    const [selectedOption] = graphSelectionOptionsByAlgorithm.splice(removeIndex, 1);
-    const selectedAlgorithmName = selectedOption.name;
+    const { name, algorithmPlot, description, aggregate } = selectedAlgorithm;
 
-    graphSelectionOptions.sort((a, b) => {
-      const aLastX = a.value.strategyPlot.y.at(-1) ?? 0;
-      const bLastX = b.value.strategyPlot.y.at(-1) ?? 0;
-      return bLastX - aLastX;
-    });
-
-    const chooseToPlotGraphResponse = await tryAsync(() =>
-      chooseToPlot(
-        `Viewing backtesting results for algorithm ${selectedAlgorithmName}`,
-        graphSelectionOptions,
-      ),
+    const tickerSelectionResponse = await tryAsync(() =>
+      getUserSelectionInput({
+        allMessage: 'All (display all plots)',
+        header: `Viewing backtesting results for algorithm '${selectedAlgorithm.name}'`,
+        message: 'Select a ticker to plot against the algorithm:',
+        options: tickerGraphSelectionOptionsByAggregate[aggregate],
+        quitMessage: 'Quit (do not display any plot)',
+      }),
     );
-    if (!chooseToPlotGraphResponse.ok) {
-      if (chooseToPlotGraphResponse.error instanceof UserExitEarlyError) {
-        console.error('User did not select a graph to plot');
+    if (!tickerSelectionResponse.ok) {
+      if (tickerSelectionResponse.error instanceof UserExitEarlyError) {
+        console.error('User did not select a ticker to plot against the algorithm');
         return;
       }
-      throw chooseToPlotGraphResponse.error;
+      throw tickerSelectionResponse.error;
+    }
+    const selectedTicker = tickerSelectionResponse.data;
+
+    if (selectedTicker == null) {
+      // User chose to not display any tickers, so reprompt for an algorithm
+      continue;
+    } else if (selectedTicker === 'all') {
+      for (const tickerPlotSelectionOption of tickerGraphSelectionOptionsByAggregate[aggregate]) {
+        await plotAlgorithm({
+          tickerPlot: tickerPlotSelectionOption.value,
+          algorithmPlot,
+          algorithmName: name,
+          description,
+        });
+      }
+    } else {
+      await plotAlgorithm({
+        tickerPlot: selectedTicker,
+        algorithmPlot,
+        algorithmName: name,
+        description,
+      });
+    }
+
+    // Remove the selected algorithm from the list of options
+    const removeIndex = algorithmGraphSelectionOptions.findIndex(
+      (option) => option.value === selectedAlgorithm,
+    );
+    algorithmGraphSelectionOptions.splice(removeIndex, 1);
+
+    // Wait for the server to be up
+    if (!serverIsUp) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      serverIsUp = true;
     }
   }
 }

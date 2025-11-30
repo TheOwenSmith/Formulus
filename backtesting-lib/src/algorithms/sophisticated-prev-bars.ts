@@ -1,32 +1,37 @@
 import {
   Action,
-  OutsideMarketHoursAction,
+  createAlgorithmFromSimpleAlgorithm,
   type Algorithm,
-} from '@/backtesting/backtest-algorithms-concurrently';
+} from '@/algorithms/create-simple-algorithm';
 import { getAggregateDataIterator, type Bar } from '@/backtesting/read-data';
+import type { Ticker, Timestamp } from '@/fetch/fetch';
 import { trySync } from '@/utils/errorHandling';
 import { withCommas } from '@/utils/number-utils';
 import z from 'zod';
 
 export const sophisticatedPrevBarsAlgorithm = ({
+  aggregate,
+  algorithmMaxHoldingProportion,
   contextLength,
   contextMap,
   name,
-  outsideMarketHours,
-  doPlot,
+  ticker,
 }: {
+  aggregate: Timestamp;
+  algorithmMaxHoldingProportion?: number;
   contextLength: number;
   contextMap: Map<number, boolean>;
   name?: string;
-  outsideMarketHours?: OutsideMarketHoursAction;
-  doPlot?: boolean;
-}): Algorithm => ({
-  contextLength,
-  doPlot,
-  implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
-  name: name ?? `Sophisticated Previous Bars (${contextLength})`,
-  outsideMarketHours,
-});
+  ticker: Ticker;
+}): Algorithm =>
+  createAlgorithmFromSimpleAlgorithm({
+    aggregate,
+    algorithmMaxHoldingProportion,
+    contextLength,
+    implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
+    name: name ?? `Sophisticated Previous Bars (${contextLength})`,
+    ticker,
+  });
 
 export const sophisticatedPrevBarsAlgorithmImplementation = (contextMap: Map<number, boolean>) => {
   return function (context: Bar[], _position: number): Action {
@@ -64,34 +69,34 @@ export async function createContextMap({
   }
   const iterator = getIteratorResponse.data;
 
-  const outcomeMap = new Map<number, [number, number]>();
-  const previousTicks: Bar[] = [];
-  for await (const tick of iterator) {
-    if (previousTicks.length < contextLength) {
-      previousTicks.push(tick);
+  const outcomeMap = new Map<number, [sum: number, total: number]>();
+  const previousBars: Bar[] = [];
+  for await (const bar of iterator) {
+    if (previousBars.length < contextLength) {
+      previousBars.push(bar);
       continue;
     }
 
-    const historyMasked: number = maskHistory(previousTicks);
-    const previousOutcome = outcomeMap.get(historyMasked) ?? [0, 0];
+    const historyMasked: number = maskHistory(previousBars);
+    const compiledOutcome = outcomeMap.get(historyMasked) ?? [0, 0];
 
-    const prevTick = previousTicks.at(-1)![4];
-    const nextTickPercentChange = ((tick[4] - prevTick) / prevTick) * 100;
-    previousOutcome[0] += nextTickPercentChange;
-    previousOutcome[1]++;
-    outcomeMap.set(historyMasked, previousOutcome);
+    const prevBar = previousBars.at(-1)![4];
+    const nextBarPercentChange = ((bar[4] - prevBar) / prevBar) * 100;
+    compiledOutcome[0] += nextBarPercentChange;
+    compiledOutcome[1]++;
+    outcomeMap.set(historyMasked, compiledOutcome);
 
-    previousTicks.shift();
-    previousTicks.push(tick);
+    previousBars.shift();
+    previousBars.push(bar);
   }
 
   const sortedOutcomeMap = [...outcomeMap.entries()].sort(
     (
-      [_historyA, [nextTickPercentChangeSumA, totalTicksA]],
-      [_historyB, [nextTickPercentChangeSumB, totalTicksB]],
+      [_historyA, [nextBarPercentChangeSumA, totalBarsA]],
+      [_historyB, [nextBarPercentChangeSumB, totalBarsB]],
     ) => {
-      const averagePercentChangeA = nextTickPercentChangeSumA / totalTicksA;
-      const averagePercentChangeB = nextTickPercentChangeSumB / totalTicksB;
+      const averagePercentChangeA = nextBarPercentChangeSumA / totalBarsA;
+      const averagePercentChangeB = nextBarPercentChangeSumB / totalBarsB;
       return averagePercentChangeB - averagePercentChangeA;
     },
   );
@@ -101,8 +106,8 @@ export async function createContextMap({
   let i = 0;
   let topPMaxxed = false;
   for (; i < sortedOutcomeMap.length * topP; i++) {
-    const [historyMasked, [nextTickPercentChangeSum, total]] = sortedOutcomeMap[i];
-    const averagePercentChange = nextTickPercentChangeSum / total;
+    const [historyMasked, [nextBarPercentChangeSum, total]] = sortedOutcomeMap[i];
+    const averagePercentChange = nextBarPercentChangeSum / total;
     if (averagePercentChange <= 0) {
       topPMaxxed = true;
       break;
