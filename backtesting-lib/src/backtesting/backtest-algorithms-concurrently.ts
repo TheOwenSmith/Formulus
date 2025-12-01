@@ -11,6 +11,7 @@ import { tryAsync, trySync } from '@/utils/errorHandling';
 import { countLinesInFile } from '@/utils/file';
 import { groupBy } from '@/utils/groupBy';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
+import { SharpeRatioCalculator } from '@/utils/sharpe-ratio-calculator';
 import cliProgress, { Presets } from 'cli-progress';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { getAggregateDataIterator, type AggregateDataIterator, type Bar } from './read-data';
@@ -173,6 +174,8 @@ export async function backtestAlgorithmsConcurrently({
     );
   const algorithmYsByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number[]> =
     createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => []);
+  const sharpeRatioCalculatorByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<SharpeRatioCalculator> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => new SharpeRatioCalculator());
   const algorithmGraphSelectionOptionsWithPerformance: SelectionOptionWithPerformance<{
     name: string;
     aggregate: Timestamp;
@@ -350,14 +353,18 @@ export async function backtestAlgorithmsConcurrently({
           });
         }
 
+        const portfolioValue = getPortfolioValue({
+          algorithmPositions: positions,
+          priceByTicker,
+          balance: balancesByAggregateByAlgorithm[aggregate][algorithmIndex],
+        });
+        sharpeRatioCalculatorByAggregateByAlgorithm[aggregate][algorithmIndex].addPrice(
+          portfolioValue,
+        );
+
         // Update plotting variables
         const algorithmYs = algorithmYsByAggregateByAlgorithm[aggregate][algorithmIndex];
         if (ticks % plotSpacing === 0) {
-          const portfolioValue = getPortfolioValue({
-            algorithmPositions: positions,
-            priceByTicker,
-            balance: balancesByAggregateByAlgorithm[aggregate][algorithmIndex],
-          });
           algorithmYs.push(portfolioValue);
 
           if (algorithmYs.length > MAX_POINTS_PER_PLOT) {
@@ -436,6 +443,10 @@ export async function backtestAlgorithmsConcurrently({
       const returnPercentage = balance - 100;
       const growthRatePercentage = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
       const trades = tradesByAggregateByAlgorithm[aggregate][algorithmIndex];
+      const sharpRatio =
+        sharpeRatioCalculatorByAggregateByAlgorithm[aggregate][algorithmIndex].sharpe(
+          yearsBetweenStartAndEnd,
+        );
 
       const description: string[] = [
         `Aggregate: ${aggregate}`,
@@ -444,6 +455,7 @@ export async function backtestAlgorithmsConcurrently({
         `Max holding proportion: ${algorithmMaxHoldingProportion}`,
         `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
         `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
+        `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
         `Trades made: ${withCommas(trades)}`,
       ];
 
