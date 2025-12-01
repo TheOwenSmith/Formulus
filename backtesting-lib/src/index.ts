@@ -4,22 +4,27 @@ import path from 'path';
 import { chooseToPlot } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
+  compoundSophisticatedPrevBarsAlgorithm,
   createContextMap,
   deserializeContextMap,
   serializeContextMap,
-  sophisticatedPrevBarsAlgorithm,
 } from './algorithms/sophisticated-prev-bars';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
+import type { Ticker } from './fetch/fetch';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
-const topPs: number[] = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+const tickers: [Ticker, ...Ticker[]] = ['SPY', 'SH', 'AAPL', 'GOOG', 'PFE', 'TSLA'];
 const algorithms: Algorithm[] = [prevBarAlgorithm('60min', 'SPY')];
 
 console.log('Loading context maps...');
-for (const contextLength of contextLengths) {
-  for (const topP of topPs) {
-    const contextMapFilename = `./context-maps/SPY/context-map-${contextLength}-${topP * 100}%.txt`;
+const contextMapByTickerByContextLength = new Map<Ticker, Map<number, Map<number, number>>>();
+for (const ticker of tickers) {
+  const contextMapByContextLength =
+    contextMapByTickerByContextLength.get(ticker) ?? new Map<number, Map<number, number>>();
+
+  for (const contextLength of contextLengths) {
+    const contextMapFilename = `./context-maps/${ticker}-${contextLength}.txt`;
     if (fs.existsSync(contextMapFilename)) {
       const readFileResponse = trySync(() =>
         fs.readFileSync(contextMapFilename, { encoding: 'utf8' }),
@@ -29,36 +34,17 @@ for (const contextLength of contextLengths) {
 
       const contextMapResponse = trySync(() => deserializeContextMap(serializedContextMap));
       if (!contextMapResponse.ok) throw contextMapResponse.error;
-      const contextMap = contextMapResponse.data;
-
-      algorithms.push(
-        sophisticatedPrevBarsAlgorithm({
-          aggregate: '60min',
-          contextLength,
-          contextMap,
-          name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-          ticker: 'SPY',
-        }),
-      );
+      contextMapByContextLength.set(contextLength, contextMapResponse.data);
       continue;
     }
 
-    const [contextMap, topPMaxxed] = await createContextMap({
-      tickDataFilename: './data/SPY_60min.csv',
+    const contextMap = await createContextMap({
+      tickDataFilename: `./data/cleaned/${ticker}_60min.csv`,
       contextLength,
-      topP,
-      verboseLogging: true,
+      verboseLogging: false,
     });
+    contextMapByContextLength.set(contextLength, contextMap);
     console.log(`Successfully created context map for context length ${contextLength}`);
-    algorithms.push(
-      sophisticatedPrevBarsAlgorithm({
-        aggregate: '60min',
-        contextLength,
-        contextMap,
-        name: `Sophisticated Previous Bars (${contextLength}-${topP * 100}%)`,
-        ticker: 'SPY',
-      }),
-    );
 
     const serializeContextMapResponse = trySync(() => serializeContextMap(contextMap));
     if (!serializeContextMapResponse.ok) throw serializeContextMapResponse.error;
@@ -66,8 +52,30 @@ for (const contextLength of contextLengths) {
 
     fs.mkdirSync(path.dirname(contextMapFilename), { recursive: true });
     fs.writeFileSync(contextMapFilename, serializedContextMap);
+  }
 
-    if (topPMaxxed) break;
+  contextMapByTickerByContextLength.set(ticker, contextMapByContextLength);
+}
+
+for (const k of [1, 2]) {
+  for (const contextLength of contextLengths) {
+    const contextMapByTicker = tickers.reduce(
+      (acc, ticker) => {
+        acc[ticker] = contextMapByTickerByContextLength.get(ticker)!.get(contextLength)!;
+        return acc;
+      },
+      {} as Record<Ticker, Map<number, number>>,
+    );
+
+    algorithms.push(
+      compoundSophisticatedPrevBarsAlgorithm({
+        aggregate: '60min',
+        contextLength,
+        contextMapByTicker,
+        k,
+        tickers,
+      }),
+    );
   }
 }
 
@@ -75,7 +83,7 @@ console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
-    tickerData: [{ ticker: 'SPY', aggregate: '60min', slippage: 0.2 }],
+    tickerData: tickers.map((ticker) => ({ ticker, aggregate: '60min', slippage: 5 })),
     timespan: undefined, // bearish1
   }),
 );

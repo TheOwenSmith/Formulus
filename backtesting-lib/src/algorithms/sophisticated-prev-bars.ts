@@ -6,8 +6,8 @@ import {
 import { getAggregateDataIterator, type Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 import { trySync } from '@/utils/errorHandling';
-import { withCommas } from '@/utils/number-utils';
 import z from 'zod';
+import { createAlgorithmFromTopKAlgorithm } from './top-k-algorithm';
 
 export const sophisticatedPrevBarsAlgorithm = ({
   aggregate,
@@ -15,31 +15,79 @@ export const sophisticatedPrevBarsAlgorithm = ({
   contextLength,
   contextMap,
   name,
+  threshold,
   ticker,
 }: {
   aggregate: Timestamp;
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
-  contextMap: Map<number, boolean>;
+  contextMap: Map<number, number>;
   name?: string;
+  threshold: number;
   ticker: Ticker;
 }): Algorithm =>
   createAlgorithmFromSimpleAlgorithm({
     aggregate,
     algorithmMaxHoldingProportion,
     contextLength,
-    implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap),
+    implementation: sophisticatedPrevBarsAlgorithmImplementation(contextMap, threshold),
     name: name ?? `Sophisticated Previous Bars (${contextLength})`,
     ticker,
   });
 
-export const sophisticatedPrevBarsAlgorithmImplementation = (contextMap: Map<number, boolean>) => {
+export const sophisticatedPrevBarsAlgorithmImplementation = (
+  contextMap: Map<number, number>,
+  threshold: number,
+) => {
   return function (context: Bar[], _position: number): Action {
     const historyMasked: number = maskHistory(context);
     if (contextMap.has(historyMasked)) {
-      return contextMap.get(historyMasked)! ? Action.BUY : Action.SELL;
+      return contextMap.get(historyMasked)! > threshold ? Action.BUY : Action.SELL;
     }
     return Action.HOLD;
+  };
+};
+
+export const compoundSophisticatedPrevBarsAlgorithm = ({
+  aggregate,
+  algorithmMaxHoldingProportion,
+  contextLength,
+  contextMapByTicker,
+  k,
+  name,
+  tickers,
+}: {
+  aggregate: Timestamp;
+  algorithmMaxHoldingProportion?: number;
+  contextLength: number;
+  contextMapByTicker: Record<Ticker, Map<number, number>>;
+  k: number;
+  name?: string;
+  tickers: [Ticker, ...Ticker[]];
+}): Algorithm =>
+  createAlgorithmFromTopKAlgorithm({
+    aggregate,
+    algorithmMaxHoldingProportion,
+    contextLength,
+    implementation: compoundSophisticatedPrevBarsImplementation(contextMapByTicker),
+    k,
+    name: name ?? `Compound Sophisticated Previous Bars (${contextLength}-${k})`,
+    tickers,
+  });
+
+export const compoundSophisticatedPrevBarsImplementation = (
+  contextMapByTicker: Record<Ticker, Map<number, number>>,
+) => {
+  return function (
+    context: Record<Ticker, Bar[]>,
+    _position: Record<Ticker, number>,
+  ): Record<Ticker, number> {
+    const scoreByTicker = {} as Record<Ticker, number>;
+    for (const ticker in contextMapByTicker) {
+      const historyMasked: number = maskHistory(context[ticker]);
+      scoreByTicker[ticker] = contextMapByTicker[ticker].get(historyMasked) ?? 0;
+    }
+    return scoreByTicker;
   };
 };
 
@@ -53,14 +101,12 @@ function maskHistory(context: Bar[]): number {
 export async function createContextMap({
   tickDataFilename,
   contextLength,
-  topP = 0.2,
   verboseLogging = false,
 }: {
   tickDataFilename: string;
   contextLength: number;
-  topP?: number;
   verboseLogging?: boolean;
-}): Promise<[Map<number, boolean>, boolean]> {
+}): Promise<Map<number, number>> {
   const getIteratorResponse = trySync(() =>
     getAggregateDataIterator(tickDataFilename, verboseLogging),
   );
@@ -69,7 +115,7 @@ export async function createContextMap({
   }
   const iterator = getIteratorResponse.data;
 
-  const outcomeMap = new Map<number, [sum: number, total: number]>();
+  const outcomesByState = new Map<number, [sum: number, count: number]>();
   const previousBars: Bar[] = [];
   for await (const bar of iterator) {
     if (previousBars.length < contextLength) {
@@ -78,66 +124,31 @@ export async function createContextMap({
     }
 
     const historyMasked: number = maskHistory(previousBars);
-    const compiledOutcome = outcomeMap.get(historyMasked) ?? [0, 0];
+    const outcomes = outcomesByState.get(historyMasked) ?? [0, 0];
 
     const prevBar = previousBars.at(-1)![4];
     const nextBarPercentChange = ((bar[4] - prevBar) / prevBar) * 100;
-    compiledOutcome[0] += nextBarPercentChange;
-    compiledOutcome[1]++;
-    outcomeMap.set(historyMasked, compiledOutcome);
+    outcomes[0] += nextBarPercentChange;
+    outcomes[1]++;
+    outcomesByState.set(historyMasked, outcomes);
 
     previousBars.shift();
     previousBars.push(bar);
   }
 
-  const sortedOutcomeMap = [...outcomeMap.entries()].sort(
-    (
-      [_historyA, [nextBarPercentChangeSumA, totalBarsA]],
-      [_historyB, [nextBarPercentChangeSumB, totalBarsB]],
-    ) => {
-      const averagePercentChangeA = nextBarPercentChangeSumA / totalBarsA;
-      const averagePercentChangeB = nextBarPercentChangeSumB / totalBarsB;
-      return averagePercentChangeB - averagePercentChangeA;
-    },
-  );
-
-  const contextMap = new Map<number, boolean>();
-
-  let i = 0;
-  let topPMaxxed = false;
-  for (; i < sortedOutcomeMap.length * topP; i++) {
-    const [historyMasked, [nextBarPercentChangeSum, total]] = sortedOutcomeMap[i];
-    const averagePercentChange = nextBarPercentChangeSum / total;
-    if (averagePercentChange <= 0) {
-      topPMaxxed = true;
-      break;
-    }
-    contextMap.set(historyMasked, true);
+  const contextMap = new Map<number, number>();
+  for (const [state, [sum, count]] of outcomesByState) {
+    contextMap.set(state, sum / count);
   }
-  for (; i < sortedOutcomeMap.length; i++) {
-    const [historyMasked] = sortedOutcomeMap[i];
-    contextMap.set(historyMasked, false);
-  }
-
-  if (verboseLogging && topPMaxxed) {
-    console.log(`Context map of context length ${contextLength} maxxed at topP ${topP * 100}%`);
-  }
-
-  const emptyEntries = 2 ** contextLength - contextMap.size;
-  if (verboseLogging && emptyEntries > 0) {
-    console.error(
-      `Context map of context length ${contextLength}, size ${withCommas(contextMap.size)}, and topP ${topP * 100}% has ${withCommas(emptyEntries)} empty entries`,
-    );
-  }
-  return [contextMap, topPMaxxed];
+  return contextMap;
 }
 
-export function serializeContextMap(contextMap: Map<number, boolean>): string {
+export function serializeContextMap(contextMap: Map<number, number>): string {
   return JSON.stringify(Array.from(contextMap));
 }
 
-const contextMapArraySchema = z.tuple([z.number(), z.boolean()]).array();
-export function deserializeContextMap(serializedContextMap: string): Map<number, boolean> {
+const contextMapArraySchema = z.tuple([z.number(), z.number()]).array();
+export function deserializeContextMap(serializedContextMap: string): Map<number, number> {
   const parseJsonResponse = trySync(() => JSON.parse(serializedContextMap));
   if (!parseJsonResponse.ok) throw parseJsonResponse.error;
   const parsedJson = parseJsonResponse.data;
@@ -146,5 +157,5 @@ export function deserializeContextMap(serializedContextMap: string): Map<number,
   if (!schemaParseResponse.ok) throw schemaParseResponse.error;
   const parsedContextArray = schemaParseResponse.data;
 
-  return new Map<number, boolean>(parsedContextArray);
+  return new Map<number, number>(parsedContextArray);
 }
