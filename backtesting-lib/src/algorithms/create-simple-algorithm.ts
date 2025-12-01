@@ -13,6 +13,7 @@ export type AlgorithmImplementation = (
 ) => Record<Ticker, Action>;
 
 export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;
+export const ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT = 0.99;
 export type Algorithm = {
   aggregate: Timestamp;
   algorithmMaxHoldingProportion?: number;

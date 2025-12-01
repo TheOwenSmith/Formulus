@@ -1,4 +1,5 @@
 import {
+  ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/create-simple-algorithm';
@@ -74,6 +75,15 @@ export async function backtestAlgorithmsConcurrently({
 
   const timespanDates: [Day, Day] | undefined =
     timespan != undefined ? timespanToDays(timespan) : undefined;
+
+  for (const algorithm of algorithms) {
+    const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } = algorithm;
+    if (algorithmMaxHoldingProportion > ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT) {
+      throw new Error(
+        `Algorithm max holding proportion ${algorithmMaxHoldingProportion} is greater than the limit ${ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT}`,
+      );
+    }
+  }
 
   const algorithmsByAggregatePartial: Partial<Record<Timestamp, Algorithm[]>> = groupBy(
     algorithms,
@@ -389,7 +399,7 @@ export async function backtestAlgorithmsConcurrently({
     for (const ticker in tickerYsByAggregateByTicker[aggregate]) {
       const tickerYs = tickerYsByAggregateByTicker[aggregate][ticker];
       const tickerPlot: SimplePlot = {
-        name: 'Ticker',
+        name: ticker,
         x: xs,
         y: tickerYs,
         type: 'scatter',

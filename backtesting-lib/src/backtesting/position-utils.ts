@@ -92,6 +92,7 @@ export function updatePosition({
   balancesByAlgorithm[algorithmIndex] += changeInBalance;
 }
 
+const TOLERANCE = 1e-8;
 function computeK({
   algorithmPositions,
   b,
@@ -183,13 +184,13 @@ function computeK({
 
   // Assuming k<p_0
   const potentialKLeftEdge = (beta - sigma_pr[0]) / (phi - s_r[0]);
-  if (potentialKLeftEdge < sortedPositionSlippageTuple[0][0]) {
+  if (potentialKLeftEdge < sortedPositionSlippageTuple[0][0] + TOLERANCE) {
     return potentialKLeftEdge;
   }
 
   // Assume k>=p{i+1}
   const potentialKRightEdge = (beta + sigma_pl.at(-1)!) / (phi + s_l.at(-1)!);
-  if (potentialKRightEdge >= sortedPositionSlippageTuple.at(-1)![0]) {
+  if (potentialKRightEdge >= sortedPositionSlippageTuple.at(-1)![0] - TOLERANCE) {
     return potentialKRightEdge;
   }
 
