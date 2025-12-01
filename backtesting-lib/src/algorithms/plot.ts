@@ -3,15 +3,55 @@ import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
 import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
 import { tryAsync } from '@/utils/errorHandling';
 
+export type DescriptionMetrics = {
+  aggregate: string;
+  algorithmReturn: string;
+  contextLength: string;
+  growthRate: string;
+  maxHoldingPercentage: string;
+  sharpeRatio: string;
+  tickers: string;
+  timespan: string;
+  tradesMade: string;
+};
+
+type DescriptionMetricOptions = {
+  [K in keyof DescriptionMetrics]: boolean;
+};
+const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
+  aggregate: true,
+  algorithmReturn: true,
+  contextLength: false,
+  growthRate: true,
+  maxHoldingPercentage: false,
+  sharpeRatio: true,
+  tickers: true,
+  timespan: true,
+  tradesMade: true,
+};
+
+const DESCRIPTION_METRICS_ORDER: (keyof DescriptionMetrics)[] = [
+  'aggregate',
+  'timespan',
+  'algorithmReturn',
+  'growthRate',
+  'sharpeRatio',
+  'tickers',
+  'maxHoldingPercentage',
+  'contextLength',
+  'tradesMade',
+];
+
 let serverIsUp = false;
 export async function chooseToPlot(
   algorithmGraphSelectionOptions: SelectionOption<{
     name: string;
     aggregate: Timestamp;
-    description: string[];
+    descriptionMetrics: DescriptionMetrics;
     algorithmPlot: SimplePlot;
   }>[],
   tickerGraphSelectionOptionsByAggregate: Record<Timestamp, SelectionOption<SimplePlot>[]>,
+  descriptionMetricOptions: Partial<DescriptionMetricOptions> = DEFAULT_DESCRIPTION_METRIC_OPTIONS,
 ) {
   while (algorithmGraphSelectionOptions.length > 0) {
     const algorithmSelectionResponse = await tryAsync(() =>
@@ -35,7 +75,7 @@ export async function chooseToPlot(
       return;
     }
 
-    const { name, algorithmPlot, description, aggregate } = selectedAlgorithm;
+    const { name, algorithmPlot, descriptionMetrics, aggregate } = selectedAlgorithm;
 
     const tickerSelectionResponse = await tryAsync(() =>
       getUserSelectionInput({
@@ -58,7 +98,19 @@ export async function chooseToPlot(
     if (selectedTicker == null) {
       // User chose to not display any tickers, so reprompt for an algorithm
       continue;
-    } else if (selectedTicker === 'all') {
+    }
+
+    // Create description
+    const description: string[] = [];
+    for (const metric of DESCRIPTION_METRICS_ORDER) {
+      const showMetric =
+        descriptionMetricOptions[metric] ?? DEFAULT_DESCRIPTION_METRIC_OPTIONS[metric];
+      if (showMetric) {
+        description.push(descriptionMetrics[metric]);
+      }
+    }
+
+    if (selectedTicker === 'all') {
       for (const tickerPlotSelectionOption of tickerGraphSelectionOptionsByAggregate[aggregate]) {
         await plotAlgorithm({
           tickerPlot: tickerPlotSelectionOption.value,

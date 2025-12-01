@@ -3,6 +3,7 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/create-simple-algorithm';
+import type { DescriptionMetrics } from '@/algorithms/plot';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
@@ -64,7 +65,7 @@ export async function backtestAlgorithmsConcurrently({
     SelectionOption<{
       name: string;
       aggregate: Timestamp;
-      description: string[];
+      descriptionMetrics: DescriptionMetrics;
       algorithmPlot: SimplePlot;
     }>[],
     Record<Timestamp, SelectionOption<SimplePlot>[]>,
@@ -179,7 +180,7 @@ export async function backtestAlgorithmsConcurrently({
   const algorithmGraphSelectionOptionsWithPerformance: SelectionOptionWithPerformance<{
     name: string;
     aggregate: Timestamp;
-    description: string[];
+    descriptionMetrics: DescriptionMetrics;
     algorithmPlot: SimplePlot;
   }>[] = [];
 
@@ -426,6 +427,7 @@ export async function backtestAlgorithmsConcurrently({
     ) {
       const algorithm = algorithmsByAggregate[aggregate][algorithmIndex];
       const {
+        contextLength,
         name,
         tickers,
         algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
@@ -448,23 +450,24 @@ export async function backtestAlgorithmsConcurrently({
           yearsBetweenStartAndEnd,
         );
 
-      const description: string[] = [
-        `Aggregate: ${aggregate}`,
-        `Timespan: ${startDay.join('-')} to ${endDay!.join('-')}`,
-        `Tickers: ${tickersToString(tickers)}`,
-        `Max holding proportion: ${algorithmMaxHoldingProportion}`,
-        `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
-        `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
-        `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
-        `Trades made: ${withCommas(trades)}`,
-      ];
+      const descriptionMetrics: DescriptionMetrics = {
+        aggregate: `Aggregate: ${aggregate}`,
+        algorithmReturn: `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
+        contextLength: `Context length: ${contextLength}`,
+        growthRate: `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
+        maxHoldingPercentage: `Max holding percentage: ${algorithmMaxHoldingProportion * 100}%`,
+        sharpeRatio: `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
+        tickers: `Tickers: ${tickersToString(tickers)}`,
+        timespan: `Timespan: ${startDay.join('-')} to ${endDay!.join('-')}`,
+        tradesMade: `Trades made: ${withCommas(trades)}`,
+      };
 
       algorithmGraphSelectionOptionsWithPerformance.push({
         name: `${name}; Return: ${withCommasRounded(returnPercentage)}% (${withCommasRounded(growthRatePercentage)}% APY) - ${aggregate}`,
         value: {
           name,
           aggregate,
-          description,
+          descriptionMetrics,
           algorithmPlot,
         },
         performance: growthRatePercentage,
