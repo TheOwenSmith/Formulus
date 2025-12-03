@@ -3,44 +3,43 @@ import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
 import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
 import { tryAsync } from '@/utils/errorHandling';
 
+const DESCRIPTION_METRICS_ORDER = [
+  'aggregate',
+  'timespan',
+  'algorithmReturn',
+  'growthRate',
+  'sharpeRatio',
+  'profitLossRatio',
+  'winLossRatio',
+  'tickers',
+  'maxHoldingPercentage',
+  'contextLength',
+  'positionsClosed',
+  'tradesMade',
+] as const satisfies string[];
+
 export type DescriptionMetrics = {
-  aggregate: string;
-  algorithmReturn: string;
-  contextLength: string;
-  growthRate: string;
-  maxHoldingPercentage: string;
-  sharpeRatio: string;
-  tickers: string;
-  timespan: string;
-  tradesMade: string;
+  [K in (typeof DESCRIPTION_METRICS_ORDER)[number]]: string;
 };
 
 type DescriptionMetricOptions = {
-  [K in keyof DescriptionMetrics]: boolean;
+  [K in (typeof DESCRIPTION_METRICS_ORDER)[number]]: boolean;
 };
+
 const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
   aggregate: true,
   algorithmReturn: true,
   contextLength: false,
   growthRate: true,
   maxHoldingPercentage: false,
+  positionsClosed: true,
+  profitLossRatio: false,
   sharpeRatio: true,
   tickers: true,
   timespan: true,
-  tradesMade: true,
+  tradesMade: false,
+  winLossRatio: true,
 };
-
-const DESCRIPTION_METRICS_ORDER: (keyof DescriptionMetrics)[] = [
-  'aggregate',
-  'timespan',
-  'algorithmReturn',
-  'growthRate',
-  'sharpeRatio',
-  'tickers',
-  'maxHoldingPercentage',
-  'contextLength',
-  'tradesMade',
-];
 
 let serverIsUp = false;
 export async function chooseToPlot(

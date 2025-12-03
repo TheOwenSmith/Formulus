@@ -112,6 +112,8 @@ export async function backtestAlgorithmsConcurrently({
     createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => 100);
   const tradesByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number> =
     createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => 0);
+  const positionsClosedByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => 0);
   const positionsByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<Record<Ticker, number>> =
     createIndexByAggregateByAlgorithm(algorithmsByAggregate, (aggregate, algorithmIndex) => {
       return algorithmsByAggregate[aggregate][algorithmIndex].tickers.reduce(
@@ -175,6 +177,22 @@ export async function backtestAlgorithmsConcurrently({
     );
   const algorithmYsByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<number[]> =
     createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => []);
+  const winsLossesByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<[number, number]> =
+    createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => [0, 0]);
+  const cumulativeProfitLossByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<
+    [number, number]
+  > = createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => [0, 0]);
+  const changeInBalanceByTickerPositionByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<
+    Record<Ticker, number>
+  > = createIndexByAggregateByAlgorithm(algorithmsByAggregate, (aggregate, algorithmIndex) => {
+    return algorithmsByAggregate[aggregate][algorithmIndex].tickers.reduce(
+      (acc, ticker) => {
+        acc[ticker] = 0;
+        return acc;
+      },
+      {} as Record<Ticker, number>,
+    );
+  });
   const sharpeRatioCalculatorByAggregateByAlgorithm: IndexedByAggregateByAlgorithm<SharpeRatioCalculator> =
     createIndexByAggregateByAlgorithm(algorithmsByAggregate, () => new SharpeRatioCalculator());
   const algorithmGraphSelectionOptionsWithPerformance: SelectionOptionWithPerformance<{
@@ -334,20 +352,32 @@ export async function backtestAlgorithmsConcurrently({
 
           updatePosition({
             actions,
+            algorithmChangeInBalanceByTickerPosition:
+              changeInBalanceByTickerPositionByAggregateByAlgorithm[aggregate][algorithmIndex],
+            algorithmCumulativeProfitLoss:
+              cumulativeProfitLossByAggregateByAlgorithm[aggregate][algorithmIndex],
             algorithmIndex,
             algorithmMaxHoldingProportion,
             algorithmPositions: positions,
             algorithmTickers: tickers,
+            algorithmWinsLosses: winsLossesByAggregateByAlgorithm[aggregate][algorithmIndex],
             balancesByAlgorithm: balancesByAggregateByAlgorithm[aggregate],
+            positionsClosedByAlgorithm: positionsClosedByAggregateByAlgorithm[aggregate],
             priceByTicker,
             tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
             tradesByAlgorithm: tradesByAggregateByAlgorithm[aggregate],
           });
         } else if (!hasNextBar) {
           closeAllPositions({
+            algorithmChangeInBalanceByTickerPosition:
+              changeInBalanceByTickerPositionByAggregateByAlgorithm[aggregate][algorithmIndex],
+            algorithmCumulativeProfitLoss:
+              cumulativeProfitLossByAggregateByAlgorithm[aggregate][algorithmIndex],
             algorithmIndex,
             algorithmPositions: positions,
+            algorithmWinsLosses: winsLossesByAggregateByAlgorithm[aggregate][algorithmIndex],
             balancesByAlgorithm: balancesByAggregateByAlgorithm[aggregate],
+            positionsClosedByAlgorithm: positionsClosedByAggregateByAlgorithm[aggregate],
             priceByTicker,
             tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
             tradesByAlgorithm: tradesByAggregateByAlgorithm[aggregate],
@@ -449,6 +479,13 @@ export async function backtestAlgorithmsConcurrently({
         sharpeRatioCalculatorByAggregateByAlgorithm[aggregate][algorithmIndex].sharpe(
           yearsBetweenStartAndEnd,
         );
+      const winLossRatio =
+        winsLossesByAggregateByAlgorithm[aggregate][algorithmIndex][0] /
+        winsLossesByAggregateByAlgorithm[aggregate][algorithmIndex][1];
+      const profitLossRatio =
+        cumulativeProfitLossByAggregateByAlgorithm[aggregate][algorithmIndex][0] /
+        cumulativeProfitLossByAggregateByAlgorithm[aggregate][algorithmIndex][1];
+      const positionsClosed = positionsClosedByAggregateByAlgorithm[aggregate][algorithmIndex];
 
       const descriptionMetrics: DescriptionMetrics = {
         aggregate: `Aggregate: ${aggregate}`,
@@ -456,10 +493,13 @@ export async function backtestAlgorithmsConcurrently({
         contextLength: `Context length: ${contextLength}`,
         growthRate: `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
         maxHoldingPercentage: `Max holding percentage: ${algorithmMaxHoldingProportion * 100}%`,
+        positionsClosed: `Positions closed: ${positionsClosed}`,
+        profitLossRatio: `Profit/loss ratio: ${profitLossRatio}`,
         sharpeRatio: `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
         tickers: `Tickers: ${tickersToString(tickers)}`,
         timespan: `Timespan: ${startDay.join('-')} to ${endDay!.join('-')}`,
         tradesMade: `Trades made: ${withCommas(trades)}`,
+        winLossRatio: `Win/loss ratio: ${winLossRatio}`,
       };
 
       algorithmGraphSelectionOptionsWithPerformance.push({

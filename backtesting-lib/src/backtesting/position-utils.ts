@@ -4,21 +4,29 @@ import type { Ticker } from '@/fetch/fetch';
 // See docs/Phoenix_Trader_Position_Management_System.pdf
 export function updatePosition({
   actions,
+  algorithmChangeInBalanceByTickerPosition,
+  algorithmCumulativeProfitLoss,
   algorithmIndex,
   algorithmMaxHoldingProportion,
   algorithmPositions,
   algorithmTickers,
+  algorithmWinsLosses,
   balancesByAlgorithm,
+  positionsClosedByAlgorithm,
   priceByTicker,
   tickerDataByTicker,
   tradesByAlgorithm,
 }: {
   actions: Record<Ticker, Action>;
+  algorithmChangeInBalanceByTickerPosition: Record<Ticker, number>;
+  algorithmCumulativeProfitLoss: [number, number];
   algorithmIndex: number;
   algorithmMaxHoldingProportion: number;
   algorithmPositions: Record<Ticker, number>;
   algorithmTickers: Ticker[];
+  algorithmWinsLosses: [number, number];
   balancesByAlgorithm: number[];
+  positionsClosedByAlgorithm: number[];
   priceByTicker: Record<Ticker, number>;
   tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
   tradesByAlgorithm: number[];
@@ -63,9 +71,19 @@ export function updatePosition({
     const sharesOwned = algorithmPositions[ticker];
     const positionSize = priceByTicker[ticker] * sharesOwned;
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const sellingProfit = (1 - slippage) * positionSize;
+    changeInBalance += sellingProfit;
 
-    changeInBalance += (1 - slippage) * positionSize;
-    algorithmPositions[ticker] = 0;
+    closePosition({
+      algorithmChangeInBalanceByTickerPosition,
+      algorithmCumulativeProfitLoss,
+      algorithmIndex,
+      algorithmPositions,
+      algorithmWinsLosses,
+      positionsClosedByAlgorithm,
+      sellingProfit,
+      ticker,
+    });
   }
 
   // Adjust holding
@@ -74,9 +92,12 @@ export function updatePosition({
     const positionSize = priceByTicker[ticker] * sharesOwned;
     const deltaPositionSize = k - positionSize;
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
-
     const slippageFactor = deltaPositionSize < 0 ? 1 - slippage : 1 + slippage;
-    changeInBalance += slippageFactor * -deltaPositionSize;
+
+    // Update balance
+    const deltaChangeInBalance = slippageFactor * -deltaPositionSize;
+    changeInBalance += deltaChangeInBalance;
+    algorithmChangeInBalanceByTickerPosition[ticker] += deltaChangeInBalance;
     algorithmPositions[ticker] += deltaPositionSize / priceByTicker[ticker];
   }
 
@@ -84,7 +105,10 @@ export function updatePosition({
   for (const ticker of b) {
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
     algorithmPositions[ticker] = k / priceByTicker[ticker];
-    changeInBalance -= (1 + slippage) * k;
+
+    const cost = (1 + slippage) * k;
+    changeInBalance -= cost;
+    algorithmChangeInBalanceByTickerPosition[ticker] -= cost;
   }
 
   // Update trades and balances
@@ -214,27 +238,82 @@ export function getPortfolioValue({
 }
 
 export function closeAllPositions({
+  algorithmChangeInBalanceByTickerPosition,
+  algorithmCumulativeProfitLoss,
   algorithmIndex,
   algorithmPositions,
+  algorithmWinsLosses,
   balancesByAlgorithm,
+  positionsClosedByAlgorithm,
   priceByTicker,
   tickerDataByTicker,
   tradesByAlgorithm,
 }: {
+  algorithmChangeInBalanceByTickerPosition: Record<Ticker, number>;
+  algorithmCumulativeProfitLoss: [number, number];
   algorithmIndex: number;
   algorithmPositions: Record<Ticker, number>;
+  algorithmWinsLosses: [number, number];
   balancesByAlgorithm: number[];
+  positionsClosedByAlgorithm: number[];
   priceByTicker: Record<Ticker, number>;
   tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
   tradesByAlgorithm: number[];
 }) {
   let changeInBalance = 0;
   for (const ticker in algorithmPositions) {
+    const sharesOwned = algorithmPositions[ticker];
+    const positionSize = priceByTicker[ticker] * sharesOwned;
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
-    const positionSize = priceByTicker[ticker] * algorithmPositions[ticker];
-    changeInBalance += (1 - slippage) * positionSize;
-    algorithmPositions[ticker] = 0;
+    const sellingProfit = (1 - slippage) * positionSize;
+    changeInBalance += sellingProfit;
+
+    closePosition({
+      algorithmChangeInBalanceByTickerPosition,
+      algorithmCumulativeProfitLoss,
+      algorithmIndex,
+      algorithmPositions,
+      algorithmWinsLosses,
+      positionsClosedByAlgorithm,
+      sellingProfit,
+      ticker,
+    });
   }
   tradesByAlgorithm[algorithmIndex] += Object.keys(algorithmPositions).length;
   balancesByAlgorithm[algorithmIndex] += changeInBalance;
+}
+
+function closePosition({
+  algorithmChangeInBalanceByTickerPosition,
+  algorithmCumulativeProfitLoss,
+  algorithmIndex,
+  algorithmPositions,
+  algorithmWinsLosses,
+  positionsClosedByAlgorithm,
+  sellingProfit,
+  ticker,
+}: {
+  algorithmChangeInBalanceByTickerPosition: Record<Ticker, number>;
+  algorithmCumulativeProfitLoss: [number, number];
+  algorithmIndex: number;
+  algorithmPositions: Record<Ticker, number>;
+  algorithmWinsLosses: [number, number];
+  positionsClosedByAlgorithm: number[];
+  sellingProfit: number;
+  ticker: Ticker;
+}) {
+  // Update balance
+  const positionProfit = algorithmChangeInBalanceByTickerPosition[ticker] + sellingProfit;
+  algorithmPositions[ticker] = 0;
+  algorithmChangeInBalanceByTickerPosition[ticker] = 0;
+
+  // Update W/L and P/L related variables
+  if (positionProfit > 0) {
+    algorithmWinsLosses[0]++;
+    algorithmCumulativeProfitLoss[0] += positionProfit;
+  } else if (positionProfit < 0) {
+    algorithmWinsLosses[1]++;
+    algorithmCumulativeProfitLoss[1] += -positionProfit;
+  }
+  positionsClosedByAlgorithm[algorithmIndex]++;
 }
