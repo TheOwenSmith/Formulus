@@ -1,13 +1,17 @@
-import type { Timestamp } from '@/fetch/fetch';
+import type { DescriptionMetrics } from '@/backtesting/statistics';
+import { tickersToString } from '@/backtesting/ticker-utils';
+import type { Ticker, Timestamp } from '@/fetch/fetch';
 import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
 import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
+import { dayToString, type Day } from '@/utils/date-utils';
 import { tryAsync } from '@/utils/errorHandling';
+import { withCommas, withCommasRounded } from '@/utils/number-utils';
 
 const DESCRIPTION_METRICS_ORDER = [
   'aggregate',
   'timespan',
-  'algorithmReturn',
-  'growthRate',
+  'algorithmReturnPercentage',
+  'growthRatePercentage',
   'sharpeRatio',
   'profitLossRatio',
   'winRate',
@@ -16,21 +20,41 @@ const DESCRIPTION_METRICS_ORDER = [
   'contextLength',
   'positionsClosed',
   'tradesMade',
-] as const satisfies string[];
+] as const satisfies (keyof DescriptionMetrics)[];
 
-export type DescriptionMetrics = {
-  [K in (typeof DESCRIPTION_METRICS_ORDER)[number]]: string;
+const DESCRIPTION_METRIC_TO_STRING: {
+  [K in keyof DescriptionMetrics]: (descriptionMetric: DescriptionMetrics[K]) => string;
+} = {
+  aggregate: (aggregate: Timestamp) => `Aggregate: ${aggregate}`,
+  algorithmReturnPercentage: (algorithmReturnPercentage: number) =>
+    `Algorithm return: ${withCommasRounded(algorithmReturnPercentage)}%`,
+  contextLength: (contextLength: number) => `Context length: ${withCommas(contextLength)}`,
+  growthRatePercentage: (growthRatePercentage: number) =>
+    `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
+  maxHoldingPercentage: (maxHoldingPercentage: number) =>
+    `Max holding percentage: ${withCommasRounded(maxHoldingPercentage)}%`,
+  positionsClosed: (positionsClosed: number) => `Positions closed: ${withCommas(positionsClosed)}`,
+  profitLossRatio: (profitLossRatio: number) => {
+    const profitLossRatioString =
+      profitLossRatio !== Infinity ? `${withCommasRounded(profitLossRatio)}:1` : '1:0';
+    return `Profit/loss ratio: ${profitLossRatioString}`;
+  },
+  sharpeRatio: (sharpeRatio: number) => `Sharpe ratio: ${withCommasRounded(sharpeRatio)}`,
+  tickers: (tickers: Ticker[]) => `Tickers: ${tickersToString(tickers)}`,
+  timespan: (timespan: [Day, Day]) =>
+    `Timespan: ${dayToString(timespan[0])} to ${dayToString(timespan[1])}`,
+  tradesMade: (tradesMade: number) => `Trades made: ${withCommas(tradesMade)}`,
+  winRate: (winRate: number) => `Win rate: ${withCommasRounded(winRate)}%`,
 };
 
 type DescriptionMetricOptions = {
   [K in (typeof DESCRIPTION_METRICS_ORDER)[number]]: boolean;
 };
-
 const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
   aggregate: true,
-  algorithmReturn: true,
+  algorithmReturnPercentage: true,
   contextLength: false,
-  growthRate: true,
+  growthRatePercentage: true,
   maxHoldingPercentage: false,
   positionsClosed: true,
   profitLossRatio: false,
@@ -105,7 +129,12 @@ export async function chooseToPlot(
       const showMetric =
         descriptionMetricOptions[metric] ?? DEFAULT_DESCRIPTION_METRIC_OPTIONS[metric];
       if (showMetric) {
-        description.push(descriptionMetrics[metric]);
+        const toStringFn = DESCRIPTION_METRIC_TO_STRING[metric] as (
+          descriptionMetric: DescriptionMetrics[typeof metric],
+        ) => string;
+
+        const strigifiedMetric = toStringFn(descriptionMetrics[metric]);
+        description.push(strigifiedMetric);
       }
     }
 

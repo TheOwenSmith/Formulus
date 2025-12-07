@@ -2,18 +2,16 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/create-simple-algorithm';
-import type { DescriptionMetrics } from '@/algorithms/plot';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import type { SelectionOption } from '@/utils/cli';
-import { dayToString, type Day } from '@/utils/date-utils';
-import { withCommas, withCommasRounded } from '@/utils/number-utils';
+import { type Day } from '@/utils/date-utils';
+import { withCommasRounded } from '@/utils/number-utils';
 import {
   MAX_POINTS_PER_PLOT,
   type AlgorithmData,
   type SelectionOptionWithPerformance,
 } from './backtest-algorithms-concurrently';
-import { tickersToString } from './ticker-utils';
 
 export function updateGraph<T>({
   graphByIndex,
@@ -62,28 +60,47 @@ export function getTickerSelectionOption({
     value: tickerPlot,
   };
 }
-export function getAlgorithmSelectionOptionWithPerformance({
-  algorithmData,
+
+export type DescriptionMetrics = {
+  aggregate: Timestamp;
+  algorithmReturnPercentage: number;
+  contextLength: number;
+  growthRatePercentage: number;
+  maxHoldingPercentage: number;
+  positionsClosed: number;
+  profitLossRatio: number;
+  sharpeRatio: number;
+  tickers: Ticker[];
+  timespan: [Day, Day];
+  tradesMade: number;
+  winRate: number;
+};
+
+export async function getAlgorithmSelectionOptionWithPerformance({
   aggregate,
-  yearsBetweenStartAndEnd,
-  startDay,
-  endDay,
-  xs,
   algorithm,
+  algorithmData,
+  performanceFn = (descriptionMetrics: DescriptionMetrics) =>
+    descriptionMetrics.growthRatePercentage,
+  timespan,
+  xs,
+  yearsBetweenStartAndEnd,
 }: {
-  algorithmData: AlgorithmData;
   aggregate: Timestamp;
-  yearsBetweenStartAndEnd: number;
-  startDay: Day;
-  endDay: Day;
-  xs: number[];
   algorithm: Algorithm;
-}): SelectionOptionWithPerformance<{
-  name: string;
-  aggregate: Timestamp;
-  descriptionMetrics: DescriptionMetrics;
-  algorithmPlot: SimplePlot;
-}> {
+  algorithmData: AlgorithmData;
+  performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
+  timespan: [Day, Day];
+  xs: number[];
+  yearsBetweenStartAndEnd: number;
+}): Promise<
+  SelectionOptionWithPerformance<{
+    name: string;
+    aggregate: Timestamp;
+    descriptionMetrics: DescriptionMetrics;
+    algorithmPlot: SimplePlot;
+  }>
+> {
   const {
     contextLength,
     name,
@@ -107,37 +124,34 @@ export function getAlgorithmSelectionOptionWithPerformance({
     type: 'scatter',
   };
 
-  const returnPercentage = balance - 100;
+  const algorithmReturnPercentage = balance - 100;
   const growthRatePercentage = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
-  const sharpRatio = sharpeRatioCalculator.sharpe(yearsBetweenStartAndEnd);
-  const winPercentage = (winsLosses[0] / (winsLosses[0] + winsLosses[1])) * 100;
-  const profitLossRatio = cumulativeProfitLoss[0] / cumulativeProfitLoss[1];
-  const profitLossRatioString =
-    profitLossRatio !== Infinity ? `${withCommasRounded(profitLossRatio)}:1` : '1:0';
 
   const descriptionMetrics: DescriptionMetrics = {
-    aggregate: `Aggregate: ${aggregate}`,
-    algorithmReturn: `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
-    contextLength: `Context length: ${withCommas(contextLength)}`,
-    growthRate: `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
-    maxHoldingPercentage: `Max holding percentage: ${algorithmMaxHoldingProportion * 100}%`,
-    positionsClosed: `Positions closed: ${withCommas(positionsClosed)}`,
-    profitLossRatio: `Profit/loss ratio: ${profitLossRatioString}`,
-    sharpeRatio: `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
-    tickers: `Tickers: ${tickersToString(tickers)}`,
-    timespan: `Timespan: ${dayToString(startDay)} to ${dayToString(endDay!)}`,
-    tradesMade: `Trades made: ${withCommas(trades)}`,
-    winRate: `Win rate: ${withCommasRounded(winPercentage)}%`,
+    aggregate,
+    algorithmReturnPercentage,
+    contextLength,
+    growthRatePercentage,
+    maxHoldingPercentage: algorithmMaxHoldingProportion * 100,
+    positionsClosed,
+    profitLossRatio: cumulativeProfitLoss[0] / cumulativeProfitLoss[1],
+    sharpeRatio: sharpeRatioCalculator.sharpe(yearsBetweenStartAndEnd),
+    tickers,
+    timespan,
+    tradesMade: trades,
+    winRate: (winsLosses[0] / (winsLosses[0] + winsLosses[1])) * 100,
   };
 
+  const performance = await performanceFn(descriptionMetrics);
+
   return {
-    name: `${name}; Return: ${withCommasRounded(returnPercentage)}% (${withCommasRounded(growthRatePercentage)}% APY) - ${aggregate}`,
+    name: `${name}; Return: ${withCommasRounded(algorithmReturnPercentage)}% (${withCommasRounded(growthRatePercentage)}% APY) - ${aggregate}`,
     value: {
       name,
       aggregate,
       descriptionMetrics,
       algorithmPlot,
     },
-    performance: growthRatePercentage,
+    performance,
   };
 }

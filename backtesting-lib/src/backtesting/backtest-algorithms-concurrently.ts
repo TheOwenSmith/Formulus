@@ -3,7 +3,6 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/create-simple-algorithm';
-import type { DescriptionMetrics } from '@/algorithms/plot';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
@@ -25,6 +24,7 @@ import {
   getAlgorithmSelectionOptionWithPerformance,
   getTickerSelectionOption,
   updateGraph,
+  type DescriptionMetrics,
 } from './statistics';
 import {
   countLinesToProcess,
@@ -69,12 +69,14 @@ const PROGRESS_UPDATE_INTERVAL = 1_000;
 
 export async function backtestAlgorithmsConcurrently({
   algorithms,
+  performanceFn,
   tickerData = [],
   timespan,
   trackProgress,
   verboseLogging,
 }: {
   algorithms: Algorithm[];
+  performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   tickerData?: TickerData[];
   timespan?: [string | undefined, string | undefined];
   trackProgress?: boolean;
@@ -417,15 +419,16 @@ export async function backtestAlgorithmsConcurrently({
       algorithmIndex < algorithmsByAggregate[aggregate].length;
       algorithmIndex++
     ) {
-      const algorithmSelectionOptionWithPerformance = getAlgorithmSelectionOptionWithPerformance({
-        aggregate,
-        algorithm: algorithmsByAggregate[aggregate][algorithmIndex],
-        algorithmData: algorithmDataByAlgorithm[algorithmIndex],
-        endDay: endDay!,
-        startDay,
-        xs,
-        yearsBetweenStartAndEnd,
-      });
+      const algorithmSelectionOptionWithPerformance =
+        await getAlgorithmSelectionOptionWithPerformance({
+          aggregate,
+          algorithm: algorithmsByAggregate[aggregate][algorithmIndex],
+          algorithmData: algorithmDataByAlgorithm[algorithmIndex],
+          performanceFn,
+          timespan: [startDay, endDay!],
+          xs,
+          yearsBetweenStartAndEnd,
+        });
       algorithmGraphSelectionOptionsWithPerformance.push(algorithmSelectionOptionWithPerformance);
     }
   }
