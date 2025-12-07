@@ -93,4 +93,6 @@ if (!backtestResponse.ok) {
 
 const [algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate] =
   backtestResponse.data;
-await chooseToPlot(algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate);
+await chooseToPlot(algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate, {
+  profitLossRatio: true,
+});

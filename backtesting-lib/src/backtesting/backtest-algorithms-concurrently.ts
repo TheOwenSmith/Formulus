@@ -451,12 +451,15 @@ export async function backtestAlgorithmsConcurrently({
       const trades = statisticsByAlgorithm[algorithmIndex].trades;
       const sharpRatio =
         statisticsByAlgorithm[algorithmIndex].sharpeRatioCalculator.sharpe(yearsBetweenStartAndEnd);
-      const winLossRatio =
-        statisticsByAlgorithm[algorithmIndex].winsLosses[0] /
-        statisticsByAlgorithm[algorithmIndex].winsLosses[1];
+      const winPercentage =
+        (statisticsByAlgorithm[algorithmIndex].winsLosses[0] /
+          (statisticsByAlgorithm[algorithmIndex].winsLosses[0] +
+            statisticsByAlgorithm[algorithmIndex].winsLosses[1])) *
+        100;
       const profitLossRatio =
         statisticsByAlgorithm[algorithmIndex].cumulativeProfitLoss[0] /
         statisticsByAlgorithm[algorithmIndex].cumulativeProfitLoss[1];
+      const profitLossRatioString = profitLossRatio !== Infinity ? `${profitLossRatio}:1` : '1:0';
       const positionsClosed = statisticsByAlgorithm[algorithmIndex].positionsClosed;
 
       const descriptionMetrics: DescriptionMetrics = {
@@ -466,12 +469,12 @@ export async function backtestAlgorithmsConcurrently({
         growthRate: `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
         maxHoldingPercentage: `Max holding percentage: ${algorithmMaxHoldingProportion * 100}%`,
         positionsClosed: `Positions closed: ${positionsClosed}`,
-        profitLossRatio: `Profit/loss ratio: ${profitLossRatio}`,
+        profitLossRatio: `Profit/loss ratio: ${profitLossRatioString}`,
         sharpeRatio: `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
         tickers: `Tickers: ${tickersToString(tickers)}`,
         timespan: `Timespan: ${dayToString(startDay)} to ${dayToString(endDay!)}`,
         tradesMade: `Trades made: ${withCommas(trades)}`,
-        winLossRatio: `Win/loss ratio: ${winLossRatio}`,
+        winRate: `Win rate: ${withCommasRounded(winPercentage)}%`,
       };
 
       algorithmGraphSelectionOptionsWithPerformance.push({

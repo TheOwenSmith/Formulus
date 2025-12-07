@@ -10,7 +10,7 @@ const DESCRIPTION_METRICS_ORDER = [
   'growthRate',
   'sharpeRatio',
   'profitLossRatio',
-  'winLossRatio',
+  'winRate',
   'tickers',
   'maxHoldingPercentage',
   'contextLength',
@@ -38,7 +38,7 @@ const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
   tickers: true,
   timespan: true,
   tradesMade: false,
-  winLossRatio: true,
+  winRate: true,
 };
 
 let serverIsUp = false;
