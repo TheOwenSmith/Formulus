@@ -1,11 +1,7 @@
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 import { Heap } from '@/utils/heap';
-import {
-  Action,
-  DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-  type Algorithm,
-} from './create-simple-algorithm';
+import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
 
 export type TopKAlgorithm = {
   aggregate: Timestamp;

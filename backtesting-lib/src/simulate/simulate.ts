@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { deserializeContextMap } from '@/algorithms/sophisticated-prev-bars';
+import { deserializeContextMap } from '@/algorithms/examples/green-red-bars';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { trySync } from '@/utils/errorHandling';
 import fs from 'fs';

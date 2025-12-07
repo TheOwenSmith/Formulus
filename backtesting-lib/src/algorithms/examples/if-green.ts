@@ -1,17 +1,14 @@
-import {
-  Action,
-  createAlgorithmFromSimpleAlgorithm,
-  type Algorithm,
-} from '@/algorithms/create-simple-algorithm';
+import { Action, type Algorithm } from '@/algorithms/algorithm';
+import { createAlgorithmFromSimpleAlgorithm } from '@/algorithms/simple-algorithm';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 
-export const prevBarAlgorithm = (aggregate: Timestamp, ticker: Ticker): Algorithm =>
+export const ifGreenAlgorithm = (aggregate: Timestamp, ticker: Ticker): Algorithm =>
   createAlgorithmFromSimpleAlgorithm({
     aggregate,
     contextLength: 1,
     implementation: prevBarAlgorithmImplementation,
-    name: 'Previous Bar',
+    name: 'If Green',
     ticker,
   });
 

@@ -1,4 +1,4 @@
-import { type Algorithm } from '@/algorithms/create-simple-algorithm';
+import { type Algorithm } from '@/algorithms/algorithm';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
 import { compareDays, dayToString, timestampToDay, type Day } from '@/utils/date-utils';
 import { tryAsync, trySync } from '@/utils/errorHandling';

@@ -2,7 +2,7 @@ import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
-} from '@/algorithms/create-simple-algorithm';
+} from '@/algorithms/algorithm';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';

@@ -1,7 +1,4 @@
-import {
-  DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-  type Algorithm,
-} from '@/algorithms/create-simple-algorithm';
+import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from '@/algorithms/algorithm';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import type { SelectionOption } from '@/utils/cli';

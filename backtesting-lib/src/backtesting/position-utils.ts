@@ -1,4 +1,4 @@
-import { Action } from '@/algorithms/create-simple-algorithm';
+import { Action } from '@/algorithms/algorithm';
 import type { Ticker } from '@/fetch/fetch';
 import type { AlgorithmData } from './backtest-algorithms-concurrently';
 

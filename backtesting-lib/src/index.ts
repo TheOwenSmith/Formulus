@@ -1,22 +1,27 @@
-import { type Algorithm } from '@/algorithms/create-simple-algorithm';
 import fs from 'fs';
 import path from 'path';
-import { chooseToPlot } from './algorithms/plot';
-import { prevBarAlgorithm } from './algorithms/prev-bar';
+import z from 'zod';
+import { type Algorithm } from './algorithms/algorithm';
 import {
-  compoundSophisticatedPrevBarsAlgorithm,
   createContextMap,
   deserializeContextMap,
   serializeContextMap,
-} from './algorithms/sophisticated-prev-bars';
+} from './algorithms/context-maps/context-map';
+import {
+  greenRedBarsChooseKAlgorithm,
+  greenRedBarsMaskHistory,
+} from './algorithms/examples/green-red-bars';
+import { ifGreenAlgorithm } from './algorithms/examples/if-green';
+import { chooseToPlot } from './algorithms/plot';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
 import type { Ticker } from './fetch/fetch';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
 const tickers: [Ticker, ...Ticker[]] = ['SPY', 'SH', 'AAPL', 'GOOG', 'PFE', 'TSLA'];
-const algorithms: Algorithm[] = [prevBarAlgorithm('60min', 'SPY')];
+const algorithms: Algorithm[] = [ifGreenAlgorithm('60min', 'SPY')];
 
+// Load context maps
 console.log('Loading context maps...');
 const contextMapByTickerByContextLength = new Map<Ticker, Map<number, Map<number, number>>>();
 for (const ticker of tickers) {
@@ -32,7 +37,9 @@ for (const ticker of tickers) {
       if (!readFileResponse.ok) throw readFileResponse.error;
       const serializedContextMap = readFileResponse.data;
 
-      const contextMapResponse = trySync(() => deserializeContextMap(serializedContextMap));
+      const contextMapResponse = trySync(() =>
+        deserializeContextMap(serializedContextMap, z.number()),
+      );
       if (!contextMapResponse.ok) throw contextMapResponse.error;
       contextMapByContextLength.set(contextLength, contextMapResponse.data);
       continue;
@@ -41,6 +48,7 @@ for (const ticker of tickers) {
     const contextMap = await createContextMap({
       tickDataFilename: `./data/cleaned/${ticker}_60min.csv`,
       contextLength,
+      encodeContext: greenRedBarsMaskHistory,
       verboseLogging: false,
     });
     contextMapByContextLength.set(contextLength, contextMap);
@@ -68,7 +76,7 @@ for (const k of [1, 2]) {
     );
 
     algorithms.push(
-      compoundSophisticatedPrevBarsAlgorithm({
+      greenRedBarsChooseKAlgorithm({
         aggregate: '60min',
         contextLength,
         contextMapByTicker,
