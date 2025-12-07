@@ -224,7 +224,7 @@ export async function matchAggregateDataIterators(
     throw new Error('Failed to find actual start day');
   }
 
-  const actualStartDay: Day = timestampToDay(actualStartDayTimestamp);
+  const actualStartDay = timestampToDay(actualStartDayTimestamp);
   return [actualStartDay, firstBarByAggregateByTicker];
 }
 

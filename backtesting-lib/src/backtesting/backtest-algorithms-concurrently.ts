@@ -16,11 +16,16 @@ import {
 } from '@/utils/date-utils';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { groupBy } from '@/utils/groupBy';
-import { withCommas, withCommasRounded } from '@/utils/number-utils';
+import { withCommas } from '@/utils/number-utils';
 import { SharpeRatioCalculator } from '@/utils/sharpe-ratio-calculator';
 import cliProgress, { Presets } from 'cli-progress';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator, type Bar } from './read-data';
+import {
+  getAlgorithmSelectionOptionWithPerformance,
+  getTickerSelectionOption,
+  updateGraph,
+} from './statistics';
 import {
   countLinesToProcess,
   createIndexByTicker,
@@ -28,7 +33,6 @@ import {
   getTickerDataByAggregateByTicker,
   getTickerIteratorsByTicker,
   matchAggregateDataIterators,
-  tickersToString,
   type IndexedByAggregateByTicker,
 } from './ticker-utils';
 
@@ -46,7 +50,7 @@ export type TickerData =
       filename: string;
     };
 
-type SelectionOptionWithPerformance<T> = SelectionOption<T> & { performance: number };
+export type SelectionOptionWithPerformance<T> = SelectionOption<T> & { performance: number };
 
 export type AlgorithmData = {
   algorithmYs: number[];
@@ -60,7 +64,7 @@ export type AlgorithmData = {
   winsLosses: [number, number];
 };
 
-const MAX_POINTS_PER_PLOT = 1_000;
+export const MAX_POINTS_PER_PLOT = 1_000;
 const PROGRESS_UPDATE_INTERVAL = 1_000;
 
 export async function backtestAlgorithmsConcurrently({
@@ -209,7 +213,7 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Algorithm tracking variables
-    const statisticsByAlgorithm: AlgorithmData[] = Array.from(
+    const algorithmDataByAlgorithm: AlgorithmData[] = Array.from(
       { length: algorithmsByAggregate[aggregate].length },
       (_, algorithmIndex) => ({
         algorithmYs: [],
@@ -280,7 +284,6 @@ export async function backtestAlgorithmsConcurrently({
         }
       }
 
-      // Update plotting variables
       for (const ticker in tickerIteratorByTicker) {
         // Update progress bar
         if (trackProgress && ++linesProcessed % PROGRESS_UPDATE_INTERVAL === 0) {
@@ -299,19 +302,12 @@ export async function backtestAlgorithmsConcurrently({
         }
 
         // Update plotting variables
-        const tickerYs = tickerYsByTicker[ticker];
         if (ticks % plotSpacing === 0) {
-          tickerYs.push((currentBarByTicker[ticker][4] / firstPriceByTicker[ticker]) * 100);
-
-          if (tickerYs.length > MAX_POINTS_PER_PLOT) {
-            // Reduce the number of points in the plot by half
-            const reducedTickerPlot: number[] = [];
-            for (let j = 0; j < tickerYs.length; j += 2) {
-              reducedTickerPlot.push(tickerYs[j]);
-            }
-            tickerYsByTicker[ticker] = reducedTickerPlot;
-            updatePlotSpacing = true;
-          }
+          updatePlotSpacing = updateGraph({
+            graphByIndex: tickerYsByTicker,
+            graphIndex: ticker,
+            pointY: (currentBarByTicker[ticker][4] / firstPriceByTicker[ticker]) * 100,
+          });
         }
       }
 
@@ -326,7 +322,7 @@ export async function backtestAlgorithmsConcurrently({
           algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
         } = algorithm;
 
-        const positions = statisticsByAlgorithm[algorithmIndex].positions;
+        const positions = algorithmDataByAlgorithm[algorithmIndex].positions;
         const priceByTicker: Record<Ticker, number> = tickers.reduce(
           (acc, ticker) => {
             acc[ticker] = contextByTicker[ticker].at(-1)![4];
@@ -350,7 +346,7 @@ export async function backtestAlgorithmsConcurrently({
 
           updatePosition({
             actions,
-            algorithmData: statisticsByAlgorithm[algorithmIndex],
+            algorithmData: algorithmDataByAlgorithm[algorithmIndex],
             algorithmMaxHoldingProportion,
             algorithmTickers: tickers,
             priceByTicker,
@@ -358,7 +354,7 @@ export async function backtestAlgorithmsConcurrently({
           });
         } else if (!hasNextBar) {
           closeAllPositions({
-            algorithmData: statisticsByAlgorithm[algorithmIndex],
+            algorithmData: algorithmDataByAlgorithm[algorithmIndex],
             priceByTicker,
             tickerDataByTicker,
           });
@@ -366,24 +362,17 @@ export async function backtestAlgorithmsConcurrently({
 
         const portfolioValue = getPortfolioValue({
           priceByTicker,
-          algorithmData: statisticsByAlgorithm[algorithmIndex],
+          algorithmData: algorithmDataByAlgorithm[algorithmIndex],
         });
-        statisticsByAlgorithm[algorithmIndex].sharpeRatioCalculator.addPrice(portfolioValue);
+        algorithmDataByAlgorithm[algorithmIndex].sharpeRatioCalculator.addPrice(portfolioValue);
 
         // Update plotting variables
-        const algorithmYs = statisticsByAlgorithm[algorithmIndex].algorithmYs;
         if (ticks % plotSpacing === 0) {
-          algorithmYs.push(portfolioValue);
-
-          if (algorithmYs.length > MAX_POINTS_PER_PLOT) {
-            // Reduce the number of points in the plot by half
-            const reducedAlgorithmPlot: number[] = [];
-            for (let j = 0; j < algorithmYs.length; j += 2) {
-              reducedAlgorithmPlot.push(algorithmYs[j]);
-            }
-            statisticsByAlgorithm[algorithmIndex].algorithmYs = reducedAlgorithmPlot;
-            updatePlotSpacing = true;
-          }
+          updatePlotSpacing = updateGraph({
+            graphByIndex: algorithmDataByAlgorithm[algorithmIndex],
+            graphIndex: 'algorithmYs',
+            pointY: portfolioValue,
+          });
         }
 
         if (!hasNextBar) {
@@ -408,21 +397,17 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Compile ticker plots
-    const pointsPlotted = statisticsByAlgorithm[0].algorithmYs.length;
+    const pointsPlotted = algorithmDataByAlgorithm[0].algorithmYs.length;
     const xs = Array.from({ length: pointsPlotted }, (_, i) => i);
 
     for (const ticker in tickerYsByTicker) {
-      const tickerYs = tickerYsByTicker[ticker];
-      const tickerPlot: SimplePlot = {
-        name: ticker,
-        x: xs,
-        y: tickerYs,
-        type: 'scatter',
-      };
-      tickerGraphSelectionOptionsByAggregate[aggregate].push({
-        name: `${ticker} (${aggregate})`,
-        value: tickerPlot,
+      const tickerSelectionOption = getTickerSelectionOption({
+        aggregate,
+        ticker,
+        tickerYs: tickerYsByTicker[ticker],
+        xs,
       });
+      tickerGraphSelectionOptionsByAggregate[aggregate].push(tickerSelectionOption);
     }
 
     // Compile algorithm plots
@@ -432,65 +417,16 @@ export async function backtestAlgorithmsConcurrently({
       algorithmIndex < algorithmsByAggregate[aggregate].length;
       algorithmIndex++
     ) {
-      const algorithm = algorithmsByAggregate[aggregate][algorithmIndex];
-      const {
-        contextLength,
-        name,
-        tickers,
-        algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-      } = algorithm;
-
-      const algorithmYs = statisticsByAlgorithm[algorithmIndex].algorithmYs;
-      const algorithmPlot: SimplePlot = {
-        name: 'Algorithm',
-        x: xs,
-        y: algorithmYs,
-        type: 'scatter',
-      };
-
-      const balance = statisticsByAlgorithm[algorithmIndex].balance;
-      const returnPercentage = balance - 100;
-      const growthRatePercentage = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
-      const trades = statisticsByAlgorithm[algorithmIndex].trades;
-      const sharpRatio =
-        statisticsByAlgorithm[algorithmIndex].sharpeRatioCalculator.sharpe(yearsBetweenStartAndEnd);
-      const winPercentage =
-        (statisticsByAlgorithm[algorithmIndex].winsLosses[0] /
-          (statisticsByAlgorithm[algorithmIndex].winsLosses[0] +
-            statisticsByAlgorithm[algorithmIndex].winsLosses[1])) *
-        100;
-      const profitLossRatio =
-        statisticsByAlgorithm[algorithmIndex].cumulativeProfitLoss[0] /
-        statisticsByAlgorithm[algorithmIndex].cumulativeProfitLoss[1];
-      const profitLossRatioString =
-        profitLossRatio !== Infinity ? `${withCommasRounded(profitLossRatio)}:1` : '1:0';
-      const positionsClosed = statisticsByAlgorithm[algorithmIndex].positionsClosed;
-
-      const descriptionMetrics: DescriptionMetrics = {
-        aggregate: `Aggregate: ${aggregate}`,
-        algorithmReturn: `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
-        contextLength: `Context length: ${withCommas(contextLength)}`,
-        growthRate: `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
-        maxHoldingPercentage: `Max holding percentage: ${algorithmMaxHoldingProportion * 100}%`,
-        positionsClosed: `Positions closed: ${withCommas(positionsClosed)}`,
-        profitLossRatio: `Profit/loss ratio: ${profitLossRatioString}`,
-        sharpeRatio: `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
-        tickers: `Tickers: ${tickersToString(tickers)}`,
-        timespan: `Timespan: ${dayToString(startDay)} to ${dayToString(endDay!)}`,
-        tradesMade: `Trades made: ${withCommas(trades)}`,
-        winRate: `Win rate: ${withCommasRounded(winPercentage)}%`,
-      };
-
-      algorithmGraphSelectionOptionsWithPerformance.push({
-        name: `${name}; Return: ${withCommasRounded(returnPercentage)}% (${withCommasRounded(growthRatePercentage)}% APY) - ${aggregate}`,
-        value: {
-          name,
-          aggregate,
-          descriptionMetrics,
-          algorithmPlot,
-        },
-        performance: growthRatePercentage,
+      const algorithmSelectionOptionWithPerformance = getAlgorithmSelectionOptionWithPerformance({
+        aggregate,
+        algorithm: algorithmsByAggregate[aggregate][algorithmIndex],
+        algorithmData: algorithmDataByAlgorithm[algorithmIndex],
+        endDay: endDay!,
+        startDay,
+        xs,
+        yearsBetweenStartAndEnd,
       });
+      algorithmGraphSelectionOptionsWithPerformance.push(algorithmSelectionOptionWithPerformance);
     }
   }
 
