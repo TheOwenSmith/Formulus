@@ -1,7 +1,7 @@
 import { type Algorithm } from '@/algorithms/create-simple-algorithm';
 import fs from 'fs';
 import path from 'path';
-import { chooseToPlot } from './algorithms/plot';
+import { ALL_DESCRIPTION_METRIC_OPTIONS, chooseToPlot } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
   compoundSophisticatedPrevBarsAlgorithm,
@@ -11,7 +11,6 @@ import {
 } from './algorithms/sophisticated-prev-bars';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
 import type { Ticker } from './fetch/fetch';
-import { bearish1 } from './timespans';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
@@ -85,7 +84,8 @@ const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
     tickerData: tickers.map((ticker) => ({ ticker, aggregate: '60min', slippage: 5 })),
-    timespan: bearish1,
+    timespan: ['2020-01-01', '3030-01-01'],
+    verboseLogging: true,
   }),
 );
 if (!backtestResponse.ok) {
@@ -94,7 +94,8 @@ if (!backtestResponse.ok) {
 
 const [algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate] =
   backtestResponse.data;
-await chooseToPlot(algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate, {
-  profitLossRatio: true,
-  expectancyPerTrade: true,
-});
+await chooseToPlot(
+  algorithmGraphSelectionOptions,
+  tickerGraphSelectionOptionsByAggregate,
+  ALL_DESCRIPTION_METRIC_OPTIONS,
+);

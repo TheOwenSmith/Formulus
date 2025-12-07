@@ -267,7 +267,7 @@ export async function countLinesToProcess({
   tickerDataByAggregateByTicker: IndexedByAggregateByTicker<[filename: string, slippage: number]>;
   timespanDays: [Day | undefined, Day | undefined];
   verboseLogging?: boolean;
-}): Promise<[startDay: Day, number]> {
+}): Promise<[startDay: Day, endDay: Day, linesToProcess: number]> {
   const tickerIteratorByAggregateByTicker: IndexedByAggregateByTicker<AggregateDataIterator> =
     aggregateTimestamps.reduce((acc, aggregate) => {
       // Fetch ticker iterators for all tickers
@@ -291,8 +291,9 @@ export async function countLinesToProcess({
     matchAggregateDataIterators(tickerIteratorByAggregateByTicker, timespanDays?.[0]),
   );
   if (!matchIteratorResponse.ok) throw matchIteratorResponse.error;
-  const [startDay] = matchIteratorResponse.data;
+  const [startDay, firstBarByAggregateByTicker] = matchIteratorResponse.data;
 
+  let endDay: Day | null = null;
   let linesToProcess = 0;
   for (const aggregate of aggregateTimestamps) {
     // Skip if no tickers
@@ -302,13 +303,34 @@ export async function countLinesToProcess({
       continue;
     }
 
+    // Choose random ticker to get first day
+    let nextBarDay = timestampToDay(
+      firstBarByAggregateByTicker[aggregate][Object.keys(tickerIteratorByTicker)[0]][0],
+    );
+
+    // Keep iterating until some tickers have no more bars or end of timespan is reached
     let hasNextBar = true;
+    let endDayForAggregate: Day | null = null;
     while (hasNextBar) {
+      let nextBarTimestamp = '';
+      const currentBarDay = nextBarDay;
       for (const ticker in tickerIteratorByTicker) {
         const nextBarIteratorResult = await tickerIteratorByTicker[ticker].next();
         if (nextBarIteratorResult.done) {
           hasNextBar = false;
+          endDayForAggregate = currentBarDay;
           break;
+        }
+
+        const nextBar = nextBarIteratorResult.value;
+        if (nextBarTimestamp === '') {
+          nextBarDay = timestampToDay(nextBar[0]);
+          if (timespanDays[1] != undefined && compareDays(nextBarDay, timespanDays[1]) > 0) {
+            hasNextBar = false;
+            endDayForAggregate = currentBarDay;
+            break;
+          }
+          nextBarTimestamp = nextBar[0];
         }
       }
       linesToProcess += numTickers;
@@ -317,8 +339,12 @@ export async function countLinesToProcess({
     for (const ticker in tickerIteratorByTicker) {
       tickerIteratorByTicker[ticker].close();
     }
+
+    if (endDay == null || compareDays(endDayForAggregate!, endDay) < 0) {
+      endDay = endDayForAggregate!;
+    }
   }
-  return [startDay, linesToProcess];
+  return [startDay, endDay!, linesToProcess];
 }
 
 const MAX_TICKERS_TO_SHOW = 3;

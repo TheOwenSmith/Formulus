@@ -7,6 +7,7 @@ import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch'
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
 import {
+  compareDays,
   dayToString,
   timespanToDays,
   timestampToDay,
@@ -95,7 +96,7 @@ export async function backtestAlgorithmsConcurrently({
   ]
 > {
   trackProgress ??= !verboseLogging;
-  verboseLogging ??= !trackProgress;
+  verboseLogging ??= false;
 
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
@@ -151,7 +152,7 @@ export async function backtestAlgorithmsConcurrently({
   // Count number of lines that need to be processed
   console.log('Counting number of lines to process...');
   const startCountLinesToProcessTimestamp = Date.now();
-  const [startDay, linesToProcess] = await countLinesToProcess({
+  const [startDay, endDay, linesToProcess] = await countLinesToProcess({
     distinctTickersByAggregate,
     tickerDataByAggregateByTicker,
     timespanDays,
@@ -169,7 +170,9 @@ export async function backtestAlgorithmsConcurrently({
   }
 
   if (verboseLogging) {
-    console.log(`Starting on day ${dayToString(startDay)}`);
+    console.log(
+      `Starting on day '${dayToString(startDay)}' and ending on day '${dayToString(endDay)}'`,
+    );
   }
 
   // Backtest algorithms
@@ -270,12 +273,11 @@ export async function backtestAlgorithmsConcurrently({
     );
 
     let hasNextBar = true;
-    let endDay: Day | null = null;
-    const nextBarByTicker: Record<Ticker, Bar> = firstBarByAggregateByTicker[aggregate];
+    const nextBarByTicker: Record<Ticker, Bar> = { ...firstBarByAggregateByTicker[aggregate] };
     while (hasNextBar) {
       // Get next bars
       let nextBarTimestamp = '';
-      const currentBarByTicker: Record<Ticker, Bar> = nextBarByTicker;
+      const currentBarByTicker: Record<Ticker, Bar> = { ...nextBarByTicker };
       for (const ticker in tickerIteratorByTicker) {
         const nextBarIteratorResult = await tickerIteratorByTicker[ticker].next();
         if (nextBarIteratorResult.done) {
@@ -285,8 +287,15 @@ export async function backtestAlgorithmsConcurrently({
 
         const nextBar = nextBarIteratorResult.value;
         nextBarByTicker[ticker] = nextBar;
-        if (nextBarTimestamp === '') nextBarTimestamp = nextBar[0];
-        else if (nextBar[0] !== nextBarTimestamp) {
+        if (nextBarTimestamp === '') {
+          const nextBarDay = timestampToDay(nextBar[0]);
+          if (compareDays(nextBarDay, endDay) > 0) {
+            hasNextBar = false;
+            break;
+          }
+
+          nextBarTimestamp = nextBar[0];
+        } else if (nextBar[0] !== nextBarTimestamp) {
           throw new Error(
             `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextBarTimestamp}' but got '${nextBar[0]}'`,
           );
@@ -384,11 +393,6 @@ export async function backtestAlgorithmsConcurrently({
             graphIndex: 'algorithmYs',
             pointY: portfolioValue,
           });
-        }
-
-        if (!hasNextBar) {
-          const endTimestamp = Object.values(currentBarByTicker)[0][0];
-          endDay = timestampToDay(endTimestamp);
         }
       }
 

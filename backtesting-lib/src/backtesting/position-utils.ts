@@ -266,6 +266,8 @@ function closePosition({
   ticks: number;
 }) {
   const sharesOwned = algorithmData.positions[ticker];
+  if (sharesOwned === 0) return;
+
   const positionSize = pricePerShare * sharesOwned;
   const sellingProfit = (1 - slippage) * positionSize;
 
