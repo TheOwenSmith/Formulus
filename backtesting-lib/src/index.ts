@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import z from 'zod';
-import { type Algorithm } from './algorithms/algorithm';
+import {
+  createAlgorithmFromMarketInvariantAlgorithm,
+  type Algorithm,
+} from './algorithms/algorithm';
 import {
   createContextMap,
   deserializeContextMap,
@@ -12,6 +15,7 @@ import {
   greenRedBarsMaskHistory,
 } from './algorithms/examples/green-red-bars';
 import { ifGreenAlgorithm } from './algorithms/examples/if-green';
+import { overboughtOversoldAlgorithm } from './algorithms/examples/overbought-oversold';
 import { chooseToPlot } from './algorithms/plot';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
@@ -69,6 +73,7 @@ for (const ticker of tickers) {
   contextMapByTickerByContextLength.set(ticker, contextMapByContextLength);
 }
 
+// Populate algorithms with green/red bars algorithms
 for (const k of [1, 2]) {
   for (const contextLength of contextLengths) {
     const contextMapByTicker = tickers.reduce(
@@ -90,6 +95,11 @@ for (const k of [1, 2]) {
     );
   }
 }
+
+// Populate algorithms with overbought/oversold algorithm
+algorithms.push(
+  createAlgorithmFromMarketInvariantAlgorithm(overboughtOversoldAlgorithm, '60min', tickers),
+);
 
 console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
