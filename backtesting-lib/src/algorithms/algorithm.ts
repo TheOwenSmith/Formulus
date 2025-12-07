@@ -22,3 +22,24 @@ export type Algorithm = {
   name: string;
   tickers: [Ticker, ...Ticker[]];
 };
+
+export type MarketInvariantAlgorithm = {
+  algorithmMaxHoldingProportion?: number;
+  contextLength: number;
+  implementation: AlgorithmImplementation;
+  name: string;
+};
+export function createAlgorithmFromMarketInvariantAlgorithm(
+  marketInvariantAlgorithm: MarketInvariantAlgorithm,
+  aggregate: Timestamp,
+  tickers: [Ticker, ...Ticker[]],
+): Algorithm {
+  return {
+    aggregate,
+    algorithmMaxHoldingProportion: marketInvariantAlgorithm.algorithmMaxHoldingProportion,
+    contextLength: marketInvariantAlgorithm.contextLength,
+    implementation: marketInvariantAlgorithm.implementation,
+    name: marketInvariantAlgorithm.name,
+    tickers,
+  };
+}

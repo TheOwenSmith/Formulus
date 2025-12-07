@@ -31,3 +31,24 @@ export function createAlgorithmFromSimpleAlgorithm({
     tickers: [ticker],
   };
 }
+
+export type SimpleMarketInvariantAlgorithm = {
+  algorithmMaxHoldingProportion?: number;
+  contextLength: number;
+  implementation: (context: Bar[], position: number) => Action;
+  name: string;
+};
+export function createAlgorithmFromSimpleMarketInvariantAlgorithm(
+  marketInvariantAlgorithm: SimpleMarketInvariantAlgorithm,
+  aggregate: Timestamp,
+  ticker: Ticker,
+) {
+  return createAlgorithmFromSimpleAlgorithm({
+    aggregate,
+    algorithmMaxHoldingProportion: marketInvariantAlgorithm.algorithmMaxHoldingProportion,
+    contextLength: marketInvariantAlgorithm.contextLength,
+    implementation: marketInvariantAlgorithm.implementation,
+    name: marketInvariantAlgorithm.name,
+    ticker,
+  });
+}

@@ -62,3 +62,29 @@ export function createAlgorithmFromTopKAlgorithm({
     tickers,
   };
 }
+
+export type TopKMarketInvariantAlgorithm = {
+  algorithmMaxHoldingProportion?: number;
+  contextLength: number;
+  implementation: (
+    context: Record<Ticker, Bar[]>,
+    positions: Record<Ticker, number>,
+  ) => Record<Ticker, number>;
+  k: number;
+  name: string;
+};
+export function createAlgorithmFromTopKMarketInvariantAlgorithm(
+  marketInvariantAlgorithm: TopKMarketInvariantAlgorithm,
+  aggregate: Timestamp,
+  tickers: [Ticker, ...Ticker[]],
+) {
+  return createAlgorithmFromTopKAlgorithm({
+    aggregate,
+    algorithmMaxHoldingProportion: marketInvariantAlgorithm.algorithmMaxHoldingProportion,
+    contextLength: marketInvariantAlgorithm.contextLength,
+    implementation: marketInvariantAlgorithm.implementation,
+    k: marketInvariantAlgorithm.k,
+    name: marketInvariantAlgorithm.name,
+    tickers,
+  });
+}
