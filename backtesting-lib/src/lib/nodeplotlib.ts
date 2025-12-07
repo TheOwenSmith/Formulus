@@ -20,7 +20,7 @@ export async function plotAlgorithm({
   algorithmName,
   description,
 }: Graph) {
-  plot([tickerPlot, algorithmPlot], {
+  plot([algorithmPlot, tickerPlot], {
     title: algorithmName,
     xaxis: { title: 'Time Points' },
     yaxis: { title: 'Portfolio Value ($)' },

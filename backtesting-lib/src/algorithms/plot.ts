@@ -17,6 +17,7 @@ const DESCRIPTION_METRICS_ORDER = exhaustiveArray<DescriptionMetrics>()([
   'winRate',
   'profitLossRatio',
   'expectancyPerTrade',
+  'averageHoldingDuration',
   'tickers',
   'maxHoldingPorportion',
   'volatility',
@@ -31,6 +32,8 @@ const DESCRIPTION_METRIC_TO_STRING: {
   aggregate: (aggregate: Timestamp) => `Aggregate: ${aggregate}`,
   algorithmReturn: (algorithmReturn: number) =>
     `Algorithm return: ${withCommasRounded(algorithmReturn * 100)}%`,
+  averageHoldingDuration: (averageHoldingDuration: number) =>
+    `Average holding duration: ${withCommasRounded(averageHoldingDuration)} ticks`,
   contextLength: (contextLength: number) => `Context length: ${withCommas(contextLength)}`,
   expectancyPerTrade: (expectancyPerTrade: number) =>
     `Expectancy per trade: ${withCommasRounded(expectancyPerTrade * 100)}%`,
@@ -58,6 +61,7 @@ type DescriptionMetricOptions = {
 const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
   aggregate: true,
   algorithmReturn: true,
+  averageHoldingDuration: false,
   contextLength: false,
   expectancyPerTrade: false,
   growthRate: true,
@@ -71,6 +75,11 @@ const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
   volatility: false,
   winRate: true,
 };
+export const ALL_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions =
+  DESCRIPTION_METRICS_ORDER.reduce((acc, metric) => {
+    acc[metric] = true;
+    return acc;
+  }, {} as DescriptionMetricOptions);
 
 let serverIsUp = false;
 export async function chooseToPlot(

@@ -10,6 +10,7 @@ export function updatePosition({
   algorithmTickers,
   priceByTicker,
   tickerDataByTicker,
+  ticks,
 }: {
   actions: Record<Ticker, Action>;
   algorithmMaxHoldingProportion: number;
@@ -17,6 +18,7 @@ export function updatePosition({
   algorithmTickers: Ticker[];
   priceByTicker: Record<Ticker, number>;
   tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
+  ticks: number;
 }) {
   // Initialize sets
   const h: Ticker[] = [];
@@ -59,8 +61,9 @@ export function updatePosition({
     closePosition({
       algorithmData,
       pricePerShare: priceByTicker[ticker],
-      ticker,
       slippage,
+      ticker,
+      ticks,
     });
   }
 
@@ -100,6 +103,7 @@ export function updatePosition({
     const cost = (1 + slippage) * k;
     algorithmData.balance -= cost;
     algorithmData.entracePriceExitPriceByTickerPosition[ticker][0] += cost;
+    algorithmData.entraceTimeByTickerPosition[ticker] = ticks;
     algorithmData.trades++;
   }
 }
@@ -228,10 +232,12 @@ export function closeAllPositions({
   algorithmData,
   priceByTicker,
   tickerDataByTicker,
+  ticks,
 }: {
   algorithmData: AlgorithmData;
   priceByTicker: Record<Ticker, number>;
   tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
+  ticks: number;
 }) {
   for (const ticker in algorithmData.positions) {
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
@@ -241,6 +247,7 @@ export function closeAllPositions({
       pricePerShare: priceByTicker[ticker],
       slippage,
       ticker,
+      ticks,
     });
   }
 }
@@ -250,11 +257,13 @@ function closePosition({
   pricePerShare,
   slippage,
   ticker,
+  ticks,
 }: {
   algorithmData: AlgorithmData;
   pricePerShare: number;
   slippage: number;
   ticker: Ticker;
+  ticks: number;
 }) {
   const sharesOwned = algorithmData.positions[ticker];
   const positionSize = pricePerShare * sharesOwned;
@@ -278,6 +287,9 @@ function closePosition({
     algorithmData.winsLosses[1]++;
     algorithmData.cumulativeProfitLoss[1] += -profitLossPercentage;
   }
+
+  // Update holding time, positions closed, and trades
+  algorithmData.cumulativeHoldingTime += ticks - algorithmData.entraceTimeByTickerPosition[ticker];
   algorithmData.positionsClosed++;
   algorithmData.trades++;
 }

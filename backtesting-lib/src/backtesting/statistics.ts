@@ -64,6 +64,7 @@ export function getTickerSelectionOption({
 export type DescriptionMetrics = {
   aggregate: Timestamp;
   algorithmReturn: number;
+  averageHoldingDuration: number;
   contextLength: number;
   expectancyPerTrade: number;
   growthRate: number;
@@ -115,6 +116,7 @@ export async function getAlgorithmSelectionOptionWithPerformance({
     cumulativeProfitLoss,
     positionsClosed,
     sharpeRatioCalculator,
+    cumulativeHoldingTime,
     algorithmYs,
   } = algorithmData;
 
@@ -131,6 +133,7 @@ export async function getAlgorithmSelectionOptionWithPerformance({
   const descriptionMetrics: DescriptionMetrics = {
     aggregate,
     algorithmReturn: algorithmReturnPercentage / 100,
+    averageHoldingDuration: cumulativeHoldingTime / positionsClosed,
     contextLength,
     expectancyPerTrade: (cumulativeProfitLoss[0] - cumulativeProfitLoss[1]) / positionsClosed,
     growthRate,
@@ -144,7 +147,6 @@ export async function getAlgorithmSelectionOptionWithPerformance({
     volatility: sharpeRatioCalculator.volatility(),
     winRate: winsLosses[0] / (winsLosses[0] + winsLosses[1]),
   };
-  console.log({ cumulativeProfitLoss });
 
   const performance = await performanceFn(descriptionMetrics);
   return {
