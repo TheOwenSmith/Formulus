@@ -41,15 +41,18 @@ export class SharpeRatioCalculator {
     this.prevPrice = price;
   }
 
+  volatility() {
+    return this.returns.stddev();
+  }
+
   sharpe(yearsOfData: number) {
     const mean = this.returns.mean;
-    const sd = this.returns.stddev();
-    if (sd === 0) return 0;
+    const volatility = this.volatility();
 
     const freq = this.returns.count() / yearsOfData;
     const rfPerPeriod = Math.pow(1 + this.riskFreeRate, 1 / freq) - 1;
 
-    const sharpePeriod = (mean - rfPerPeriod) / sd;
+    const sharpePeriod = (mean - rfPerPeriod) / volatility;
     return sharpePeriod * Math.sqrt(freq);
   }
 }

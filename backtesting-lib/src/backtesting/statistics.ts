@@ -63,16 +63,17 @@ export function getTickerSelectionOption({
 
 export type DescriptionMetrics = {
   aggregate: Timestamp;
-  algorithmReturnPercentage: number;
+  algorithmReturn: number;
   contextLength: number;
-  growthRatePercentage: number;
-  maxHoldingPercentage: number;
+  growthRate: number;
+  maxHoldingPorportion: number;
   positionsClosed: number;
   profitLossRatio: number;
   sharpeRatio: number;
   tickers: Ticker[];
   timespan: [Day, Day];
   tradesMade: number;
+  volatility: number;
   winRate: number;
 };
 
@@ -80,8 +81,7 @@ export async function getAlgorithmSelectionOptionWithPerformance({
   aggregate,
   algorithm,
   algorithmData,
-  performanceFn = (descriptionMetrics: DescriptionMetrics) =>
-    descriptionMetrics.growthRatePercentage,
+  performanceFn = (descriptionMetrics: DescriptionMetrics) => descriptionMetrics.growthRate,
   timespan,
   xs,
   yearsBetweenStartAndEnd,
@@ -125,27 +125,27 @@ export async function getAlgorithmSelectionOptionWithPerformance({
   };
 
   const algorithmReturnPercentage = balance - 100;
-  const growthRatePercentage = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
+  const growthRate = Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1;
 
   const descriptionMetrics: DescriptionMetrics = {
     aggregate,
-    algorithmReturnPercentage,
+    algorithmReturn: algorithmReturnPercentage / 100,
     contextLength,
-    growthRatePercentage,
-    maxHoldingPercentage: algorithmMaxHoldingProportion * 100,
+    growthRate,
+    maxHoldingPorportion: algorithmMaxHoldingProportion,
     positionsClosed,
     profitLossRatio: cumulativeProfitLoss[0] / cumulativeProfitLoss[1],
     sharpeRatio: sharpeRatioCalculator.sharpe(yearsBetweenStartAndEnd),
     tickers,
     timespan,
     tradesMade: trades,
-    winRate: (winsLosses[0] / (winsLosses[0] + winsLosses[1])) * 100,
+    volatility: sharpeRatioCalculator.volatility(),
+    winRate: winsLosses[0] / (winsLosses[0] + winsLosses[1]),
   };
 
   const performance = await performanceFn(descriptionMetrics);
-
   return {
-    name: `${name}; Return: ${withCommasRounded(algorithmReturnPercentage)}% (${withCommasRounded(growthRatePercentage)}% APY) - ${aggregate}`,
+    name: `${name}; Return: ${withCommasRounded(algorithmReturnPercentage)}% (${withCommasRounded(growthRate * 100)}% APY) - ${aggregate}`,
     value: {
       name,
       aggregate,
