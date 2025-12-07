@@ -162,17 +162,17 @@ export async function backtestAlgorithmsConcurrently({
     `Lines to process: ${withCommas(linesToProcess)} (took ${withCommas(Date.now() - startCountLinesToProcessTimestamp)}ms)`,
   );
 
+  if (verboseLogging) {
+    console.log(
+      `Starting on day '${dayToString(startDay)}' and ending on day '${dayToString(endDay)}'`,
+    );
+  }
+
   // Initialize progress bar
   const progressBar = new cliProgress.SingleBar({}, Presets.shades_grey);
   const progressStartTimestamp = Date.now();
   if (trackProgress) {
     progressBar.start(linesToProcess, 0);
-  }
-
-  if (verboseLogging) {
-    console.log(
-      `Starting on day '${dayToString(startDay)}' and ending on day '${dayToString(endDay)}'`,
-    );
   }
 
   // Backtest algorithms

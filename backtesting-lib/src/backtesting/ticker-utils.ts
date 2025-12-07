@@ -198,7 +198,7 @@ export async function matchAggregateDataIterators(
               `Failed to match iterator '${ticker}' (${aggregate}) to the latest first bar; expected '${actualStartDayTimestamp}' but got '${current.value[0].slice(0, 10)}'`,
             );
           }
-        } else if (currentDayTimestamp > startDayTimestamp) {
+        } else if (currentDayTimestamp >= startDayTimestamp) {
           // If there is not a set start day and the current day is sufficient as a start day, we can set it as the actual start day and break
           actualStartDayTimestamp = currentDayTimestamp;
           break;
@@ -211,7 +211,7 @@ export async function matchAggregateDataIterators(
 
       if (current.done) {
         throw new Error(
-          `Data is missing for ticker '${ticker}' (${aggregate}); No bar is available for the matching start day: ${startDayTimestamp}.`,
+          `Data is missing for ticker '${ticker}' (${aggregate}); Failed to match to start day '${actualStartDayTimestamp}'`,
         );
       }
 
