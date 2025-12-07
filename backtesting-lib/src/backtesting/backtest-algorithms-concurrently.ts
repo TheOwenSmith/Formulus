@@ -67,8 +67,8 @@ export async function backtestAlgorithmsConcurrently({
   algorithms,
   tickerData = [],
   timespan,
-  trackProgress = true,
-  verboseLogging = false,
+  trackProgress,
+  verboseLogging,
 }: {
   algorithms: Algorithm[];
   tickerData?: TickerData[];
@@ -86,6 +86,9 @@ export async function backtestAlgorithmsConcurrently({
     tickerGraphSelectionOptionsByAggregate: Record<Timestamp, SelectionOption<SimplePlot>[]>,
   ]
 > {
+  trackProgress ??= !verboseLogging;
+  verboseLogging ??= !trackProgress;
+
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
   }
