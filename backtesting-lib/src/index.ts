@@ -1,7 +1,7 @@
 import { type Algorithm } from '@/algorithms/create-simple-algorithm';
 import fs from 'fs';
 import path from 'path';
-import { ALL_DESCRIPTION_METRIC_OPTIONS, chooseToPlot } from './algorithms/plot';
+import { chooseToPlot } from './algorithms/plot';
 import { prevBarAlgorithm } from './algorithms/prev-bar';
 import {
   compoundSophisticatedPrevBarsAlgorithm,
@@ -84,8 +84,7 @@ const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
     tickerData: tickers.map((ticker) => ({ ticker, aggregate: '60min', slippage: 5 })),
-    timespan: ['2020-01-01', '3030-01-01'],
-    verboseLogging: true,
+    timespan: undefined, //bearish1,
   }),
 );
 if (!backtestResponse.ok) {
@@ -94,8 +93,7 @@ if (!backtestResponse.ok) {
 
 const [algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate] =
   backtestResponse.data;
-await chooseToPlot(
-  algorithmGraphSelectionOptions,
-  tickerGraphSelectionOptionsByAggregate,
-  ALL_DESCRIPTION_METRIC_OPTIONS,
-);
+await chooseToPlot(algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate, {
+  profitLossRatio: true,
+  averageHoldingDuration: true,
+});

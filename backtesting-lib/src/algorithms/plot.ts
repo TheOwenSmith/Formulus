@@ -172,11 +172,13 @@ export async function chooseToPlot(
       });
     }
 
-    // Remove the selected algorithm from the list of options
-    const removeIndex = algorithmGraphSelectionOptions.findIndex(
+    // Add flag to indicate that the algorithm has been viewed
+    const selectionOption = algorithmGraphSelectionOptions.find(
       (option) => option.value === selectedAlgorithm,
-    );
-    algorithmGraphSelectionOptions.splice(removeIndex, 1);
+    )!;
+    if (!selectionOption.name.endsWith('(viewed)')) {
+      selectionOption.name = `${selectionOption.name} (viewed)`;
+    }
 
     // Wait for the server to be up
     if (!serverIsUp) {
