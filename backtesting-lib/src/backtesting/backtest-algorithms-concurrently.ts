@@ -459,16 +459,17 @@ export async function backtestAlgorithmsConcurrently({
       const profitLossRatio =
         statisticsByAlgorithm[algorithmIndex].cumulativeProfitLoss[0] /
         statisticsByAlgorithm[algorithmIndex].cumulativeProfitLoss[1];
-      const profitLossRatioString = profitLossRatio !== Infinity ? `${profitLossRatio}:1` : '1:0';
+      const profitLossRatioString =
+        profitLossRatio !== Infinity ? `${withCommasRounded(profitLossRatio)}:1` : '1:0';
       const positionsClosed = statisticsByAlgorithm[algorithmIndex].positionsClosed;
 
       const descriptionMetrics: DescriptionMetrics = {
         aggregate: `Aggregate: ${aggregate}`,
         algorithmReturn: `Algorithm return: ${withCommasRounded(returnPercentage)}%`,
-        contextLength: `Context length: ${contextLength}`,
+        contextLength: `Context length: ${withCommas(contextLength)}`,
         growthRate: `Growth rate: ${withCommasRounded(growthRatePercentage)}%`,
         maxHoldingPercentage: `Max holding percentage: ${algorithmMaxHoldingProportion * 100}%`,
-        positionsClosed: `Positions closed: ${positionsClosed}`,
+        positionsClosed: `Positions closed: ${withCommas(positionsClosed)}`,
         profitLossRatio: `Profit/loss ratio: ${profitLossRatioString}`,
         sharpeRatio: `Sharpe ratio: ${withCommasRounded(sharpRatio)}`,
         tickers: `Tickers: ${tickersToString(tickers)}`,
