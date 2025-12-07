@@ -46,9 +46,10 @@ for (const ticker of tickers) {
     }
 
     const contextMap = await createContextMap({
-      tickDataFilename: `./data/cleaned/${ticker}_60min.csv`,
       contextLength,
       encodeContext: greenRedBarsMaskHistory,
+      tickDataFilename: `./data/cleaned/${ticker}_60min.csv`,
+      timespan: [undefined, '2018-12-31'],
       verboseLogging: false,
     });
     contextMapByContextLength.set(contextLength, contextMap);
@@ -92,7 +93,7 @@ const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
     tickerData: tickers.map((ticker) => ({ ticker, aggregate: '60min', slippage: 5 })),
-    timespan: undefined, //bearish1,
+    timespan: ['2019-01-01', undefined],
   }),
 );
 if (!backtestResponse.ok) {

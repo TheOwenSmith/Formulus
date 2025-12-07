@@ -3,24 +3,32 @@ import {} from '@/algorithms/simple-algorithm';
 import type { TopKAlgorithm } from '@/algorithms/top-k-algorithm';
 import { getAggregateDataIterator, type Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
+import { dayToString, timespanToDays, type Day } from '@/utils/date-utils';
 import { trySync } from '@/utils/errorHandling';
 import { isRecord } from '@/utils/types';
 import z, { ZodType } from 'zod';
 
 export async function createContextMap<T>({
-  tickDataFilename,
   contextLength,
   encodeContext,
+  tickDataFilename,
+  timespan,
   verboseLogging = false,
 }: {
-  tickDataFilename: string;
   contextLength: number;
   encodeContext: (context: Bar[]) => T;
+  tickDataFilename: string;
+  timespan?: [string | undefined, string | undefined];
   verboseLogging?: boolean;
 }): Promise<Map<T, number>> {
   if (contextLength < 1) {
     throw new Error('Context length must be at least 1');
   }
+
+  const timespanDays: [Day | undefined, Day | undefined] = timespanToDays(timespan);
+  const timespanDayTimestamps = timespanDays.map((day: Day | undefined) =>
+    day != undefined ? dayToString(day) : undefined,
+  );
 
   const getIteratorResponse = trySync(() =>
     getAggregateDataIterator(tickDataFilename, verboseLogging),
@@ -33,6 +41,15 @@ export async function createContextMap<T>({
   const outcomeByHistoryEncoded = new Map<T, [sum: number, count: number]>();
   const previousBars: Bar[] = [];
   for await (const bar of iterator) {
+    // If bar is before start of timespan, skip
+    if (timespanDayTimestamps[0] != undefined && bar[0] < timespanDayTimestamps[0]) {
+      continue;
+    }
+    // If bar is after end of timespan, break
+    if (timespanDayTimestamps[1] != undefined && bar[0] > timespanDayTimestamps[1]) {
+      break;
+    }
+
     if (previousBars.length < contextLength) {
       previousBars.push(bar);
       continue;
