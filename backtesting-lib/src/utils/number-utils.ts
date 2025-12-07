@@ -1,7 +1,7 @@
 export function withCommas(number: number): string {
   const [integer, decimal] = number.toString().split('.');
   const integerWithCommas = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return decimal !== undefined ? `${integerWithCommas}.${decimal}` : integerWithCommas;
+  return decimal != undefined ? `${integerWithCommas}.${decimal}` : integerWithCommas;
 }
 
 export function roundToDecimal(number: number, decimals: number): number {
@@ -9,5 +9,8 @@ export function roundToDecimal(number: number, decimals: number): number {
 }
 
 export function withCommasRounded(number: number): string {
-  return withCommas(roundToDecimal(number, 2));
+  const fixed = number.toFixed(2);
+  const [integer, decimal] = fixed.split('.');
+  const integerWithCommas = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${integerWithCommas}.${decimal}`;
 }
