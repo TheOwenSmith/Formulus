@@ -11,6 +11,7 @@ import {
 } from './algorithms/sophisticated-prev-bars';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
 import type { Ticker } from './fetch/fetch';
+import { bearish1 } from './timespans';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
@@ -84,7 +85,7 @@ const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
     tickerData: tickers.map((ticker) => ({ ticker, aggregate: '60min', slippage: 5 })),
-    timespan: undefined, // bearish1
+    timespan: bearish1,
   }),
 );
 if (!backtestResponse.ok) {
