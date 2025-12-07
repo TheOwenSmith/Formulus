@@ -1,34 +1,31 @@
 import { type Algorithm } from '@/algorithms/create-simple-algorithm';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
-import { compareDays, dateToDay, type Day } from '@/utils/date-utils';
-import { tryAsync } from '@/utils/errorHandling';
+import { compareDays, dayToString, timestampToDay, type Day } from '@/utils/date-utils';
+import { tryAsync, trySync } from '@/utils/errorHandling';
 import fs from 'fs';
 import type { TickerData } from './backtest-algorithms-concurrently';
-import type { AggregateDataIterator, Bar } from './read-data';
+import { getAggregateDataIterator, type AggregateDataIterator, type Bar } from './read-data';
 
 export type IndexedByAggregateByTicker<T> = Record<Timestamp, Record<Ticker, T>>;
-export type IndexedByAggregateByAlgorithm<T> = Record<Timestamp, T[]>;
 
-export type TickerDataIndexed = IndexedByAggregateByTicker<[filename: string, slippage: number]>;
-
-export function emptyIndexByAggregateByTicker<T>(): IndexedByAggregateByTicker<T> {
+function emptyIndexByAggregateByTicker<T>(): IndexedByAggregateByTicker<T> {
   return aggregateTimestamps.reduce((acc, aggregate) => {
     acc[aggregate] = {} as Record<Ticker, T>;
     return acc;
   }, {} as IndexedByAggregateByTicker<T>);
 }
 
-export function createIndexByAggregateByTicker<T>(
-  distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
-  fillFn: (aggregate: Timestamp, ticker: Ticker) => T,
-): IndexedByAggregateByTicker<T> {
-  return aggregateTimestamps.reduce((acc, aggregate) => {
-    acc[aggregate] = {} as Record<Ticker, T>;
-    for (const ticker of distinctTickersByAggregate[aggregate]) {
-      acc[aggregate][ticker] = fillFn(aggregate, ticker);
-    }
-    return acc;
-  }, {} as IndexedByAggregateByTicker<T>);
+export function createIndexByTicker<T>(
+  distinctTickers: Ticker[],
+  fillFn: (ticker: Ticker) => T,
+): Record<Ticker, T> {
+  return distinctTickers.reduce(
+    (acc, ticker) => {
+      acc[ticker] = fillFn(ticker);
+      return acc;
+    },
+    {} as Record<Ticker, T>,
+  );
 }
 
 export function getDistinctTickersByAggregate(
@@ -52,9 +49,10 @@ export function getTickerDataByAggregateByTicker(
   tickerData: TickerData[],
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
   verboseLogging = false,
-): TickerDataIndexed {
-  const userInputtedTickerDataIndexed: TickerDataIndexed =
-    emptyIndexByAggregateByTicker<[filename: string, slippage: number]>();
+): IndexedByAggregateByTicker<[filename: string, slippage: number]> {
+  const userInputtedTickerDataIndexed: IndexedByAggregateByTicker<
+    [filename: string, slippage: number]
+  > = emptyIndexByAggregateByTicker<[filename: string, slippage: number]>();
   for (const tickData of tickerData) {
     const { ticker, aggregate, slippage = 0, filename } = tickData;
     if (ticker in userInputtedTickerDataIndexed[aggregate]) {
@@ -78,11 +76,13 @@ export function getTickerDataByAggregateByTicker(
     userInputtedTickerDataIndexed[aggregate][ticker] = [resolvedFilename, slippage];
   }
 
-  const outputTickerDataIndexed: TickerDataIndexed = createIndexByAggregateByTicker(
-    distinctTickersByAggregate,
-    (aggregate, ticker) => {
+  const outputTickerDataIndexed: IndexedByAggregateByTicker<[filename: string, slippage: number]> =
+    emptyIndexByAggregateByTicker<[filename: string, slippage: number]>();
+  for (const aggregate of aggregateTimestamps) {
+    for (const ticker of distinctTickersByAggregate[aggregate]) {
       if (ticker in userInputtedTickerDataIndexed[aggregate]) {
-        return userInputtedTickerDataIndexed[aggregate][ticker];
+        outputTickerDataIndexed[aggregate][ticker] =
+          userInputtedTickerDataIndexed[aggregate][ticker];
       } else {
         const impliedFilename = `./data/cleaned/${ticker}_${aggregate}.csv`;
         const impliedSlippage = 0;
@@ -94,12 +94,12 @@ export function getTickerDataByAggregateByTicker(
         }
 
         if (!fs.existsSync(impliedFilename)) {
-          throw new Error(`Filename '${impliedFilename}' does not exist`);
+          throw new Error(`Assumed filename '${impliedFilename}' does not exist`);
         }
-        return [impliedFilename, impliedSlippage];
+        outputTickerDataIndexed[aggregate][ticker] = [impliedFilename, impliedSlippage];
       }
-    },
-  );
+    }
+  }
 
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in userInputtedTickerDataIndexed[aggregate]) {
@@ -113,29 +113,18 @@ export function getTickerDataByAggregateByTicker(
   return outputTickerDataIndexed;
 }
 
-export function createIndexByAggregateByAlgorithm<T>(
-  algorithmsByAggregate: Record<Timestamp, Algorithm[]>,
-  fillFn: (timestamp: Timestamp, algorithmIndex: number) => T,
-): IndexedByAggregateByAlgorithm<T> {
-  return aggregateTimestamps.reduce((acc, aggregate) => {
-    acc[aggregate] = Array.from(
-      { length: algorithmsByAggregate[aggregate].length },
-      (_, algorithmIndex) => fillFn(aggregate, algorithmIndex),
-    );
-    return acc;
-  }, {} as IndexedByAggregateByAlgorithm<T>);
-}
-
-export async function matchAggregateDataIterators(
-  tickerIteratorByAggregateByTicker: IndexedByAggregateByTicker<AggregateDataIterator>,
+export async function getFirstIteratorBars(
+  tickerIteratorByAggregateByTicker: Partial<IndexedByAggregateByTicker<AggregateDataIterator>>,
   startDay?: Day,
-): Promise<[startDay: Day, firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>]> {
+): Promise<{
+  startDayDefined: Day;
+  firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>;
+}> {
   const firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar> =
     emptyIndexByAggregateByTicker();
 
   // Get latest first bar timestamp off all iterator
   let latestFirstBarTimestamp = '';
-  let latestFirstBarIteratorAggregateTicker: [Timestamp, Ticker] | null = null;
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
       const iterator = tickerIteratorByAggregateByTicker[aggregate][ticker];
@@ -144,15 +133,14 @@ export async function matchAggregateDataIterators(
       const firstBarIteratorResult = firstBarIteratorResultResponse.data;
 
       if (firstBarIteratorResult.done) {
-        throw new Error('Iterator is done before matching');
+        throw new Error(`Iterator '${ticker}' (${aggregate}) has no data`);
       }
 
       const firstBar = firstBarIteratorResult.value;
+      firstBarByAggregateByTicker[aggregate][ticker] = firstBar;
       const firstBarTimestamp = firstBar[0];
       if (latestFirstBarTimestamp === '' || firstBarTimestamp > latestFirstBarTimestamp) {
         latestFirstBarTimestamp = firstBarTimestamp;
-        latestFirstBarIteratorAggregateTicker = [aggregate, ticker];
-        firstBarByAggregateByTicker[aggregate][ticker] = firstBar;
       }
     }
   }
@@ -161,38 +149,48 @@ export async function matchAggregateDataIterators(
     throw new Error('Failed to find latest first bar day');
   }
 
-  // If start day is provided, ensure all iterator are at or after the start day
-  let latestFirstBarDay = dateToDay(latestFirstBarTimestamp);
+  // Set the latest first bar day to the timestampToDay of the latest first bar timestamp.
+  let startDayDefined = timestampToDay(latestFirstBarTimestamp);
   if (startDay != undefined) {
-    const comp = compareDays(latestFirstBarDay, startDay);
+    const comp = compareDays(startDayDefined, startDay);
     if (comp > 0) {
       throw new Error(
-        `Data is missing through ${latestFirstBarDay.join('-')}; the provided start day ${startDay.join('-')} is not sufficient`,
+        `Data is missing through ${dayToString(startDayDefined)}; the provided start day ${dayToString(startDay)} is not sufficient`,
       );
     } else if (comp < 0) {
-      latestFirstBarDay = startDay;
-      latestFirstBarIteratorAggregateTicker = null;
+      startDayDefined = startDay;
     }
   }
+  return { startDayDefined, firstBarByAggregateByTicker };
+}
+
+export async function matchAggregateDataIterators(
+  tickerIteratorByAggregateByTicker: Partial<IndexedByAggregateByTicker<AggregateDataIterator>>,
+  startDay?: Day,
+): Promise<[startDay: Day, firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>]> {
+  const { startDayDefined, firstBarByAggregateByTicker } = await getFirstIteratorBars(
+    tickerIteratorByAggregateByTicker,
+    startDay,
+  );
 
   // Match all iterators to the latest first tick iterator
+  const startDayTimestamp = dayToString(startDayDefined);
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
-      if (
-        aggregate === latestFirstBarIteratorAggregateTicker?.[0] &&
-        ticker === latestFirstBarIteratorAggregateTicker?.[1]
-      ) {
+      if (firstBarByAggregateByTicker[aggregate][ticker][0].slice(0, 10) === startDayTimestamp) {
         continue;
       }
       const iterator = tickerIteratorByAggregateByTicker[aggregate][ticker];
 
       let current = await iterator.next();
       while (!current.done) {
-        const comp = compareDays(dateToDay(current.value[0]), latestFirstBarDay);
+        const comp = current.value[0].slice(0, 10).localeCompare(startDayTimestamp);
         if (comp === 0) {
           break;
         } else if (comp > 0) {
-          throw new Error('Iterator is ahead of latest first bar');
+          throw new Error(
+            `Failed to match iterator '${ticker}' (${aggregate}) to the latest first bar`,
+          );
         }
 
         const nextBarResponse = await tryAsync(() => iterator.next());
@@ -201,14 +199,109 @@ export async function matchAggregateDataIterators(
       }
 
       if (current.done) {
-        throw new Error('Iterator is done before matching');
+        throw new Error(
+          `Data is missing for ticker '${ticker}' (${aggregate}); No bar is available for the matching start day: ${startDayTimestamp}.`,
+        );
       }
 
       // Set first bar
       firstBarByAggregateByTicker[aggregate][ticker] = current.value;
     }
   }
-  return [latestFirstBarDay, firstBarByAggregateByTicker];
+  return [startDayDefined, firstBarByAggregateByTicker];
+}
+
+export function getTickerIteratorsByTicker({
+  distinctTickers,
+  tickerDataByTicker,
+  verboseLogging = false,
+}: {
+  distinctTickers: Ticker[];
+  tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
+  verboseLogging: boolean;
+}): Record<Ticker, AggregateDataIterator> {
+  return distinctTickers.reduce(
+    (acc, ticker) => {
+      const tickDataFilename = tickerDataByTicker[ticker][0];
+      if (verboseLogging) {
+        console.log(`Fetching '${tickDataFilename}'...`);
+      }
+
+      const getIteratorResponse = trySync(() =>
+        getAggregateDataIterator(tickDataFilename, verboseLogging),
+      );
+      if (!getIteratorResponse.ok) {
+        throw getIteratorResponse.error;
+      }
+      acc[ticker] = getIteratorResponse.data;
+      return acc;
+    },
+    {} as Record<Ticker, AggregateDataIterator>,
+  );
+}
+
+export async function countLinesToProcess({
+  distinctTickersByAggregate,
+  tickerDataByAggregateByTicker,
+  timespanDays,
+  verboseLogging = true,
+}: {
+  distinctTickersByAggregate: Record<Timestamp, Ticker[]>;
+  tickerDataByAggregateByTicker: IndexedByAggregateByTicker<[filename: string, slippage: number]>;
+  timespanDays: [Day | undefined, Day | undefined];
+  verboseLogging?: boolean;
+}): Promise<[startDay: Day, number]> {
+  const tickerIteratorByAggregateByTicker: IndexedByAggregateByTicker<AggregateDataIterator> =
+    aggregateTimestamps.reduce((acc, aggregate) => {
+      // Fetch ticker iterators for all tickers
+      const gettickerIteratorByTickerResponse = trySync(() =>
+        getTickerIteratorsByTicker({
+          distinctTickers: distinctTickersByAggregate[aggregate],
+          tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
+          verboseLogging,
+        }),
+      );
+      if (!gettickerIteratorByTickerResponse.ok) {
+        throw gettickerIteratorByTickerResponse.error;
+      }
+      const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
+        gettickerIteratorByTickerResponse.data;
+      acc[aggregate] = tickerIteratorByTicker;
+      return acc;
+    }, {} as IndexedByAggregateByTicker<AggregateDataIterator>);
+
+  const matchIteratorResponse = await tryAsync(() =>
+    matchAggregateDataIterators(tickerIteratorByAggregateByTicker, timespanDays?.[0]),
+  );
+  if (!matchIteratorResponse.ok) throw matchIteratorResponse.error;
+  const [startDay] = matchIteratorResponse.data;
+
+  let linesToProcess = 0;
+  for (const aggregate of aggregateTimestamps) {
+    // Skip if no tickers
+    const tickerIteratorByTicker = tickerIteratorByAggregateByTicker[aggregate];
+    const numTickers = Object.keys(tickerIteratorByTicker).length;
+    if (numTickers === 0) {
+      continue;
+    }
+
+    let hasNextBar = true;
+    while (hasNextBar) {
+      for (const ticker in tickerIteratorByTicker) {
+        const nextBarIteratorResult = await tickerIteratorByTicker[ticker].next();
+        if (nextBarIteratorResult.done) {
+          hasNextBar = false;
+          break;
+        }
+      }
+      linesToProcess += numTickers;
+    }
+
+    for (const ticker in tickerIteratorByTicker) {
+      tickerIteratorByTicker[ticker].close();
+    }
+  }
+  return [startDay, linesToProcess];
 }
 
 const MAX_TICKERS_TO_SHOW = 3;

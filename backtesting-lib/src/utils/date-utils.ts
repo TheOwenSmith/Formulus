@@ -3,6 +3,13 @@ import { trySync } from './errorHandling';
 
 export type Day = [year: number, month: number, day: number];
 const daySchema = z.tuple([z.number(), z.number(), z.number()]);
+const dateStringToDaySchema = z
+  .string()
+  .regex(/^(\d{4})-(\d{2})-(\d{2})$/)
+  .transform((data) => {
+    const splitResult = data.split('-').map(Number);
+    return daySchema.parse(splitResult);
+  });
 
 export function compareDays(day1: Day, day2: Day): number {
   if (day1[0] !== day2[0]) return day1[0] - day2[0];
@@ -10,39 +17,49 @@ export function compareDays(day1: Day, day2: Day): number {
   return day1[2] - day2[2];
 }
 
-export function dateToDay(timestamp: string) {
-  const [datePart, _timePart] = timestamp.split(' ');
-  const [year, month, day] = datePart.split('-').map(Number);
-  const zodParsedDayResponse = trySync(() => daySchema.parse([year, month, day]));
-  if (!zodParsedDayResponse.ok) throw zodParsedDayResponse.error;
-  return zodParsedDayResponse.data;
+export function dayToString(day: Day): string {
+  return `${day[0]}-${String(day[1]).padStart(2, '0')}-${String(day[2]).padStart(2, '0')}`;
 }
 
-export function timespanToDays(timespan: [string, string]): [Day, Day] {
-  const timespanDates: [Day, Day] = [
-    [0, 0, 0],
-    [0, 0, 0],
-  ];
+export function timestampToDay(timestamp: string): Day {
+  const [dateString, _timeString] = timestamp.split(' ');
+  const zodParseDayResponse = trySync(() => dateStringToDaySchema.parse(dateString));
+  if (!zodParseDayResponse.ok) throw zodParseDayResponse.error;
+  return zodParseDayResponse.data;
+}
 
-  const unparsedStartDay = timespan[0].split('-').map(Number);
-  const zodParsedStartDayResponse = trySync(() => daySchema.parse(unparsedStartDay));
-  if (!zodParsedStartDayResponse.ok) {
-    throw new Error(
-      `Timespan is invalid: start date ${timespan[0]} is not a valid date; it must be of the form YYYY-MM-DD`,
-    );
+export function timespanToDays(
+  timespan?: [string | undefined, string | undefined],
+): [Day | undefined, Day | undefined] {
+  if (timespan == undefined) return [undefined, undefined];
+
+  const timespanDates: [Day | undefined, Day | undefined] = [undefined, undefined];
+
+  if (timespan[0] != undefined) {
+    const zodParseStartDayResponse = trySync(() => dateStringToDaySchema.parse(timespan[0]));
+    if (!zodParseStartDayResponse.ok) {
+      throw new Error(
+        `Timespan is invalid: start date '${timespan[0]}' is not a valid date; it must be of the form YYYY-MM-DD`,
+      );
+    }
+    timespanDates[0] = zodParseStartDayResponse.data;
   }
-  timespanDates[0] = zodParsedStartDayResponse.data;
 
-  const unparsedEndDay = timespan[1].split('-').map(Number);
-  const unparsedEndDayResponse = trySync(() => daySchema.parse(unparsedEndDay));
-  if (!unparsedEndDayResponse.ok) {
-    throw new Error(
-      `Timespan is invalid: end date ${timespan[1]} is not a valid date; it must be of the form YYYY-MM-DD`,
-    );
+  if (timespan[1] != undefined) {
+    const zodParseEndDayResponse = trySync(() => dateStringToDaySchema.parse(timespan[1]));
+    if (!zodParseEndDayResponse.ok) {
+      throw new Error(
+        `Timespan is invalid: end date '${timespan[1]}' is not a valid date; it must be of the form YYYY-MM-DD`,
+      );
+    }
+    timespanDates[1] = zodParseEndDayResponse.data;
   }
-  timespanDates[1] = unparsedEndDayResponse.data;
 
-  if (compareDays(timespanDates[0], timespanDates[1]) >= 0) {
+  if (
+    timespanDates[0] != undefined &&
+    timespanDates[1] != undefined &&
+    compareDays(timespanDates[0], timespanDates[1]) >= 0
+  ) {
     throw new Error('Timespan is invalid: start date is after or equal to end date');
   }
   return timespanDates;

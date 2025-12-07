@@ -1,35 +1,22 @@
 import { Action } from '@/algorithms/create-simple-algorithm';
 import type { Ticker } from '@/fetch/fetch';
+import type { AlgorithmData } from './backtest-algorithms-concurrently';
 
 // See docs/Phoenix_Trader_Position_Management_System.pdf
 export function updatePosition({
   actions,
-  algorithmChangeInBalanceByTickerPosition,
-  algorithmCumulativeProfitLoss,
-  algorithmIndex,
   algorithmMaxHoldingProportion,
-  algorithmPositions,
+  algorithmData,
   algorithmTickers,
-  algorithmWinsLosses,
-  balancesByAlgorithm,
-  positionsClosedByAlgorithm,
   priceByTicker,
   tickerDataByTicker,
-  tradesByAlgorithm,
 }: {
   actions: Record<Ticker, Action>;
-  algorithmChangeInBalanceByTickerPosition: Record<Ticker, number>;
-  algorithmCumulativeProfitLoss: [number, number];
-  algorithmIndex: number;
   algorithmMaxHoldingProportion: number;
-  algorithmPositions: Record<Ticker, number>;
+  algorithmData: AlgorithmData;
   algorithmTickers: Ticker[];
-  algorithmWinsLosses: [number, number];
-  balancesByAlgorithm: number[];
-  positionsClosedByAlgorithm: number[];
   priceByTicker: Record<Ticker, number>;
   tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
-  tradesByAlgorithm: number[];
 }) {
   // Initialize sets
   const h: Ticker[] = [];
@@ -41,7 +28,7 @@ export function updatePosition({
       throw new Error(`No action specified for ticker '${ticker}' in actions record`);
     }
 
-    const has = algorithmPositions[ticker] > 0;
+    const has = algorithmData.positions[ticker] > 0;
     const action = actions[ticker];
 
     if (has && action === Action.SELL) {
@@ -55,9 +42,9 @@ export function updatePosition({
 
   // Compute k
   const k = computeK({
-    algorithmPositions,
+    algorithmPositions: algorithmData.positions,
     b,
-    c: balancesByAlgorithm[algorithmIndex],
+    c: algorithmData.balance,
     h,
     priceByTicker,
     r: algorithmMaxHoldingProportion,
@@ -66,29 +53,20 @@ export function updatePosition({
   });
 
   // Sell
-  let changeInBalance = 0;
   for (const ticker of th) {
-    const sharesOwned = algorithmPositions[ticker];
-    const positionSize = priceByTicker[ticker] * sharesOwned;
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
-    const sellingProfit = (1 - slippage) * positionSize;
-    changeInBalance += sellingProfit;
 
     closePosition({
-      algorithmChangeInBalanceByTickerPosition,
-      algorithmCumulativeProfitLoss,
-      algorithmIndex,
-      algorithmPositions,
-      algorithmWinsLosses,
-      positionsClosedByAlgorithm,
-      sellingProfit,
+      algorithmData,
+      pricePerShare: priceByTicker[ticker],
       ticker,
+      slippage,
     });
   }
 
   // Adjust holding
   for (const ticker of h) {
-    const sharesOwned = algorithmPositions[ticker];
+    const sharesOwned = algorithmData.positions[ticker];
     const positionSize = priceByTicker[ticker] * sharesOwned;
     const deltaPositionSize = k - positionSize;
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
@@ -96,24 +74,22 @@ export function updatePosition({
 
     // Update balance
     const deltaChangeInBalance = slippageFactor * -deltaPositionSize;
-    changeInBalance += deltaChangeInBalance;
-    algorithmChangeInBalanceByTickerPosition[ticker] += deltaChangeInBalance;
-    algorithmPositions[ticker] += deltaPositionSize / priceByTicker[ticker];
+    algorithmData.balance += deltaChangeInBalance;
+    algorithmData.changeInBalanceByTickerPosition[ticker] += deltaChangeInBalance;
+    algorithmData.positions[ticker] += deltaPositionSize / priceByTicker[ticker];
+    algorithmData.trades++;
   }
 
   // Buy
   for (const ticker of b) {
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
-    algorithmPositions[ticker] = k / priceByTicker[ticker];
+    algorithmData.positions[ticker] = k / priceByTicker[ticker];
 
     const cost = (1 + slippage) * k;
-    changeInBalance -= cost;
-    algorithmChangeInBalanceByTickerPosition[ticker] -= cost;
+    algorithmData.balance -= cost;
+    algorithmData.changeInBalanceByTickerPosition[ticker] -= cost;
+    algorithmData.trades++;
   }
-
-  // Update trades and balances
-  tradesByAlgorithm[algorithmIndex] += th.length + h.length + b.length;
-  balancesByAlgorithm[algorithmIndex] += changeInBalance;
 }
 
 const TOLERANCE = 1e-8;
@@ -222,98 +198,70 @@ function computeK({
 }
 
 export function getPortfolioValue({
-  algorithmPositions,
   priceByTicker,
-  balance,
+  algorithmData,
 }: {
-  algorithmPositions: Record<Ticker, number>;
   priceByTicker: Record<Ticker, number>;
-  balance: number;
+  algorithmData: AlgorithmData;
 }): number {
-  let value = balance;
-  for (const ticker in algorithmPositions) {
-    value += algorithmPositions[ticker] * priceByTicker[ticker];
+  let value = algorithmData.balance;
+  for (const ticker in algorithmData.positions) {
+    const sharesOwned = algorithmData.positions[ticker];
+    value += priceByTicker[ticker] * sharesOwned;
   }
   return value;
 }
 
 export function closeAllPositions({
-  algorithmChangeInBalanceByTickerPosition,
-  algorithmCumulativeProfitLoss,
-  algorithmIndex,
-  algorithmPositions,
-  algorithmWinsLosses,
-  balancesByAlgorithm,
-  positionsClosedByAlgorithm,
+  algorithmData,
   priceByTicker,
   tickerDataByTicker,
-  tradesByAlgorithm,
 }: {
-  algorithmChangeInBalanceByTickerPosition: Record<Ticker, number>;
-  algorithmCumulativeProfitLoss: [number, number];
-  algorithmIndex: number;
-  algorithmPositions: Record<Ticker, number>;
-  algorithmWinsLosses: [number, number];
-  balancesByAlgorithm: number[];
-  positionsClosedByAlgorithm: number[];
+  algorithmData: AlgorithmData;
   priceByTicker: Record<Ticker, number>;
   tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
-  tradesByAlgorithm: number[];
 }) {
-  let changeInBalance = 0;
-  for (const ticker in algorithmPositions) {
-    const sharesOwned = algorithmPositions[ticker];
-    const positionSize = priceByTicker[ticker] * sharesOwned;
+  for (const ticker in algorithmData.positions) {
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
-    const sellingProfit = (1 - slippage) * positionSize;
-    changeInBalance += sellingProfit;
 
     closePosition({
-      algorithmChangeInBalanceByTickerPosition,
-      algorithmCumulativeProfitLoss,
-      algorithmIndex,
-      algorithmPositions,
-      algorithmWinsLosses,
-      positionsClosedByAlgorithm,
-      sellingProfit,
+      algorithmData,
+      pricePerShare: priceByTicker[ticker],
+      slippage,
       ticker,
     });
   }
-  tradesByAlgorithm[algorithmIndex] += Object.keys(algorithmPositions).length;
-  balancesByAlgorithm[algorithmIndex] += changeInBalance;
 }
 
 function closePosition({
-  algorithmChangeInBalanceByTickerPosition,
-  algorithmCumulativeProfitLoss,
-  algorithmIndex,
-  algorithmPositions,
-  algorithmWinsLosses,
-  positionsClosedByAlgorithm,
-  sellingProfit,
+  algorithmData,
+  pricePerShare,
+  slippage,
   ticker,
 }: {
-  algorithmChangeInBalanceByTickerPosition: Record<Ticker, number>;
-  algorithmCumulativeProfitLoss: [number, number];
-  algorithmIndex: number;
-  algorithmPositions: Record<Ticker, number>;
-  algorithmWinsLosses: [number, number];
-  positionsClosedByAlgorithm: number[];
-  sellingProfit: number;
+  algorithmData: AlgorithmData;
+  pricePerShare: number;
+  slippage: number;
   ticker: Ticker;
 }) {
-  // Update balance
-  const positionProfit = algorithmChangeInBalanceByTickerPosition[ticker] + sellingProfit;
-  algorithmPositions[ticker] = 0;
-  algorithmChangeInBalanceByTickerPosition[ticker] = 0;
+  const sharesOwned = algorithmData.positions[ticker];
+  const positionSize = pricePerShare * sharesOwned;
+  const sellingProfit = (1 - slippage) * positionSize;
+
+  // Update balance and position
+  algorithmData.balance += sellingProfit;
+  algorithmData.positions[ticker] = 0;
+  const positionProfit = algorithmData.changeInBalanceByTickerPosition[ticker] + sellingProfit;
+  algorithmData.changeInBalanceByTickerPosition[ticker] = 0;
 
   // Update W/L and P/L related variables
   if (positionProfit > 0) {
-    algorithmWinsLosses[0]++;
-    algorithmCumulativeProfitLoss[0] += positionProfit;
+    algorithmData.winsLosses[0]++;
+    algorithmData.cumulativeProfitLoss[0] += positionProfit;
   } else if (positionProfit < 0) {
-    algorithmWinsLosses[1]++;
-    algorithmCumulativeProfitLoss[1] += -positionProfit;
+    algorithmData.winsLosses[1]++;
+    algorithmData.cumulativeProfitLoss[1] += -positionProfit;
   }
-  positionsClosedByAlgorithm[algorithmIndex]++;
+  algorithmData.positionsClosed++;
+  algorithmData.trades++;
 }
