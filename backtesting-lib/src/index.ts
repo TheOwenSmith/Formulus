@@ -13,13 +13,16 @@ import {
 } from './algorithms/examples/green-red-bars';
 import { ifGreenAlgorithm } from './algorithms/examples/if-green';
 import { chooseToPlot } from './algorithms/plot';
+import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
 import type { Ticker } from './fetch/fetch';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const contextLengths: number[] = [3, 5, 7, 9];
 const tickers: [Ticker, ...Ticker[]] = ['SPY', 'SH', 'AAPL', 'GOOG', 'PFE', 'TSLA'];
-const algorithms: Algorithm[] = [ifGreenAlgorithm('60min', 'SPY')];
+const algorithms: Algorithm[] = [
+  createAlgorithmFromSimpleMarketInvariantAlgorithm(ifGreenAlgorithm, '60min', 'SPY'),
+];
 
 // Load context maps
 console.log('Loading context maps...');
