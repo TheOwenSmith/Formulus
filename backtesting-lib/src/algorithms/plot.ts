@@ -14,8 +14,9 @@ const DESCRIPTION_METRICS_ORDER = exhaustiveArray<DescriptionMetrics>()([
   'algorithmReturn',
   'growthRate',
   'sharpeRatio',
-  'profitLossRatio',
   'winRate',
+  'profitLossRatio',
+  'expectancyPerTrade',
   'tickers',
   'maxHoldingPorportion',
   'volatility',
@@ -31,6 +32,8 @@ const DESCRIPTION_METRIC_TO_STRING: {
   algorithmReturn: (algorithmReturn: number) =>
     `Algorithm return: ${withCommasRounded(algorithmReturn * 100)}%`,
   contextLength: (contextLength: number) => `Context length: ${withCommas(contextLength)}`,
+  expectancyPerTrade: (expectancyPerTrade: number) =>
+    `Expectancy per trade: ${withCommasRounded(expectancyPerTrade * 100)}%`,
   growthRate: (growthRate: number) => `Growth rate: ${withCommasRounded(growthRate * 100)}%`,
   maxHoldingPorportion: (maxHoldingPorportion: number) =>
     `Max holding percentage: ${withCommasRounded(maxHoldingPorportion * 100)}%`,
@@ -46,7 +49,7 @@ const DESCRIPTION_METRIC_TO_STRING: {
     `Timespan: ${dayToString(timespan[0])} to ${dayToString(timespan[1])}`,
   tradesMade: (tradesMade: number) => `Trades made: ${withCommas(tradesMade)}`,
   volatility: (volatility: number) => `Volatility: ${withCommasRounded(volatility * 100)}%`,
-  winRate: (winRate: number) => `Win rate: ${withCommasRounded(winRate)}%`,
+  winRate: (winRate: number) => `Win rate: ${withCommasRounded(winRate * 100)}%`,
 };
 
 type DescriptionMetricOptions = {
@@ -56,6 +59,7 @@ const DEFAULT_DESCRIPTION_METRIC_OPTIONS: DescriptionMetricOptions = {
   aggregate: true,
   algorithmReturn: true,
   contextLength: false,
+  expectancyPerTrade: false,
   growthRate: true,
   maxHoldingPorportion: false,
   positionsClosed: true,

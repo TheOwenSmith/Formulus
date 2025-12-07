@@ -55,13 +55,13 @@ export type SelectionOptionWithPerformance<T> = SelectionOption<T> & { performan
 export type AlgorithmData = {
   algorithmYs: number[];
   balance: number;
-  changeInBalanceByTickerPosition: Record<Ticker, number>;
-  cumulativeProfitLoss: [number, number];
+  cumulativeProfitLoss: [profit: number, loss: number];
+  entracePriceExitPriceByTickerPosition: Record<Ticker, [entryPrice: number, exitPrice: number]>;
   positions: Record<Ticker, number>;
   positionsClosed: number;
   sharpeRatioCalculator: SharpeRatioCalculator;
   trades: number;
-  winsLosses: [number, number];
+  winsLosses: [wins: number, losses: number];
 };
 
 export const MAX_POINTS_PER_PLOT = 1_000;
@@ -220,11 +220,11 @@ export async function backtestAlgorithmsConcurrently({
       (_, algorithmIndex) => ({
         algorithmYs: [],
         balance: 100,
-        changeInBalanceByTickerPosition: createIndexByTicker(
-          algorithmsByAggregate[aggregate][algorithmIndex].tickers,
-          (_ticker) => 0,
-        ),
         cumulativeProfitLoss: [0, 0],
+        entracePriceExitPriceByTickerPosition: createIndexByTicker(
+          algorithmsByAggregate[aggregate][algorithmIndex].tickers,
+          (_ticker) => [0, 0],
+        ),
         positions: createIndexByTicker(
           algorithmsByAggregate[aggregate][algorithmIndex].tickers,
           (_ticker) => 0,

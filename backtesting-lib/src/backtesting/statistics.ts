@@ -65,6 +65,7 @@ export type DescriptionMetrics = {
   aggregate: Timestamp;
   algorithmReturn: number;
   contextLength: number;
+  expectancyPerTrade: number;
   growthRate: number;
   maxHoldingPorportion: number;
   positionsClosed: number;
@@ -131,6 +132,7 @@ export async function getAlgorithmSelectionOptionWithPerformance({
     aggregate,
     algorithmReturn: algorithmReturnPercentage / 100,
     contextLength,
+    expectancyPerTrade: (cumulativeProfitLoss[0] - cumulativeProfitLoss[1]) / positionsClosed,
     growthRate,
     maxHoldingPorportion: algorithmMaxHoldingProportion,
     positionsClosed,
@@ -142,6 +144,7 @@ export async function getAlgorithmSelectionOptionWithPerformance({
     volatility: sharpeRatioCalculator.volatility(),
     winRate: winsLosses[0] / (winsLosses[0] + winsLosses[1]),
   };
+  console.log({ cumulativeProfitLoss });
 
   const performance = await performanceFn(descriptionMetrics);
   return {

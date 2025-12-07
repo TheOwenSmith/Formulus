@@ -70,12 +70,24 @@ export function updatePosition({
     const positionSize = priceByTicker[ticker] * sharesOwned;
     const deltaPositionSize = k - positionSize;
     const slippage = tickerDataByTicker[ticker][1] / 10_000;
-    const slippageFactor = deltaPositionSize < 0 ? 1 - slippage : 1 + slippage;
 
     // Update balance
-    const deltaChangeInBalance = slippageFactor * -deltaPositionSize;
-    algorithmData.balance += deltaChangeInBalance;
-    algorithmData.changeInBalanceByTickerPosition[ticker] += deltaChangeInBalance;
+    if (deltaPositionSize > 0) {
+      // Buy to correct position
+      const slippageFactor = 1 + slippage;
+      const cost = slippageFactor * deltaPositionSize;
+      algorithmData.balance -= cost;
+      algorithmData.entracePriceExitPriceByTickerPosition[ticker][0] += cost;
+    } else if (deltaPositionSize < 0) {
+      // Sell to correct position
+      const slippageFactor = 1 - slippage;
+      const profit = slippageFactor * -deltaPositionSize;
+      algorithmData.balance += profit;
+      algorithmData.entracePriceExitPriceByTickerPosition[ticker][1] += profit;
+    } else {
+      continue;
+    }
+
     algorithmData.positions[ticker] += deltaPositionSize / priceByTicker[ticker];
     algorithmData.trades++;
   }
@@ -87,7 +99,7 @@ export function updatePosition({
 
     const cost = (1 + slippage) * k;
     algorithmData.balance -= cost;
-    algorithmData.changeInBalanceByTickerPosition[ticker] -= cost;
+    algorithmData.entracePriceExitPriceByTickerPosition[ticker][0] += cost;
     algorithmData.trades++;
   }
 }
@@ -251,16 +263,20 @@ function closePosition({
   // Update balance and position
   algorithmData.balance += sellingProfit;
   algorithmData.positions[ticker] = 0;
-  const positionProfit = algorithmData.changeInBalanceByTickerPosition[ticker] + sellingProfit;
-  algorithmData.changeInBalanceByTickerPosition[ticker] = 0;
+  algorithmData.entracePriceExitPriceByTickerPosition[ticker][1] += sellingProfit;
+  const [entryPrice, exitPrice] = algorithmData.entracePriceExitPriceByTickerPosition[ticker];
+
+  // = (average exit price per share - average entrace price per share) / average entrace price per share
+  const profitLossPercentage = (exitPrice - entryPrice) / entryPrice;
+  algorithmData.entracePriceExitPriceByTickerPosition[ticker] = [0, 0];
 
   // Update W/L and P/L related variables
-  if (positionProfit > 0) {
+  if (profitLossPercentage > 0) {
     algorithmData.winsLosses[0]++;
-    algorithmData.cumulativeProfitLoss[0] += positionProfit;
-  } else if (positionProfit < 0) {
+    algorithmData.cumulativeProfitLoss[0] += profitLossPercentage;
+  } else if (profitLossPercentage < 0) {
     algorithmData.winsLosses[1]++;
-    algorithmData.cumulativeProfitLoss[1] += -positionProfit;
+    algorithmData.cumulativeProfitLoss[1] += -profitLossPercentage;
   }
   algorithmData.positionsClosed++;
   algorithmData.trades++;
