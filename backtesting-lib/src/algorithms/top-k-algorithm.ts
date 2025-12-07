@@ -35,24 +35,22 @@ export function createAlgorithmFromTopKAlgorithm({
   ) {
     const scoresByTicker: Record<Ticker, number> = implementation(context, positions);
     const maxHeap = new Heap<[Ticker, number]>(
-      (a: [Ticker, number], b: [Ticker, number]) => b[1] - a[1],
+      (a: [Ticker, number], b: [Ticker, number]) => a[1] - b[1],
     );
     const result = {} as Record<Ticker, Action>;
     for (const ticker in scoresByTicker) {
+      maxHeap.add([ticker, scoresByTicker[ticker]]);
+
       // Min heap has capacity of k
-      if (maxHeap.size < k) {
-        maxHeap.add([ticker, scoresByTicker[ticker]]);
-      } else {
+      if (maxHeap.size > k) {
         // removeTicker is not top k score, so we sell or hold
         const removedTicker = maxHeap.pop()![0];
         result[removedTicker] = positions[removedTicker] > 0 ? Action.SELL : Action.HOLD;
-
-        maxHeap.add([ticker, scoresByTicker[ticker]]);
       }
     }
 
     while (maxHeap.size > 0) {
-      // removeTicker is not top k score, so we buy or hold
+      // removeTicker is top k score, so we buy or hold
       const removedTicker = maxHeap.pop()![0];
       result[removedTicker] = positions[removedTicker] > 0 ? Action.HOLD : Action.BUY;
     }
