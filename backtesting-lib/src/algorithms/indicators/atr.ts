@@ -2,7 +2,7 @@ import type { Bar } from '@/backtesting/read-data';
 
 export function computeATR(bars: Bar[], period = 14): (number | undefined)[] {
   if (bars.length < period) {
-    throw new Error(`Must have at least ${period} bars to compute ATR`);
+    throw new Error(`Must have context length of at least ${period} to compute ATR`);
   }
 
   const trs: number[] = [];
