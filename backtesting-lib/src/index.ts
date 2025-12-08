@@ -10,7 +10,7 @@ import {
   deserializeContextMap,
   serializeContextMap,
 } from './algorithms/context-maps/context-map';
-import { aboveBelowAlgorithm } from './algorithms/examples/above-below';
+import { aboveBelowSmaAlgorithm } from './algorithms/examples/above-below-sma';
 import {
   greenRedBarsChooseKAlgorithm,
   greenRedBarsMaskHistory,
@@ -18,6 +18,7 @@ import {
 import { ifGreenAlgorithm } from './algorithms/examples/if-green';
 import { longShortAlgorithm } from './algorithms/examples/long-short';
 import { overboughtOversoldAlgorithm } from './algorithms/examples/overbought-oversold';
+import { regressionLineAlgorithm } from './algorithms/examples/regression-line';
 import { chooseToPlot } from './algorithms/plot';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
@@ -110,13 +111,18 @@ if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
     createAlgorithmFromMarketInvariantAlgorithm(overboughtOversoldAlgorithm, '60min', tickers),
   );
 
-  // Populate algorithms with above/below algorithm
+  // Populate algorithms with above/below SMA algorithm
   algorithms.push(
-    createAlgorithmFromMarketInvariantAlgorithm(aboveBelowAlgorithm, '60min', tickers),
+    createAlgorithmFromMarketInvariantAlgorithm(aboveBelowSmaAlgorithm, '60min', tickers),
   );
 
   // Populate algorithms with long/short algorithm
   algorithms.push(longShortAlgorithm);
+
+  // Populate algorithms with regression line algorithm
+  algorithms.push(
+    createAlgorithmFromMarketInvariantAlgorithm(regressionLineAlgorithm, '60min', tickers),
+  );
 }
 
 console.log('Backtesting algorithms...');
