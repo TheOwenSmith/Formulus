@@ -16,6 +16,7 @@ import {
   greenRedBarsMaskHistory,
 } from './algorithms/examples/green-red-bars';
 import { ifGreenAlgorithm } from './algorithms/examples/if-green';
+import { longShortAlgorithm } from './algorithms/examples/long-short';
 import { overboughtOversoldAlgorithm } from './algorithms/examples/overbought-oversold';
 import { chooseToPlot } from './algorithms/plot';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
@@ -113,6 +114,9 @@ if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
   algorithms.push(
     createAlgorithmFromMarketInvariantAlgorithm(aboveBelowAlgorithm, '60min', tickers),
   );
+
+  // Populate algorithms with long/short algorithm
+  algorithms.push(longShortAlgorithm);
 }
 
 console.log('Backtesting algorithms...');
@@ -132,4 +136,5 @@ const [algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate] =
 await chooseToPlot(algorithmGraphSelectionOptions, tickerGraphSelectionOptionsByAggregate, {
   profitLossRatio: true,
   averageHoldingDuration: true,
+  expectancyPerTrade: true,
 });
