@@ -1,7 +1,7 @@
 import type { Bar } from '@/backtesting/read-data';
 import { computeATR } from './atr';
 
-const enum Direction {
+export const enum Direction {
   UP,
   DOWN,
 }
@@ -11,8 +11,8 @@ export function computeSuperTrend(
   period = 10,
   multiplier = 3,
 ): ({ superTrend: number; direction: Direction } | undefined)[] {
-  if (bars.length < period) {
-    throw new Error(`Must have context length of at least ${period} to compute SuperTrend`);
+  if (bars.length < period + 1) {
+    throw new Error(`Must have context length of at least ${period + 1} to compute SuperTrend`);
   }
 
   const result: ({ superTrend: number; direction: Direction } | undefined)[] = Array(

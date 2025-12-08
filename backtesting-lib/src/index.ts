@@ -19,6 +19,7 @@ import { ifGreenAlgorithm } from './algorithms/examples/if-green';
 import { longShortAlgorithm } from './algorithms/examples/long-short';
 import { overboughtOversoldAlgorithm } from './algorithms/examples/overbought-oversold';
 import { regressionLineAlgorithm } from './algorithms/examples/regression-line';
+import { superTrendDirectionAlgorithm } from './algorithms/examples/super-trend-direction';
 import { chooseToPlot } from './algorithms/plot';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
 import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
@@ -122,6 +123,11 @@ if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
   // Populate algorithms with regression line algorithm
   algorithms.push(
     createAlgorithmFromMarketInvariantAlgorithm(regressionLineAlgorithm, '60min', tickers),
+  );
+
+  // Populate algorithms with super trend direction algorithm
+  algorithms.push(
+    createAlgorithmFromMarketInvariantAlgorithm(superTrendDirectionAlgorithm, '60min', tickers),
   );
 }
 
