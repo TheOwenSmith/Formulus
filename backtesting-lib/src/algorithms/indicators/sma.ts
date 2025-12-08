@@ -5,7 +5,7 @@ export function computeSMA(bars: Bar[], period: number): (number | undefined)[] 
     throw new Error(`Must have context length of at least ${period} to compute ${period}-SMA`);
   }
 
-  const result: (number | undefined)[] = [];
+  const result: (number | undefined)[] = Array(bars.length).fill(undefined);
   let sum = 0;
 
   for (let i = 0; i < bars.length; i++) {
@@ -15,10 +15,8 @@ export function computeSMA(bars: Bar[], period: number): (number | undefined)[] 
       sum -= bars[i - period][4];
     }
 
-    if (i < period - 1) {
-      result.push(undefined);
-    } else {
-      result.push(sum / period);
+    if (i >= period - 1) {
+      result[i] = sum / period;
     }
   }
   return result;
