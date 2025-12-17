@@ -109,7 +109,7 @@ export async function backtestAlgorithmsConcurrently({
     const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } = algorithm;
     if (algorithmMaxHoldingProportion > ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT) {
       throw new Error(
-        `Algorithm max holding proportion ${algorithmMaxHoldingProportion} is greater than the limit ${ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT}`,
+        `Algorithm max holding proportion '${algorithmMaxHoldingProportion}' is greater than the limit ${ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT}`,
       );
     }
   }

@@ -31,13 +31,7 @@ export type Ticker = 'SPY' | 'SPUU' | 'SPXL' | 'SPX' | 'SH' | 'SDS' | 'SPXU' | (
 export const aggregateTimestamps = ['1min', '5min', '15min', '30min', '60min'] as const;
 export type Timestamp = (typeof aggregateTimestamps)[number];
 
-export const aggregateInMillisecondsFromTimestamp: Record<Timestamp, number> = {
-  '1min': 60_000,
-  '5min': 300_000,
-  '15min': 900_000,
-  '30min': 1_800_000,
-  '60min': 3_600_000,
-};
+export const tickDataCsvHeader = 'timestamp,open,high,low,close,volume\n';
 
 export async function fetchAlphaVantageData({
   ticker,
@@ -56,15 +50,13 @@ export async function fetchAlphaVantageData({
 
   const writeToFilename = `${ticker}_${timestamp}.csv`;
   const writeToFile = `./data/uncleaned/${writeToFilename}`;
-  if (!fs.existsSync(writeToFile)) {
+  if (!fs.existsSync('./data/uncleaned')) {
     const makeDirResponse = trySync(() => fs.mkdirSync('./data/uncleaned', { recursive: true }));
     if (!makeDirResponse.ok) throw makeDirResponse.error;
   }
 
   // Write header
-  const writeHeaderResponse = trySync(() =>
-    fs.writeFileSync(writeToFile, 'timestamp,open,high,low,close,volume\n'),
-  );
+  const writeHeaderResponse = trySync(() => fs.writeFileSync(writeToFile, tickDataCsvHeader));
   if (!writeHeaderResponse.ok) throw writeHeaderResponse.error;
 
   const currentYear = new Date().getFullYear();

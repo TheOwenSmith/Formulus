@@ -165,7 +165,7 @@ export async function matchAggregateDataIterators(
     const comp = compareDays(latestFirstBarDay, startDay);
     if (comp > 0) {
       throw new Error(
-        `Data is missing through ${dayToString(latestFirstBarDay)}; the provided start day ${dayToString(startDay)} is not sufficient`,
+        `Data is missing through ${dayToString(latestFirstBarDay)}; the provided start day '${dayToString(startDay)}' is not sufficient`,
       );
     } else if (comp === 0) {
       actualStartDayTimestamp = dayToString(startDay);

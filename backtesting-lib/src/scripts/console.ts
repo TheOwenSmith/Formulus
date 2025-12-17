@@ -1,3 +1,4 @@
+import { createSearchIndex } from '@/fetch/create-search-index';
 import { aggregateTimestamps, fetchAlphaVantageData, type Ticker } from '@/fetch/fetch';
 
 const tickers: Ticker[] = [
@@ -22,13 +23,13 @@ const tickers: Ticker[] = [
 ];
 
 for (const timestamp of aggregateTimestamps) {
-  if (timestamp === '60min') continue;
-
   for (const ticker of tickers) {
     await fetchAlphaVantageData({
       ticker,
       years: 20,
       timestamp,
     });
+
+    await createSearchIndex(ticker, timestamp);
   }
 }

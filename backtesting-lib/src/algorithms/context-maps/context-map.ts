@@ -119,7 +119,7 @@ export function createAlgorithmFromContextMaps<T>({
   if (isRecord(contextMaps)) {
     for (const ticker of tickers) {
       if (!(ticker in contextMaps)) {
-        throw new Error(`Missing context map for ticker ${ticker}`);
+        throw new Error(`Missing context map for ticker '${ticker}'`);
       }
     }
   }
@@ -193,7 +193,7 @@ export function createTopKAlgorithmFromContextMaps<T>({
   if (isRecord(contextMaps)) {
     for (const ticker of tickers) {
       if (!(ticker in contextMaps)) {
-        throw new Error(`Missing context map for ticker ${ticker}`);
+        throw new Error(`Missing context map for ticker '${ticker}'`);
       }
     }
   }

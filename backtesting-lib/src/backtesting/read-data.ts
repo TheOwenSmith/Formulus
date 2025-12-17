@@ -19,6 +19,10 @@ export async function getAllAggregateData(
   filename: string,
   verboseLogging = false,
 ): Promise<Bar[]> {
+  if (!fs.existsSync(filename)) {
+    throw new Error(`File '${filename}' does not exist`);
+  }
+
   const iter = readline
     .createInterface({
       input: fs.createReadStream(filename),
