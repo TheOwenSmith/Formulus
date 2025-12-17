@@ -49,68 +49,108 @@ export function getTickerDataByAggregateByTicker(
   tickerData: TickerData[],
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
   verboseLogging = false,
-): IndexedByAggregateByTicker<[filename: string, slippage: number]> {
-  const userInputtedTickerDataIndexed: IndexedByAggregateByTicker<
-    [filename: string, slippage: number]
-  > = emptyIndexByAggregateByTicker<[filename: string, slippage: number]>();
+): {
+  slippageByAggregateByTicker: IndexedByAggregateByTicker<number>;
+  filenameByAggregateByTicker: IndexedByAggregateByTicker<string>;
+  indexByAggregateByTicker: IndexedByAggregateByTicker<string>;
+} {
+  const userInputtedDataByAggregateByTicker = emptyIndexByAggregateByTicker<{
+    slippage: number;
+    filename: string;
+    index: string;
+  }>();
   for (const tickData of tickerData) {
-    const { ticker, aggregate, slippage = 0, filename } = tickData;
-    if (ticker in userInputtedTickerDataIndexed[aggregate]) {
+    const { ticker, aggregate, slippage = 0, filename, index } = tickData;
+    if (ticker in userInputtedDataByAggregateByTicker[aggregate]) {
       throw new Error(`Duplicate data for '${ticker}' (${aggregate}) provided`);
     }
 
-    // Resolve filename
+    // Resolve filename and index
     const impliedFilename = `./data/cleaned/${ticker}_${aggregate}.csv`;
     if (verboseLogging && filename == undefined) {
       console.error(
         `Missing filename for '${ticker}' (${aggregate}); assuming filename '${impliedFilename}'`,
       );
     }
-    const resolvedFilename = filename ?? impliedFilename;
+    const impliedIndex = `./data/index/${ticker}_${aggregate}.idx`;
+    if (verboseLogging && index == undefined) {
+      console.error(
+        `Missing index for '${ticker}' (${aggregate}); assuming index '${impliedIndex}'`,
+      );
+    }
 
-    // Check if file exists
+    const resolvedFilename = filename ?? impliedFilename;
+    const resolvedIndex = index ?? impliedIndex;
+
+    // Check if resolvedFilename and resolvedIndex exist
     if (!fs.existsSync(resolvedFilename)) {
       throw new Error(`Filename '${resolvedFilename}' does not exist`);
     }
+    if (!fs.existsSync(resolvedIndex)) {
+      throw new Error(`Index '${resolvedIndex}' does not exist`);
+    }
 
-    userInputtedTickerDataIndexed[aggregate][ticker] = [resolvedFilename, slippage];
+    userInputtedDataByAggregateByTicker[aggregate][ticker] = {
+      slippage,
+      filename: resolvedFilename,
+      index: resolvedIndex,
+    };
   }
 
-  const outputTickerDataIndexed: IndexedByAggregateByTicker<[filename: string, slippage: number]> =
-    emptyIndexByAggregateByTicker<[filename: string, slippage: number]>();
+  const slippageByAggregateByTicker = emptyIndexByAggregateByTicker<number>();
+  const filenameByAggregateByTicker = emptyIndexByAggregateByTicker<string>();
+  const indexByAggregateByTicker = emptyIndexByAggregateByTicker<string>();
   for (const aggregate of aggregateTimestamps) {
     for (const ticker of distinctTickersByAggregate[aggregate]) {
-      if (ticker in userInputtedTickerDataIndexed[aggregate]) {
-        outputTickerDataIndexed[aggregate][ticker] =
-          userInputtedTickerDataIndexed[aggregate][ticker];
+      if (ticker in userInputtedDataByAggregateByTicker[aggregate]) {
+        slippageByAggregateByTicker[aggregate][ticker] =
+          userInputtedDataByAggregateByTicker[aggregate][ticker].slippage;
+        filenameByAggregateByTicker[aggregate][ticker] =
+          userInputtedDataByAggregateByTicker[aggregate][ticker].filename;
+        indexByAggregateByTicker[aggregate][ticker] =
+          userInputtedDataByAggregateByTicker[aggregate][ticker].index;
       } else {
-        const impliedFilename = `./data/cleaned/${ticker}_${aggregate}.csv`;
         const impliedSlippage = 0;
+        const impliedFilename = `./data/cleaned/${ticker}_${aggregate}.csv`;
+        const impliedIndex = `./data/index/${ticker}_${aggregate}.idx`;
 
         if (verboseLogging) {
           console.error(
-            `Missing data for '${ticker}' (${aggregate}); assuming filename '${impliedFilename}' and slippage ${impliedSlippage}bps`,
+            `Missing data for '${ticker}' (${aggregate}); assuming slippage ${impliedSlippage}bps, filename '${impliedFilename}', and index '${impliedIndex}'`,
           );
         }
 
         if (!fs.existsSync(impliedFilename)) {
           throw new Error(`Assumed filename '${impliedFilename}' does not exist`);
         }
-        outputTickerDataIndexed[aggregate][ticker] = [impliedFilename, impliedSlippage];
+        if (!fs.existsSync(impliedIndex)) {
+          throw new Error(`Assumed index '${impliedIndex}' does not exist`);
+        }
+        slippageByAggregateByTicker[aggregate][ticker] = impliedSlippage;
+        filenameByAggregateByTicker[aggregate][ticker] = impliedFilename;
+        indexByAggregateByTicker[aggregate][ticker] = impliedIndex;
       }
     }
   }
 
   for (const aggregate of aggregateTimestamps) {
-    for (const ticker in userInputtedTickerDataIndexed[aggregate]) {
-      if (!(ticker in outputTickerDataIndexed[aggregate])) {
+    for (const ticker in userInputtedDataByAggregateByTicker[aggregate]) {
+      if (
+        !(ticker in slippageByAggregateByTicker[aggregate]) ||
+        !(ticker in filenameByAggregateByTicker[aggregate]) ||
+        !(ticker in indexByAggregateByTicker[aggregate])
+      ) {
         console.error(
           `Received data for '${ticker}' (${aggregate}), but no algorithm is configured to use it`,
         );
       }
     }
   }
-  return outputTickerDataIndexed;
+  return {
+    slippageByAggregateByTicker,
+    filenameByAggregateByTicker,
+    indexByAggregateByTicker,
+  };
 }
 
 export async function getFirstIteratorBars(
@@ -230,16 +270,16 @@ export async function matchAggregateDataIterators(
 
 export function getTickerIteratorsByTicker({
   distinctTickers,
-  tickerDataByTicker,
+  filenameByTicker,
   verboseLogging = false,
 }: {
   distinctTickers: Ticker[];
-  tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
+  filenameByTicker: Record<Ticker, string>;
   verboseLogging: boolean;
 }): Record<Ticker, AggregateDataIterator> {
   return distinctTickers.reduce(
     (acc, ticker) => {
-      const tickDataFilename = tickerDataByTicker[ticker][0];
+      const tickDataFilename = filenameByTicker[ticker];
       if (verboseLogging) {
         console.log(`Fetching '${tickDataFilename}'...`);
       }
@@ -259,12 +299,12 @@ export function getTickerIteratorsByTicker({
 
 export async function countLinesToProcess({
   distinctTickersByAggregate,
-  tickerDataByAggregateByTicker,
+  filenameByAggregateByTicker,
   timespanDays,
   verboseLogging = true,
 }: {
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>;
-  tickerDataByAggregateByTicker: IndexedByAggregateByTicker<[filename: string, slippage: number]>;
+  filenameByAggregateByTicker: IndexedByAggregateByTicker<string>;
   timespanDays: [Day | undefined, Day | undefined];
   verboseLogging?: boolean;
 }): Promise<[startDay: Day, endDay: Day, linesToProcess: number]> {
@@ -274,7 +314,7 @@ export async function countLinesToProcess({
       const gettickerIteratorByTickerResponse = trySync(() =>
         getTickerIteratorsByTicker({
           distinctTickers: distinctTickersByAggregate[aggregate],
-          tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
+          filenameByTicker: filenameByAggregateByTicker[aggregate],
           verboseLogging,
         }),
       );

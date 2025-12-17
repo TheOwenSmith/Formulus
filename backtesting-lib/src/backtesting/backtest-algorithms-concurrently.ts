@@ -18,6 +18,7 @@ import { tryAsync, trySync } from '@/utils/errorHandling';
 import { groupBy } from '@/utils/groupBy';
 import { withCommas } from '@/utils/number-utils';
 import { SharpeRatioCalculator } from '@/utils/sharpe-ratio-calculator';
+import type { AtLeastOne } from '@/utils/types';
 import cliProgress, { Presets } from 'cli-progress';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator, type Bar } from './read-data';
@@ -34,22 +35,16 @@ import {
   getTickerDataByAggregateByTicker,
   getTickerIteratorsByTicker,
   matchAggregateDataIterators,
-  type IndexedByAggregateByTicker,
 } from './ticker-utils';
 
-export type TickerData =
-  | {
-      ticker: Ticker;
-      aggregate: Timestamp;
-      slippage: number;
-      filename?: string;
-    }
-  | {
-      ticker: Ticker;
-      aggregate: Timestamp;
-      slippage?: number;
-      filename: string;
-    };
+export type TickerData = {
+  ticker: Ticker;
+  aggregate: Timestamp;
+} & AtLeastOne<{
+  slippage: number;
+  filename: string;
+  index: string;
+}>;
 
 export type SelectionOptionWithPerformance<T> = SelectionOption<T> & { performance: number };
 
@@ -129,9 +124,8 @@ export async function backtestAlgorithmsConcurrently({
   const distinctTickersByAggregate: Record<Timestamp, Ticker[]> =
     getDistinctTickersByAggregate(algorithmsByAggregate);
 
-  const tickerDataByAggregateByTicker: IndexedByAggregateByTicker<
-    [filename: string, slippage: number]
-  > = getTickerDataByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
+  const { slippageByAggregateByTicker, filenameByAggregateByTicker, indexByAggregateByTicker } =
+    getTickerDataByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
 
   // Output variables
   const algorithmGraphSelectionOptionsWithPerformance: SelectionOptionWithPerformance<{
@@ -154,7 +148,7 @@ export async function backtestAlgorithmsConcurrently({
   const startCountLinesToProcessTimestamp = Date.now();
   const [startDay, endDay, linesToProcess] = await countLinesToProcess({
     distinctTickersByAggregate,
-    tickerDataByAggregateByTicker,
+    filenameByAggregateByTicker,
     timespanDays,
     verboseLogging,
   });
@@ -188,18 +182,18 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Fetch ticker iterators for all tickers
-    const gettickerIteratorByTickerResponse = trySync(() =>
+    const getTickerIteratorByTickerResponse = trySync(() =>
       getTickerIteratorsByTicker({
         distinctTickers: distinctTickersByAggregate[aggregate],
-        tickerDataByTicker: tickerDataByAggregateByTicker[aggregate],
+        filenameByTicker: filenameByAggregateByTicker[aggregate],
         verboseLogging,
       }),
     );
-    if (!gettickerIteratorByTickerResponse.ok) {
-      throw gettickerIteratorByTickerResponse.error;
+    if (!getTickerIteratorByTickerResponse.ok) {
+      throw getTickerIteratorByTickerResponse.error;
     }
     const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
-      gettickerIteratorByTickerResponse.data;
+      getTickerIteratorByTickerResponse.data;
 
     // Match all iterators buffer one bar ahead to determine market state efficiently
     const matchIteratorResponse = await tryAsync(() =>
@@ -331,7 +325,7 @@ export async function backtestAlgorithmsConcurrently({
 
       // Execute algorithm trades
       const currentAlgorithms = algorithmsByAggregate[aggregate];
-      const tickerDataByTicker = tickerDataByAggregateByTicker[aggregate];
+      const slippageByTicker = slippageByAggregateByTicker[aggregate];
       for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
         const algorithm = currentAlgorithms[algorithmIndex];
         const {
@@ -368,14 +362,14 @@ export async function backtestAlgorithmsConcurrently({
             algorithmMaxHoldingProportion,
             algorithmTickers: tickers,
             priceByTicker,
-            tickerDataByTicker,
+            slippageByTicker,
             ticks,
           });
         } else if (!hasNextBar) {
           closeAllPositions({
             algorithmData: algorithmDataByAlgorithm[algorithmIndex],
             priceByTicker,
-            tickerDataByTicker,
+            slippageByTicker,
             ticks,
           });
         }

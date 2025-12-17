@@ -5,19 +5,19 @@ import type { AlgorithmData } from './backtest-algorithms-concurrently';
 // See docs/Phoenix_Trader_Position_Management_System.pdf
 export function updatePosition({
   actions,
-  algorithmMaxHoldingProportion,
   algorithmData,
+  algorithmMaxHoldingProportion,
   algorithmTickers,
   priceByTicker,
-  tickerDataByTicker,
+  slippageByTicker,
   ticks,
 }: {
   actions: Record<Ticker, Action>;
-  algorithmMaxHoldingProportion: number;
   algorithmData: AlgorithmData;
+  algorithmMaxHoldingProportion: number;
   algorithmTickers: Ticker[];
   priceByTicker: Record<Ticker, number>;
-  tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
+  slippageByTicker: Record<Ticker, number>;
   ticks: number;
 }) {
   // Initialize sets
@@ -50,13 +50,13 @@ export function updatePosition({
     h,
     priceByTicker,
     r: algorithmMaxHoldingProportion,
+    slippageByTicker,
     th,
-    tickerDataByTicker,
   });
 
   // Sell
   for (const ticker of th) {
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
 
     closePosition({
       algorithmData,
@@ -72,7 +72,7 @@ export function updatePosition({
     const sharesOwned = algorithmData.positions[ticker];
     const positionSize = priceByTicker[ticker] * sharesOwned;
     const deltaPositionSize = k - positionSize;
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
 
     // Update balance
     if (deltaPositionSize > 0) {
@@ -97,7 +97,7 @@ export function updatePosition({
 
   // Buy
   for (const ticker of b) {
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
     algorithmData.positions[ticker] = k / priceByTicker[ticker];
 
     const cost = (1 + slippage) * k;
@@ -116,8 +116,8 @@ function computeK({
   h,
   priceByTicker,
   r,
+  slippageByTicker,
   th,
-  tickerDataByTicker,
 }: {
   algorithmPositions: Record<Ticker, number>;
   b: Ticker[];
@@ -125,8 +125,8 @@ function computeK({
   h: Ticker[];
   priceByTicker: Record<Ticker, number>;
   r: number;
+  slippageByTicker: Record<Ticker, number>;
   th: Ticker[];
-  tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
 }): number {
   const sortedPositionSlippageTuple: [number, number][] = [];
 
@@ -135,7 +135,7 @@ function computeK({
   for (const ticker of h) {
     const sharesOwned = algorithmPositions[ticker];
     const positionSize = priceByTicker[ticker] * sharesOwned;
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
     beta += positionSize;
 
     sortedPositionSlippageTuple.push([positionSize, slippage]);
@@ -144,13 +144,13 @@ function computeK({
   for (const ticker of th) {
     const sharesOwned = algorithmPositions[ticker];
     const positionSize = priceByTicker[ticker] * sharesOwned;
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
     beta += positionSize - slippage * positionSize;
   }
 
   let phi = (h.length + b.length) / r;
   for (const ticker of b) {
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
     phi += slippage;
   }
 
@@ -231,16 +231,16 @@ export function getPortfolioValue({
 export function closeAllPositions({
   algorithmData,
   priceByTicker,
-  tickerDataByTicker,
+  slippageByTicker,
   ticks,
 }: {
   algorithmData: AlgorithmData;
   priceByTicker: Record<Ticker, number>;
-  tickerDataByTicker: Record<Ticker, [filename: string, slippage: number]>;
+  slippageByTicker: Record<Ticker, number>;
   ticks: number;
 }) {
   for (const ticker in algorithmData.positions) {
-    const slippage = tickerDataByTicker[ticker][1] / 10_000;
+    const slippage = slippageByTicker[ticker] / 10_000;
 
     closePosition({
       algorithmData,
