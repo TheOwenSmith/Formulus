@@ -1,7 +1,7 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
 import { computeSMA } from '@/algorithms/indicators/sma';
 import type { Bar } from '@/backtesting/read-data';
-import type { Ticker } from '@/fetch/fetch';
+import type { Ticker } from '@/fetch/types';
 
 export const aboveBelowSmaAlgorithm: MarketInvariantAlgorithm = {
   name: 'Above/Below SMA',

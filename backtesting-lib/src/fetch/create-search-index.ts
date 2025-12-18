@@ -1,7 +1,7 @@
 import { trySync } from '@/utils/errorHandling';
 import fs from 'fs';
 import { finished } from 'node:stream/promises';
-import { tickDataCsvHeader, type Ticker, type Timestamp } from './fetch';
+import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
 
 export const DATE_LENGTH = 10; // YYYY-MM-DD
 export const NUMBER_LENGTH = 10; // 10 digits (works for up to 10GB files)

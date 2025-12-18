@@ -1,6 +1,6 @@
 import { type Algorithm } from '@/algorithms/algorithm';
 import { DATE_LENGTH } from '@/fetch/create-search-index';
-import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
+import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import fs from 'fs';
 import type { TickerData } from './backtest-algorithms-concurrently';

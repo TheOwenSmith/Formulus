@@ -2,7 +2,7 @@ import { Action, type Algorithm, type AlgorithmImplementation } from '@/algorith
 import {} from '@/algorithms/simple-algorithm';
 import type { TopKAlgorithm } from '@/algorithms/top-k-algorithm';
 import { getAggregateDataIterator, type Bar } from '@/backtesting/read-data';
-import type { Ticker, Timestamp } from '@/fetch/fetch';
+import type { Ticker, Timestamp } from '@/fetch/types';
 import { toValidTimespan } from '@/utils/date-utils';
 import { trySync } from '@/utils/errorHandling';
 import { isRecord } from '@/utils/types';

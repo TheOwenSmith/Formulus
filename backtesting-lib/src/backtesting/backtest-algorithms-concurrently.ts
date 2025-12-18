@@ -4,7 +4,7 @@ import {
   type Algorithm,
 } from '@/algorithms/algorithm';
 import { DATE_LENGTH } from '@/fetch/create-search-index';
-import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
+import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
 import { toValidTimespan, yearsBetween } from '@/utils/date-utils';

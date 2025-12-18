@@ -1,6 +1,6 @@
 import type { DescriptionMetrics } from '@/backtesting/statistics';
 import { tickersToString } from '@/backtesting/ticker-utils';
-import type { Ticker, Timestamp } from '@/fetch/fetch';
+import type { Ticker, Timestamp } from '@/fetch/types';
 import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
 import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
 import { tryAsync } from '@/utils/errorHandling';

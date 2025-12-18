@@ -1,7 +1,7 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
 import { linearRegression } from '@/algorithms/indicators/linear-regression';
 import type { Bar } from '@/backtesting/read-data';
-import type { Ticker } from '@/fetch/fetch';
+import type { Ticker } from '@/fetch/types';
 
 export const regressionLineAlgorithm: MarketInvariantAlgorithm = {
   name: 'Regression Line',

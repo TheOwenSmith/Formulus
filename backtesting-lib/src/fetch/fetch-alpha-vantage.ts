@@ -6,6 +6,7 @@ import { zodSafeFetch } from '@/utils/zod-safe-fetch';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import z from 'zod';
+import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
 
 const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
   z.union([
@@ -25,13 +26,6 @@ const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
     z.object({ 'Error Message': z.string() }),
     z.object({ Information: z.string() }),
   ]);
-
-export type Ticker = 'SPY' | 'SPUU' | 'SPXL' | 'SPX' | 'SH' | 'SDS' | 'SPXU' | (string & {});
-
-export const aggregateTimestamps = ['1min', '5min', '15min', '30min', '60min'] as const;
-export type Timestamp = (typeof aggregateTimestamps)[number];
-
-export const tickDataCsvHeader = 'timestamp,open,high,low,close,volume\n';
 
 export async function fetchAlphaVantageData({
   ticker,

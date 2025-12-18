@@ -1,5 +1,5 @@
 import type { Bar } from '@/backtesting/read-data';
-import type { Ticker, Timestamp } from '@/fetch/fetch';
+import type { Ticker, Timestamp } from '@/fetch/types';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
 
 export type SimpleAlgorithm = {

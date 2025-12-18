@@ -26,7 +26,7 @@ import {
   backtestAlgorithmsConcurrently,
   type TickerData,
 } from './backtesting/backtest-algorithms-concurrently';
-import { aggregateTimestamps, type Ticker } from './fetch/fetch';
+import { aggregateTimestamps, type Ticker } from './fetch/types';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const algorithms: Algorithm[] = [];

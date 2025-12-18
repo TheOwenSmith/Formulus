@@ -1,5 +1,5 @@
 import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from '@/algorithms/algorithm';
-import type { Ticker, Timestamp } from '@/fetch/fetch';
+import type { Ticker, Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import type { SelectionOption } from '@/utils/cli';
 import { withCommasRounded } from '@/utils/number-utils';

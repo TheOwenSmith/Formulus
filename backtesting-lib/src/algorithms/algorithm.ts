@@ -1,5 +1,5 @@
 import type { Bar } from '@/backtesting/read-data';
-import type { Ticker, Timestamp } from '@/fetch/fetch';
+import type { Ticker, Timestamp } from '@/fetch/types';
 
 export const enum Action {
   BUY,

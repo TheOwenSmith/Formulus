@@ -1,7 +1,7 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
 import { computeSuperTrend, Direction } from '@/algorithms/indicators/super-trend';
 import type { Bar } from '@/backtesting/read-data';
-import type { Ticker } from '@/fetch/fetch';
+import type { Ticker } from '@/fetch/types';
 
 export const superTrendDirectionAlgorithm: MarketInvariantAlgorithm = {
   name: 'Super Trend Direction',
