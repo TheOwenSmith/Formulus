@@ -2,7 +2,6 @@ import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from '@/algo
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import type { SelectionOption } from '@/utils/cli';
-import { type Day } from '@/utils/date-utils';
 import { withCommasRounded } from '@/utils/number-utils';
 import {
   MAX_POINTS_PER_PLOT,
@@ -70,7 +69,7 @@ export type DescriptionMetrics = {
   profitLossRatio: number;
   sharpeRatio: number;
   tickers: Ticker[];
-  timespan: [Day, Day];
+  timespan: [string, string];
   tradesMade: number;
   volatility: number;
   winRate: number;
@@ -89,7 +88,7 @@ export async function getAlgorithmSelectionOptionWithPerformance({
   algorithm: Algorithm;
   algorithmData: AlgorithmData;
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
-  timespan: [Day, Day];
+  timespan: [string, string];
   xs: number[];
   yearsBetweenStartAndEnd: number;
 }): Promise<

@@ -35,7 +35,7 @@ export function computeSuperTrend(
     let direction: Direction;
 
     const prev = result[i - 1];
-    if (prev == null) {
+    if (prev == undefined) {
       if (close <= upperBand) {
         superTrend = lowerBand;
         direction = Direction.UP;

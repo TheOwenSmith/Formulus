@@ -3,7 +3,9 @@ import fs from 'fs';
 import { finished } from 'node:stream/promises';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './fetch';
 
-const DATE_LENGTH = 10; // YYYY-MM-DD
+export const DATE_LENGTH = 10; // YYYY-MM-DD
+export const NUMBER_LENGTH = 10; // 10 digits (works for up to 10GB files)
+
 export async function createSearchIndex(ticker: Ticker, timestamp: Timestamp): Promise<void> {
   console.log(`Creating search index for '${ticker}' (${timestamp})...`);
   const readFile = `./data/cleaned/${ticker}_${timestamp}.csv`;
@@ -40,8 +42,10 @@ export async function createSearchIndex(ticker: Ticker, timestamp: Timestamp): P
       if (line !== '') {
         const day = line.slice(0, DATE_LENGTH);
         if (day !== previousDay) {
-          const currentPositionBytesString = currentPositionBytes.toString().padStart(10, '0');
-          writeStream.write(`${day},${currentPositionBytesString}\n`);
+          const currentPositionBytesString = currentPositionBytes
+            .toString()
+            .padStart(NUMBER_LENGTH, '0');
+          writeStream.write(`${day}${currentPositionBytesString}`);
           previousDay = day;
         }
       }
@@ -56,8 +60,10 @@ export async function createSearchIndex(ticker: Ticker, timestamp: Timestamp): P
     const currentPositionBytes = previousBytes - Buffer.byteLength(carry);
     const day = carry.slice(0, DATE_LENGTH);
     if (day !== previousDay) {
-      const currentPositionBytesString = currentPositionBytes.toString().padStart(10, '0');
-      writeStream.write(`${day},${currentPositionBytesString}\n`);
+      const currentPositionBytesString = currentPositionBytes
+        .toString()
+        .padStart(NUMBER_LENGTH, '0');
+      writeStream.write(`${day}${currentPositionBytesString}`);
     }
   }
 

@@ -1,6 +1,6 @@
 import { type Algorithm } from '@/algorithms/algorithm';
+import { DATE_LENGTH } from '@/fetch/create-search-index';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
-import { compareDays, dayToString, timestampToDay, type Day } from '@/utils/date-utils';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import fs from 'fs';
 import type { TickerData } from './backtest-algorithms-concurrently';
@@ -156,14 +156,14 @@ export function getTickerDataByAggregateByTicker(
 export async function getFirstIteratorBars(
   tickerIteratorByAggregateByTicker: Partial<IndexedByAggregateByTicker<AggregateDataIterator>>,
 ): Promise<{
-  latestFirstBarTimestamp: string;
+  latestFirstBarDay: string;
   firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>;
 }> {
   const firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar> =
     emptyIndexByAggregateByTicker();
 
   // Get latest first bar timestamp off all iterator
-  let latestFirstBarTimestamp = '';
+  let latestFirstBarTimestamp: string | undefined = undefined;
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
       const iterator = tickerIteratorByAggregateByTicker[aggregate][ticker];
@@ -178,49 +178,48 @@ export async function getFirstIteratorBars(
       const firstBar = firstBarIteratorResult.value;
       firstBarByAggregateByTicker[aggregate][ticker] = firstBar;
       const firstBarTimestamp = firstBar[0];
-      if (latestFirstBarTimestamp === '' || firstBarTimestamp > latestFirstBarTimestamp) {
+      if (latestFirstBarTimestamp == undefined || firstBarTimestamp > latestFirstBarTimestamp) {
         latestFirstBarTimestamp = firstBarTimestamp;
       }
     }
   }
 
-  if (latestFirstBarTimestamp === '') {
+  if (latestFirstBarTimestamp == undefined) {
     throw new Error('Failed to find latest first bar day');
   }
-  return { latestFirstBarTimestamp, firstBarByAggregateByTicker };
+  return {
+    latestFirstBarDay: latestFirstBarTimestamp.slice(0, DATE_LENGTH),
+    firstBarByAggregateByTicker,
+  };
 }
 
 export async function matchAggregateDataIterators(
   tickerIteratorByAggregateByTicker: Partial<IndexedByAggregateByTicker<AggregateDataIterator>>,
-  startDay?: Day,
-): Promise<[startDay: Day, firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>]> {
-  const { latestFirstBarTimestamp, firstBarByAggregateByTicker } = await getFirstIteratorBars(
+  startDay?: string,
+): Promise<[startDay: string, firstBarByAggregateByTicker: IndexedByAggregateByTicker<Bar>]> {
+  const { latestFirstBarDay, firstBarByAggregateByTicker } = await getFirstIteratorBars(
     tickerIteratorByAggregateByTicker,
   );
 
-  // Initialize actualStartDayTimestamp
-  let actualStartDayTimestamp = '';
+  // Initialize actualStartDay
+  let actualStartDay: string | undefined = undefined;
   if (startDay != undefined) {
-    const latestFirstBarDay = timestampToDay(latestFirstBarTimestamp);
-    const comp = compareDays(latestFirstBarDay, startDay);
-    if (comp > 0) {
+    if (latestFirstBarDay > startDay) {
       throw new Error(
-        `Data is missing through ${dayToString(latestFirstBarDay)}; the provided start day '${dayToString(startDay)}' is not sufficient`,
+        `Data is missing through ${latestFirstBarDay}; the provided start day '${startDay}' is not sufficient`,
       );
-    } else if (comp === 0) {
-      actualStartDayTimestamp = dayToString(startDay);
+    } else if (latestFirstBarDay === startDay) {
+      actualStartDay = startDay;
     }
   } else {
-    actualStartDayTimestamp = latestFirstBarTimestamp.slice(0, 10);
+    actualStartDay = latestFirstBarDay;
   }
 
   // Match all iterators to the latest first bar iterator
-  const startDayTimestamp = startDay != undefined ? dayToString(startDay) : '';
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in tickerIteratorByAggregateByTicker[aggregate]) {
       if (
-        actualStartDayTimestamp !== '' &&
-        firstBarByAggregateByTicker[aggregate][ticker][0].slice(0, 10) === actualStartDayTimestamp
+        firstBarByAggregateByTicker[aggregate][ticker][0].slice(0, DATE_LENGTH) === actualStartDay!
       ) {
         continue;
       }
@@ -228,19 +227,19 @@ export async function matchAggregateDataIterators(
 
       let current = await iterator.next();
       while (!current.done) {
-        const currentDayTimestamp = current.value[0].slice(0, 10);
-        if (actualStartDayTimestamp !== '') {
+        const currentDay = current.value[0].slice(0, DATE_LENGTH);
+        if (actualStartDay != undefined) {
           // If there is a set start day
-          if (currentDayTimestamp === actualStartDayTimestamp) {
+          if (currentDay === actualStartDay) {
             break;
-          } else if (currentDayTimestamp > actualStartDayTimestamp) {
+          } else if (currentDay > actualStartDay) {
             throw new Error(
-              `Failed to match iterator '${ticker}' (${aggregate}) to the latest first bar; expected '${actualStartDayTimestamp}' but got '${current.value[0].slice(0, 10)}'`,
+              `Failed to match iterator '${ticker}' (${aggregate}) to the latest first bar; expected '${actualStartDay}' but got '${currentDay}'`,
             );
           }
-        } else if (currentDayTimestamp >= startDayTimestamp) {
+        } else if (startDay == undefined || currentDay >= startDay) {
           // If there is not a set start day and the current day is sufficient as a start day, we can set it as the actual start day and break
-          actualStartDayTimestamp = currentDayTimestamp;
+          actualStartDay = currentDay;
           break;
         }
 
@@ -251,7 +250,7 @@ export async function matchAggregateDataIterators(
 
       if (current.done) {
         throw new Error(
-          `Data is missing for ticker '${ticker}' (${aggregate}); Failed to match to start day '${actualStartDayTimestamp}'`,
+          `Data is missing for ticker '${ticker}' (${aggregate}); Failed to match to start day '${actualStartDay}'`,
         );
       }
 
@@ -260,11 +259,9 @@ export async function matchAggregateDataIterators(
     }
   }
 
-  if (actualStartDayTimestamp === '') {
+  if (actualStartDay == undefined) {
     throw new Error('Failed to find actual start day');
   }
-
-  const actualStartDay = timestampToDay(actualStartDayTimestamp);
   return [actualStartDay, firstBarByAggregateByTicker];
 }
 
@@ -305,9 +302,9 @@ export async function countLinesToProcess({
 }: {
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>;
   filenameByAggregateByTicker: IndexedByAggregateByTicker<string>;
-  timespanDays: [Day | undefined, Day | undefined];
+  timespanDays: [string | undefined, string | undefined];
   verboseLogging?: boolean;
-}): Promise<[startDay: Day, endDay: Day, linesToProcess: number]> {
+}): Promise<[startDay: string, endDay: string, linesToProcess: number]> {
   const tickerIteratorByAggregateByTicker: IndexedByAggregateByTicker<AggregateDataIterator> =
     aggregateTimestamps.reduce((acc, aggregate) => {
       // Fetch ticker iterators for all tickers
@@ -333,7 +330,7 @@ export async function countLinesToProcess({
   if (!matchIteratorResponse.ok) throw matchIteratorResponse.error;
   const [startDay, firstBarByAggregateByTicker] = matchIteratorResponse.data;
 
-  let endDay: Day | null = null;
+  let endDay: string | null = null;
   let linesToProcess = 0;
   for (const aggregate of aggregateTimestamps) {
     // Skip if no tickers
@@ -344,15 +341,15 @@ export async function countLinesToProcess({
     }
 
     // Choose random ticker to get first day
-    let nextBarDay = timestampToDay(
-      firstBarByAggregateByTicker[aggregate][Object.keys(tickerIteratorByTicker)[0]][0],
-    );
+    let nextBarDay = firstBarByAggregateByTicker[aggregate][
+      Object.keys(tickerIteratorByTicker)[0]
+    ][0].slice(0, DATE_LENGTH);
 
     // Keep iterating until some tickers have no more bars or end of timespan is reached
     let hasNextBar = true;
-    let endDayForAggregate: Day | null = null;
+    let endDayForAggregate: string | null = null;
     while (hasNextBar) {
-      let nextBarTimestamp = '';
+      let nextBarTimestamp: string | null = null;
       const currentBarDay = nextBarDay;
       for (const ticker in tickerIteratorByTicker) {
         const nextBarIteratorResult = await tickerIteratorByTicker[ticker].next();
@@ -363,9 +360,9 @@ export async function countLinesToProcess({
         }
 
         const nextBar = nextBarIteratorResult.value;
-        if (nextBarTimestamp === '') {
-          nextBarDay = timestampToDay(nextBar[0]);
-          if (timespanDays[1] != undefined && compareDays(nextBarDay, timespanDays[1]) > 0) {
+        if (nextBarTimestamp == null) {
+          nextBarDay = nextBar[0].slice(0, DATE_LENGTH);
+          if (timespanDays[1] != undefined && nextBarDay > timespanDays[1]) {
             hasNextBar = false;
             endDayForAggregate = currentBarDay;
             break;
@@ -380,7 +377,7 @@ export async function countLinesToProcess({
       tickerIteratorByTicker[ticker].close();
     }
 
-    if (endDay == null || compareDays(endDayForAggregate!, endDay) < 0) {
+    if (endDay == null || endDayForAggregate! < endDay) {
       endDay = endDayForAggregate!;
     }
   }

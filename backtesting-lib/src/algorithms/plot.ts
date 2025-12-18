@@ -3,7 +3,6 @@ import { tickersToString } from '@/backtesting/ticker-utils';
 import type { Ticker, Timestamp } from '@/fetch/fetch';
 import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
 import { getUserSelectionInput, UserExitEarlyError, type SelectionOption } from '@/utils/cli';
-import { dayToString, type Day } from '@/utils/date-utils';
 import { tryAsync } from '@/utils/errorHandling';
 import { withCommas, withCommasRounded } from '@/utils/number-utils';
 import { exhaustiveArray } from '@/utils/types';
@@ -48,8 +47,7 @@ const DESCRIPTION_METRIC_TO_STRING: {
   },
   sharpeRatio: (sharpeRatio: number) => `Sharpe ratio: ${withCommasRounded(sharpeRatio)}`,
   tickers: (tickers: Ticker[]) => `Tickers: ${tickersToString(tickers)}`,
-  timespan: (timespan: [Day, Day]) =>
-    `Timespan: ${dayToString(timespan[0])} to ${dayToString(timespan[1])}`,
+  timespan: (timespan: [string, string]) => `Timespan: ${timespan[0]} to ${timespan[1]}`,
   tradesMade: (tradesMade: number) => `Trades made: ${withCommas(tradesMade)}`,
   volatility: (volatility: number) => `Volatility: ${withCommasRounded(volatility * 100)}%`,
   winRate: (winRate: number) => `Win rate: ${withCommasRounded(winRate * 100)}%`,

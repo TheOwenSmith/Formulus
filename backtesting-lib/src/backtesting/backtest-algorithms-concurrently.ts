@@ -3,17 +3,11 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/algorithm';
+import { DATE_LENGTH } from '@/fetch/create-search-index';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/fetch';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
-import {
-  compareDays,
-  dayToString,
-  timespanToDays,
-  timestampToDay,
-  yearsBetween,
-  type Day,
-} from '@/utils/date-utils';
+import { toValidTimespan, yearsBetween } from '@/utils/date-utils';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { groupBy } from '@/utils/groupBy';
 import { withCommas } from '@/utils/number-utils';
@@ -97,7 +91,7 @@ export async function backtestAlgorithmsConcurrently({
     throw new Error('Verbose logging and tracking progress cannot be used together');
   }
 
-  const timespanDays: [Day | undefined, Day | undefined] = timespanToDays(timespan);
+  const timespanDays: [string | undefined, string | undefined] = toValidTimespan(timespan);
 
   // Verify no algorithm max holding proportion is greater than the limit
   for (const algorithm of algorithms) {
@@ -157,9 +151,7 @@ export async function backtestAlgorithmsConcurrently({
   );
 
   if (verboseLogging) {
-    console.log(
-      `Starting on day '${dayToString(startDay)}' and ending on day '${dayToString(endDay)}'`,
-    );
+    console.log(`Starting on day '${startDay}' and ending on day '${endDay}'`);
   }
 
   // Initialize progress bar
@@ -270,7 +262,7 @@ export async function backtestAlgorithmsConcurrently({
     const nextBarByTicker: Record<Ticker, Bar> = { ...firstBarByAggregateByTicker[aggregate] };
     while (hasNextBar) {
       // Get next bars
-      let nextBarTimestamp = '';
+      let nextBarTimestamp: string | undefined = undefined;
       const currentBarByTicker: Record<Ticker, Bar> = { ...nextBarByTicker };
       for (const ticker in tickerIteratorByTicker) {
         const nextBarIteratorResult = await tickerIteratorByTicker[ticker].next();
@@ -281,9 +273,9 @@ export async function backtestAlgorithmsConcurrently({
 
         const nextBar = nextBarIteratorResult.value;
         nextBarByTicker[ticker] = nextBar;
-        if (nextBarTimestamp === '') {
-          const nextBarDay = timestampToDay(nextBar[0]);
-          if (compareDays(nextBarDay, endDay) > 0) {
+        if (nextBarTimestamp == undefined) {
+          const nextBarDay = nextBar[0].slice(0, DATE_LENGTH);
+          if (nextBarDay > endDay) {
             hasNextBar = false;
             break;
           }
@@ -420,7 +412,7 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Compile algorithm plots
-    const yearsBetweenStartAndEnd = yearsBetween(endDay!, startDay);
+    const yearsBetweenStartAndEnd = yearsBetween(endDay, startDay);
     for (
       let algorithmIndex = 0;
       algorithmIndex < algorithmsByAggregate[aggregate].length;

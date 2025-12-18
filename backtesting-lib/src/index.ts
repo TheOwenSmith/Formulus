@@ -22,8 +22,11 @@ import { regressionLineAlgorithm } from './algorithms/examples/regression-line';
 import { superTrendDirectionAlgorithm } from './algorithms/examples/super-trend-direction';
 import { chooseToPlot } from './algorithms/plot';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
-import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
-import type { Ticker } from './fetch/fetch';
+import {
+  backtestAlgorithmsConcurrently,
+  type TickerData,
+} from './backtesting/backtest-algorithms-concurrently';
+import { aggregateTimestamps, type Ticker } from './fetch/fetch';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const algorithms: Algorithm[] = [];
@@ -102,40 +105,45 @@ if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
 }
 
 if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
-  // Populate algorithms with if green algorithm
-  algorithms.push(
-    createAlgorithmFromSimpleMarketInvariantAlgorithm(ifGreenAlgorithm, '60min', 'SPY'),
-  );
+  for (const aggregate of ['60min'] as const /* aggregateTimestamps */) {
+    // Populate algorithms with if green algorithm
+    algorithms.push(
+      createAlgorithmFromSimpleMarketInvariantAlgorithm(ifGreenAlgorithm, aggregate, 'SPY'),
+    );
 
-  // Populate algorithms with overbought/oversold algorithm
-  algorithms.push(
-    createAlgorithmFromMarketInvariantAlgorithm(overboughtOversoldAlgorithm, '60min', tickers),
-  );
+    // Populate algorithms with overbought/oversold algorithm
+    algorithms.push(
+      createAlgorithmFromMarketInvariantAlgorithm(overboughtOversoldAlgorithm, aggregate, tickers),
+    );
 
-  // Populate algorithms with above/below SMA algorithm
-  algorithms.push(
-    createAlgorithmFromMarketInvariantAlgorithm(aboveBelowSmaAlgorithm, '60min', tickers),
-  );
+    // Populate algorithms with above/below SMA algorithm
+    algorithms.push(
+      createAlgorithmFromMarketInvariantAlgorithm(aboveBelowSmaAlgorithm, aggregate, tickers),
+    );
 
-  // Populate algorithms with long/short algorithm
-  algorithms.push(longShortAlgorithm);
+    // Populate algorithms with long/short algorithm
+    algorithms.push(longShortAlgorithm);
 
-  // Populate algorithms with regression line algorithm
-  algorithms.push(
-    createAlgorithmFromMarketInvariantAlgorithm(regressionLineAlgorithm, '60min', tickers),
-  );
+    // Populate algorithms with regression line algorithm
+    algorithms.push(
+      createAlgorithmFromMarketInvariantAlgorithm(regressionLineAlgorithm, aggregate, tickers),
+    );
 
-  // Populate algorithms with super trend direction algorithm
-  algorithms.push(
-    createAlgorithmFromMarketInvariantAlgorithm(superTrendDirectionAlgorithm, '60min', tickers),
-  );
+    // Populate algorithms with super trend direction algorithm
+    algorithms.push(
+      createAlgorithmFromMarketInvariantAlgorithm(superTrendDirectionAlgorithm, aggregate, tickers),
+    );
+  }
 }
 
 console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
-    tickerData: tickers.map((ticker) => ({ ticker, aggregate: '60min', slippage: 5 })),
+    tickerData: aggregateTimestamps.reduce((acc, aggregate) => {
+      acc.push(...tickers.map((ticker) => ({ ticker, aggregate, slippage: 5 })));
+      return acc;
+    }, [] as TickerData[]),
     timespan: ONLY_TEST_MARKET_INVARIANT_ALGORITHMS ? undefined : ['2019-01-01', undefined],
   }),
 );

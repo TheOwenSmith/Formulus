@@ -34,7 +34,7 @@ export class SharpeRatioCalculator {
   }
 
   addPrice(price: number) {
-    if (this.prevPrice !== null) {
+    if (this.prevPrice != null) {
       const r = (price - this.prevPrice) / this.prevPrice;
       this.returns.add(r);
     }
