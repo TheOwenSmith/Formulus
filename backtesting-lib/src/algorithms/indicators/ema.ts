@@ -1,12 +1,12 @@
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeEMA(bars: Bar[], period: number): (number | undefined)[] {
+export function computeEMA(bars: Bar[], period: number): (number | null)[] {
   if (bars.length < period) {
     throw new Error(`Must have context length of at least ${period} to compute ${period}-EMA`);
   }
 
   const k = 2 / (period + 1);
-  const ema: (number | undefined)[] = Array(bars.length).fill(undefined);
+  const ema: (number | null)[] = Array(bars.length).fill(null);
 
   // Calculate the initial EMA using SMA
   let sum = 0;

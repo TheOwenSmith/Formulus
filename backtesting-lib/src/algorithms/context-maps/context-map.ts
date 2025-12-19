@@ -18,14 +18,14 @@ export async function createContextMap<T>({
   contextLength: number;
   encodeContext: (context: Bar[]) => T;
   tickDataFilename: string;
-  timespan?: [string | undefined, string | undefined];
+  timespan?: [string | null, string | null];
   verboseLogging?: boolean;
 }): Promise<Map<T, number>> {
   if (contextLength < 1) {
     throw new Error('Context length must be at least 1');
   }
 
-  const timespanDays: [string | undefined, string | undefined] = toValidTimespan(timespan);
+  const timespanDays: [string | null, string | null] = toValidTimespan(timespan);
 
   const getIteratorResponse = trySync(() =>
     getAggregateDataIterator(tickDataFilename, verboseLogging),
@@ -39,11 +39,11 @@ export async function createContextMap<T>({
   const previousBars: Bar[] = [];
   for await (const bar of iterator) {
     // If bar is before start of timespan, skip
-    if (timespanDays[0] != undefined && bar[0] < timespanDays[0]) {
+    if (timespanDays[0] != null && bar[0] < timespanDays[0]) {
       continue;
     }
     // If bar is after end of timespan, break
-    if (timespanDays[1] != undefined && bar[0] > timespanDays[1]) {
+    if (timespanDays[1] != null && bar[0] > timespanDays[1]) {
       break;
     }
 

@@ -1,11 +1,11 @@
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeATR(bars: Bar[], period = 14): (number | undefined)[] {
+export function computeATR(bars: Bar[], period = 14): (number | null)[] {
   if (bars.length < period) {
     throw new Error(`Must have at least ${period} bars to compute ATR`);
   }
 
-  const atr: (number | undefined)[] = Array(bars.length).fill(undefined);
+  const atr: (number | null)[] = Array(bars.length).fill(null);
   let atrSum = 0;
 
   for (let i = 0; i < bars.length; i++) {

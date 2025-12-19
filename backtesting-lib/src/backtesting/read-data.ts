@@ -15,86 +15,63 @@ export const stringifiedBarSchema = z.tuple([
 
 export type Bar = [t: string, o: number, h: number, l: number, c: number, v: number];
 
-export async function getAllAggregateData(
-  filename: string,
+const LINES_PROGRESS_UPDATE_INTERVAL = 1_000_000;
+
+export type AggregateDataIterator = AsyncGenerator<{ bar: Bar; bytesProcessed: number }, null> & {
+  close: () => void;
+};
+
+export function getAggregateDataIterator({
+  filename,
+  startByte,
+  endByte,
   verboseLogging = false,
-): Promise<Bar[]> {
+}: {
+  filename: string;
+  startByte?: number;
+  endByte?: number;
+  verboseLogging?: boolean;
+}): AggregateDataIterator {
   if (!fs.existsSync(filename)) {
     throw new Error(`File '${filename}' does not exist`);
   }
 
-  const iter = readline
-    .createInterface({
-      input: fs.createReadStream(filename),
-      crlfDelay: Infinity,
-    })
-    [Symbol.asyncIterator]();
-
-  await iter.next(); // headers
-  let current = await iter.next();
-
-  const data: Bar[] = [];
-  let lineNumber = 2;
-  while (!current.done) {
-    if (verboseLogging && lineNumber % 100_000 === 0) {
-      console.log(`Processed ${withCommas(lineNumber)} lines...`);
-    }
-
-    const parsedLine = trySync(() => stringifiedBarSchema.parse(current.value!.split(',')));
-    if (!parsedLine.ok) {
-      console.error(
-        `Error parsing line ${withCommas(lineNumber)}: ${current.value}`,
-        parsedLine.error,
-      );
-      throw parsedLine.error;
-    }
-    data.push(parsedLine.data);
-    lineNumber++;
-    current = await iter.next();
-  }
-  return data;
-}
-
-export type AggregateDataIterator = AsyncGenerator<Bar, undefined> & { close: () => void };
-
-export function getAggregateDataIterator(
-  filename: string,
-  verboseLogging = false,
-): AggregateDataIterator {
-  if (!fs.existsSync(filename)) {
-    throw new Error(`File '${filename}' does not exist`);
-  }
-
-  const fileStream = fs.createReadStream(filename);
+  const fileStream = fs.createReadStream(filename, {
+    ...(startByte != undefined ? { start: startByte } : {}),
+    ...(endByte != undefined ? { end: endByte } : {}),
+  });
   const rlInterface = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity,
   });
   const iter = rlInterface[Symbol.asyncIterator]();
 
-  async function* generator(): AsyncGenerator<Bar, undefined> {
-    await iter.next(); // headers
+  async function* generator(): AsyncGenerator<{ bar: Bar; bytesProcessed: number }, null> {
     let current = await iter.next();
 
-    let lineNumber = 2;
+    let linesProcessed = 0;
     while (!current.done) {
-      if (verboseLogging && lineNumber % 100_000 === 0) {
-        console.log(`Processed ${withCommas(lineNumber)} lines...`);
+      if (verboseLogging && ++linesProcessed % LINES_PROGRESS_UPDATE_INTERVAL === 0) {
+        console.log(`Processed ${withCommas(linesProcessed)} lines...`);
       }
 
-      const parsedLine = trySync(() => stringifiedBarSchema.parse(current.value!.split(',')));
+      const stringifiedLine = current.value!;
+      const parsedLine = trySync(() => stringifiedBarSchema.parse(stringifiedLine.split(',')));
       if (!parsedLine.ok) {
         console.error(
-          `Error parsing line ${withCommas(lineNumber)}: ${current.value}`,
+          `Error parsing file '${filename}' line '${stringifiedLine}'`,
           parsedLine.error,
         );
         throw parsedLine.error;
       }
-      yield parsedLine.data;
-      lineNumber++;
+      const bar = parsedLine.data;
+
+      // Account for \r\n, but not for the first line
+      const bytesProcessed = Buffer.byteLength(stringifiedLine) + (linesProcessed > 1 ? 2 : 0);
+      yield { bar, bytesProcessed };
       current = await iter.next();
     }
-    return undefined;
+    return null;
   }
 
   const gen = generator();

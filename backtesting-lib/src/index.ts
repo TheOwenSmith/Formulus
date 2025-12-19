@@ -63,7 +63,7 @@ if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
         contextLength,
         encodeContext: greenRedBarsMaskHistory,
         tickDataFilename: `./data/cleaned/${ticker}_60min.csv`,
-        timespan: [undefined, '2018-12-31'],
+        timespan: [null, '2018-12-31'],
         verboseLogging: false,
       });
       contextMapByContextLength.set(contextLength, contextMap);
@@ -144,7 +144,7 @@ const backtestResponse = await tryAsync(() =>
       acc.push(...tickers.map((ticker) => ({ ticker, aggregate, slippage: 5 })));
       return acc;
     }, [] as TickerData[]),
-    timespan: ONLY_TEST_MARKET_INVARIANT_ALGORITHMS ? undefined : ['2019-01-01', undefined],
+    timespan: ONLY_TEST_MARKET_INVARIANT_ALGORITHMS ? undefined : ['2019-01-01', null],
   }),
 );
 if (!backtestResponse.ok) {

@@ -10,17 +10,17 @@ export function computeSuperTrend(
   bars: Bar[],
   period = 10,
   multiplier = 3,
-): ({ superTrend: number; direction: Direction } | undefined)[] {
+): ({ superTrend: number; direction: Direction } | null)[] {
   if (bars.length < period + 1) {
     throw new Error(`Must have context length of at least ${period + 1} to compute SuperTrend`);
   }
 
-  const result: ({ superTrend: number; direction: Direction } | undefined)[] = Array(
-    bars.length,
-  ).fill(undefined);
+  const result: ({ superTrend: number; direction: Direction } | null)[] = Array(bars.length).fill(
+    null,
+  );
 
   // Compute ATR
-  const atrs: (number | undefined)[] = computeATR(bars, period);
+  const atrs: (number | null)[] = computeATR(bars, period);
 
   for (let i = period; i < bars.length; i++) {
     const high = bars[i][2];
@@ -35,7 +35,7 @@ export function computeSuperTrend(
     let direction: Direction;
 
     const prev = result[i - 1];
-    if (prev == undefined) {
+    if (prev == null) {
       if (close <= upperBand) {
         superTrend = lowerBand;
         direction = Direction.UP;

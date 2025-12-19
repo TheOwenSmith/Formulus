@@ -11,16 +11,20 @@ class OnlineStats {
     this.M2 += delta2 * delta;
   }
 
-  count() {
+  count(): number {
     return this.n;
   }
 
-  variance() {
-    return this.n > 1 ? this.M2 / (this.n - 1) : 0;
+  variance(): number | null {
+    if (this.n > 1) {
+      return this.M2 / (this.n - 1);
+    }
+    return null;
   }
 
-  stddev() {
-    return Math.sqrt(this.variance());
+  stddev(): number | null {
+    const variance = this.variance();
+    return variance != null ? Math.sqrt(variance) : null;
   }
 }
 
@@ -41,13 +45,16 @@ export class SharpeRatioCalculator {
     this.prevPrice = price;
   }
 
-  volatility() {
+  volatility(): number | null {
     return this.returns.stddev();
   }
 
   sharpe(yearsOfData: number) {
     const mean = this.returns.mean;
     const volatility = this.volatility();
+    if (volatility == null) {
+      return null;
+    }
 
     const freq = this.returns.count() / yearsOfData;
     const rfPerPeriod = Math.pow(1 + this.riskFreeRate, 1 / freq) - 1;

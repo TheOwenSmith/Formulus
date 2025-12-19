@@ -1,4 +1,4 @@
-import type { DescriptionMetrics } from '@/backtesting/statistics';
+import type { DescriptionMetrics, ProfitLossRatio } from '@/backtesting/statistics';
 import { tickersToString } from '@/backtesting/ticker-utils';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { plotAlgorithm, type SimplePlot } from '@/lib/nodeplotlib';
@@ -31,25 +31,36 @@ const DESCRIPTION_METRIC_TO_STRING: {
   aggregate: (aggregate: Timestamp) => `Aggregate: ${aggregate}`,
   algorithmReturn: (algorithmReturn: number) =>
     `Algorithm return: ${withCommasRounded(algorithmReturn * 100)}%`,
-  averageHoldingDuration: (averageHoldingDuration: number) =>
-    `Average holding duration: ${withCommasRounded(averageHoldingDuration)} ticks`,
+  averageHoldingDuration: (averageHoldingDuration: number | null) =>
+    `Average holding duration: ${averageHoldingDuration != null ? withCommasRounded(averageHoldingDuration) + ' ticks' : 'unknown'}`,
   contextLength: (contextLength: number) => `Context length: ${withCommas(contextLength)}`,
-  expectancyPerTrade: (expectancyPerTrade: number) =>
-    `Expectancy per trade: ${withCommasRounded(expectancyPerTrade * 100)}%`,
+  expectancyPerTrade: (expectancyPerTrade: number | null) =>
+    `Expectancy per trade: ${expectancyPerTrade != null ? withCommasRounded(expectancyPerTrade * 100) + '%' : 'unknown'}`,
   growthRate: (growthRate: number) => `Growth rate: ${withCommasRounded(growthRate * 100)}%`,
   maxHoldingPorportion: (maxHoldingPorportion: number) =>
     `Max holding percentage: ${withCommasRounded(maxHoldingPorportion * 100)}%`,
   positionsClosed: (positionsClosed: number) => `Positions closed: ${withCommas(positionsClosed)}`,
-  profitLossRatio: (profitLossRatio: number) => {
-    const profitLossRatioString =
-      profitLossRatio !== Infinity ? `${withCommasRounded(profitLossRatio)}:1` : '1:0';
-    return `Profit/loss ratio: ${profitLossRatioString}`;
+  profitLossRatio: (profitLossRatio: ProfitLossRatio) => {
+    switch (profitLossRatio.type) {
+      case 'VALUE':
+        return `Profit/loss ratio: ${withCommasRounded(profitLossRatio.value)}:1`;
+      case 'NO_LOSSES':
+        return 'Profit/loss ratio: 1:0';
+      case 'UNKNOWN':
+        return 'Profit/loss ratio: unknown';
+      default: {
+        const _exhaustiveCheck: never = profitLossRatio;
+        return _exhaustiveCheck;
+      }
+    }
   },
-  sharpeRatio: (sharpeRatio: number) => `Sharpe ratio: ${withCommasRounded(sharpeRatio)}`,
+  sharpeRatio: (sharpeRatio: number | null) =>
+    `Sharpe ratio: ${sharpeRatio != null ? withCommasRounded(sharpeRatio) : 'unknown'}`,
   tickers: (tickers: Ticker[]) => `Tickers: ${tickersToString(tickers)}`,
   timespan: (timespan: [string, string]) => `Timespan: ${timespan[0]} to ${timespan[1]}`,
   tradesMade: (tradesMade: number) => `Trades made: ${withCommas(tradesMade)}`,
-  volatility: (volatility: number) => `Volatility: ${withCommasRounded(volatility * 100)}%`,
+  volatility: (volatility: number | null) =>
+    `Volatility: ${volatility != null ? withCommasRounded(volatility * 100) + '%' : 'unknown'}`,
   winRate: (winRate: number) => `Win rate: ${withCommasRounded(winRate * 100)}%`,
 };
 

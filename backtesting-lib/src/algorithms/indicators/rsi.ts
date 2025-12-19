@@ -1,11 +1,11 @@
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeRSI(bars: Bar[], period: number = 14): (number | undefined)[] {
+export function computeRSI(bars: Bar[], period: number = 14): (number | null)[] {
   if (bars.length < period + 1) {
     throw new Error(`Must have context length of at least ${period + 1} to compute RSI`);
   }
 
-  const rsi: (number | undefined)[] = new Array(bars.length).fill(undefined);
+  const rsi: (number | null)[] = new Array(bars.length).fill(null);
 
   let gains = 0;
   let losses = 0;

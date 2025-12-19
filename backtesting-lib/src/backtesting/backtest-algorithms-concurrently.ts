@@ -3,17 +3,21 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/algorithm';
-import { DATE_LENGTH } from '@/fetch/create-search-index';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
-import { toValidTimespan, yearsBetween } from '@/utils/date-utils';
-import { tryAsync, trySync } from '@/utils/errorHandling';
+import { yearsBetween } from '@/utils/date-utils';
+import { trySync } from '@/utils/errorHandling';
 import { groupBy } from '@/utils/groupBy';
 import { withCommas } from '@/utils/number-utils';
 import { SharpeRatioCalculator } from '@/utils/sharpe-ratio-calculator';
 import type { AtLeastOne } from '@/utils/types';
 import cliProgress, { Presets } from 'cli-progress';
+import {
+  countBytesToProcess,
+  getIteratorBounds,
+  getTickerIteratorsByTicker,
+} from './iterator-utils';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator, type Bar } from './read-data';
 import {
@@ -23,12 +27,9 @@ import {
   type DescriptionMetrics,
 } from './statistics';
 import {
-  countLinesToProcess,
   createIndexByTicker,
   getDistinctTickersByAggregate,
   getTickerDataByAggregateByTicker,
-  getTickerIteratorsByTicker,
-  matchAggregateDataIterators,
 } from './ticker-utils';
 
 export type TickerData = {
@@ -57,7 +58,7 @@ export type AlgorithmData = {
 };
 
 export const MAX_POINTS_PER_PLOT = 1_000;
-const PROGRESS_UPDATE_INTERVAL = 1_000;
+const BYTES_PROGRESS_UPDATE_INTERVAL = 10_000;
 
 export async function backtestAlgorithmsConcurrently({
   algorithms,
@@ -65,12 +66,12 @@ export async function backtestAlgorithmsConcurrently({
   tickerData = [],
   timespan,
   trackProgress,
-  verboseLogging,
+  verboseLogging = false,
 }: {
   algorithms: Algorithm[];
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   tickerData?: TickerData[];
-  timespan?: [string | undefined, string | undefined];
+  timespan?: [string | null, string | null];
   trackProgress?: boolean;
   verboseLogging?: boolean;
 }): Promise<
@@ -85,13 +86,17 @@ export async function backtestAlgorithmsConcurrently({
   ]
 > {
   trackProgress ??= !verboseLogging;
-  verboseLogging ??= false;
 
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
   }
 
-  const timespanDays: [string | undefined, string | undefined] = toValidTimespan(timespan);
+  if (algorithms.length === 0) {
+    throw new Error('No algorithms provided to backtest');
+  }
+
+  const startPrepareDataTimestamp = Date.now();
+  console.log('Preparing data...');
 
   // Verify no algorithm max holding proportion is greater than the limit
   for (const algorithm of algorithms) {
@@ -121,6 +126,15 @@ export async function backtestAlgorithmsConcurrently({
   const { slippageByAggregateByTicker, filenameByAggregateByTicker, indexByAggregateByTicker } =
     getTickerDataByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
 
+  // Get ticker iterator bounds
+  const { actualTimespan, iteratorBoundsByAggregateByTicker } = await getIteratorBounds(
+    indexByAggregateByTicker,
+    timespan,
+  );
+  console.log(`Testing timespan: ${actualTimespan[0]} to ${actualTimespan[1]}`);
+  const bytesToProcess = countBytesToProcess(iteratorBoundsByAggregateByTicker);
+  console.log(`Bytes to process: ${withCommas(bytesToProcess)}`);
+
   // Output variables
   const algorithmGraphSelectionOptionsWithPerformance: SelectionOptionWithPerformance<{
     name: string;
@@ -137,32 +151,18 @@ export async function backtestAlgorithmsConcurrently({
       {} as Record<Timestamp, SelectionOption<SimplePlot>[]>,
     );
 
-  // Count number of lines that need to be processed
-  console.log('Counting number of lines to process...');
-  const startCountLinesToProcessTimestamp = Date.now();
-  const [startDay, endDay, linesToProcess] = await countLinesToProcess({
-    distinctTickersByAggregate,
-    filenameByAggregateByTicker,
-    timespanDays,
-    verboseLogging,
-  });
-  console.log(
-    `Lines to process: ${withCommas(linesToProcess)} (took ${withCommas(Date.now() - startCountLinesToProcessTimestamp)}ms)`,
-  );
-
-  if (verboseLogging) {
-    console.log(`Starting on day '${startDay}' and ending on day '${endDay}'`);
-  }
-
   // Initialize progress bar
+  console.log(
+    `Data successfully prepared (took ${withCommas(Date.now() - startPrepareDataTimestamp)}ms)`,
+  );
   const progressBar = new cliProgress.SingleBar({}, Presets.shades_grey);
   const progressStartTimestamp = Date.now();
   if (trackProgress) {
-    progressBar.start(linesToProcess, 0);
+    progressBar.start(bytesToProcess, 0);
   }
 
   // Backtest algorithms
-  let linesProcessed = 0;
+  let bytesProcessed = 0;
   for (const aggregate of aggregateTimestamps) {
     if (verboseLogging) {
       console.log(`Processing ${aggregate} aggregate data...`);
@@ -178,6 +178,7 @@ export async function backtestAlgorithmsConcurrently({
       getTickerIteratorsByTicker({
         distinctTickers: distinctTickersByAggregate[aggregate],
         filenameByTicker: filenameByAggregateByTicker[aggregate],
+        iteratorBoundsByTicker: iteratorBoundsByAggregateByTicker[aggregate],
         verboseLogging,
       }),
     );
@@ -186,13 +187,6 @@ export async function backtestAlgorithmsConcurrently({
     }
     const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
       getTickerIteratorByTickerResponse.data;
-
-    // Match all iterators buffer one bar ahead to determine market state efficiently
-    const matchIteratorResponse = await tryAsync(() =>
-      matchAggregateDataIterators({ [aggregate]: tickerIteratorByTicker }, startDay),
-    );
-    if (!matchIteratorResponse.ok) throw matchIteratorResponse.error;
-    const [_startDay, firstBarByAggregateByTicker] = matchIteratorResponse.data;
 
     // Calculate maximum context length for all algorithms
     const maxContextLengthByTicker = {} as Record<Ticker, number>;
@@ -232,20 +226,6 @@ export async function backtestAlgorithmsConcurrently({
       }),
     );
 
-    // Tracking variables
-    const contextByTicker: Record<Ticker, Bar[]> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
-      () => [],
-    );
-    const firstPriceByTicker: Record<Ticker, number> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
-      (ticker) => firstBarByAggregateByTicker[aggregate][ticker][1],
-    );
-    const lastPriceByTicker: Record<Ticker, number> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
-      (ticker) => firstBarByAggregateByTicker[aggregate][ticker][4],
-    );
-
     // Plotting variables
     let ticks = 0;
     let plotSpacing = 1;
@@ -258,42 +238,68 @@ export async function backtestAlgorithmsConcurrently({
       {} as Record<Ticker, number[]>,
     );
 
+    // Tracking variables
+    const contextByTicker: Record<Ticker, Bar[]> = createIndexByTicker(
+      distinctTickersByAggregate[aggregate],
+      (_ticker) => [],
+    );
+    const firstPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
+      distinctTickersByAggregate[aggregate],
+      (_ticker) => null,
+    );
+    const lastPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
+      distinctTickersByAggregate[aggregate],
+      (_ticker) => null,
+    );
+
     let hasNextBar = true;
-    const nextBarByTicker: Record<Ticker, Bar> = { ...firstBarByAggregateByTicker[aggregate] };
+    let nextBarByTicker: Record<Ticker, Bar> | null = null;
     while (hasNextBar) {
-      // Get next bars
-      let nextBarTimestamp: string | undefined = undefined;
-      const currentBarByTicker: Record<Ticker, Bar> = { ...nextBarByTicker };
+      const currentBarByTicker: Record<Ticker, Bar> | null =
+        nextBarByTicker != null ? { ...nextBarByTicker } : null;
+
+      // Get next bars from iterators
+      nextBarByTicker = {} as Record<Ticker, Bar>;
+      let aggregateNextTimestamp: string | null = null;
+      let deltaBytesProcessed = 0;
       for (const ticker in tickerIteratorByTicker) {
-        const nextBarIteratorResult = await tickerIteratorByTicker[ticker].next();
-        if (nextBarIteratorResult.done) {
+        const iteratorResult = await tickerIteratorByTicker[ticker].next();
+        if (iteratorResult.done) {
+          // Iterator is finished; end of timespan reached
           hasNextBar = false;
           break;
         }
 
-        const nextBar = nextBarIteratorResult.value;
-        nextBarByTicker[ticker] = nextBar;
-        if (nextBarTimestamp == undefined) {
-          const nextBarDay = nextBar[0].slice(0, DATE_LENGTH);
-          if (nextBarDay > endDay) {
-            hasNextBar = false;
-            break;
-          }
+        deltaBytesProcessed += iteratorResult.value.bytesProcessed;
+        const nextBar = iteratorResult.value.bar;
 
-          nextBarTimestamp = nextBar[0];
-        } else if (nextBar[0] !== nextBarTimestamp) {
+        if (aggregateNextTimestamp == null) {
+          aggregateNextTimestamp = nextBar[0];
+        } else if (nextBar[0] !== aggregateNextTimestamp) {
           throw new Error(
-            `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextBarTimestamp}' but got '${nextBar[0]}'`,
+            `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${aggregateNextTimestamp}' but got '${nextBar[0]}'`,
           );
         }
+
+        nextBarByTicker[ticker] = nextBar;
+      }
+
+      const shouldUpdateProgress =
+        Math.floor((bytesProcessed + deltaBytesProcessed) / BYTES_PROGRESS_UPDATE_INTERVAL) >
+        Math.floor(bytesProcessed / BYTES_PROGRESS_UPDATE_INTERVAL);
+      bytesProcessed += deltaBytesProcessed;
+      if (shouldUpdateProgress) {
+        progressBar.update(bytesProcessed);
+      }
+
+      if (currentBarByTicker == null) {
+        for (const ticker in tickerIteratorByTicker) {
+          firstPriceByTicker[ticker] = nextBarByTicker[ticker][4];
+        }
+        continue;
       }
 
       for (const ticker in tickerIteratorByTicker) {
-        // Update progress bar
-        if (trackProgress && ++linesProcessed % PROGRESS_UPDATE_INTERVAL === 0) {
-          progressBar.update(linesProcessed);
-        }
-
         // Update tracking variable
         lastPriceByTicker[ticker] = currentBarByTicker[ticker][4];
 
@@ -310,7 +316,7 @@ export async function backtestAlgorithmsConcurrently({
           updatePlotSpacing = updateGraph({
             graphByIndex: tickerYsByTicker,
             graphIndex: ticker,
-            pointY: (currentBarByTicker[ticker][4] / firstPriceByTicker[ticker]) * 100,
+            pointY: (currentBarByTicker[ticker][4] / firstPriceByTicker[ticker]!) * 100,
           });
         }
       }
@@ -412,7 +418,7 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Compile algorithm plots
-    const yearsBetweenStartAndEnd = yearsBetween(endDay, startDay);
+    const yearsBetweenStartAndEnd = yearsBetween(actualTimespan[1], actualTimespan[0]);
     for (
       let algorithmIndex = 0;
       algorithmIndex < algorithmsByAggregate[aggregate].length;
@@ -424,7 +430,7 @@ export async function backtestAlgorithmsConcurrently({
           algorithm: algorithmsByAggregate[aggregate][algorithmIndex],
           algorithmData: algorithmDataByAlgorithm[algorithmIndex],
           performanceFn,
-          timespan: [startDay, endDay!],
+          timespan: actualTimespan,
           xs,
           yearsBetweenStartAndEnd,
         });
@@ -436,7 +442,7 @@ export async function backtestAlgorithmsConcurrently({
   algorithmGraphSelectionOptionsWithPerformance.sort((a, b) => b.performance - a.performance);
 
   if (trackProgress) {
-    progressBar.update(linesToProcess);
+    progressBar.update(bytesToProcess);
     progressBar.stop();
     console.log(`Time taken: ${withCommas(Date.now() - progressStartTimestamp)}ms`);
   }

@@ -1,11 +1,11 @@
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeSMA(bars: Bar[], period: number): (number | undefined)[] {
+export function computeSMA(bars: Bar[], period: number): (number | null)[] {
   if (bars.length < period) {
     throw new Error(`Must have context length of at least ${period} to compute ${period}-SMA`);
   }
 
-  const result: (number | undefined)[] = Array(bars.length).fill(undefined);
+  const result: (number | null)[] = Array(bars.length).fill(null);
   let sum = 0;
 
   for (let i = 0; i < bars.length; i++) {

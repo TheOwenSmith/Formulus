@@ -5,6 +5,7 @@ import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
 
 export const DATE_LENGTH = 10; // YYYY-MM-DD
 export const NUMBER_LENGTH = 10; // 10 digits (works for up to 10GB files)
+export const LINE_LENGTH = DATE_LENGTH + NUMBER_LENGTH;
 
 export async function createSearchIndex(ticker: Ticker, timestamp: Timestamp): Promise<void> {
   console.log(`Creating search index for '${ticker}' (${timestamp})...`);
