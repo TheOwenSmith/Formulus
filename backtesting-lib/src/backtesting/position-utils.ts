@@ -148,13 +148,14 @@ function computeK({
     beta += positionSize - slippage * positionSize;
   }
 
-  let phi = (h.length + b.length) / r;
+  let phi = (h.length + b.length) / r; // N / r
   for (const ticker of b) {
     const slippage = slippageByTicker[ticker] / 10_000;
     phi += slippage;
   }
 
-  if (h.length === 0) {
+  const n = h.length;
+  if (n === 0) {
     return beta / phi;
   }
 
@@ -162,37 +163,37 @@ function computeK({
   sortedPositionSlippageTuple.sort((a, b) => a[0] - b[0]);
 
   // Compute s_l and s_r
-  const s_l: number[] = []; // s_l[j] = sum_{i=0}^{j} p_i
-  const s_r: number[] = []; // s_r[j] = sum_{i=j}^{n} p_i
-  for (let i = 0; i < sortedPositionSlippageTuple.length; i++) {
+  const s_l: number[] = Array(n).fill(0); // s_l[j] = sum_{i=0}^{j} slippage_i
+  const s_r: number[] = Array(n).fill(0); // s_r[j] = sum_{i=j}^{n-1} slippage_i
+  for (let i = 0; i < n; i++) {
     const slippage = sortedPositionSlippageTuple[i][1];
-    s_l.push((s_l.at(-1) ?? 0) + slippage);
+    s_l[i] = (s_l[i - 1] ?? 0) + slippage;
   }
-  for (let i = sortedPositionSlippageTuple.length - 1; i >= 0; i--) {
+  for (let i = n - 1; i >= 0; i--) {
     const slippage = sortedPositionSlippageTuple[i][1];
-    s_r.push((s_r.at(-1) ?? 0) + slippage);
+    s_r[i] = (s_r[i + 1] ?? 0) + slippage;
   }
 
   // Compute sigma_pl and sigma_pr
-  const sigma_pl: number[] = []; // sigma_pl[j] = sum_{i=0}^{j} slippage_i * p_i
-  const sigma_pr: number[] = []; // sigma_pr[j] = sum_{i=j}^{n} slippage_i * p_i
-  for (let i = 0; i < sortedPositionSlippageTuple.length; i++) {
+  const sigma_pl: number[] = Array(n - 1).fill(0); // sigma_pl[j] = sum_{i=0}^{j} slippage_i * p_i
+  const sigma_pr: number[] = Array(n - 1).fill(0); // sigma_pr[j] = sum_{i=j}^{n-1} slippage_i * p_i
+  for (let i = 0; i < n; i++) {
     const [position, slippage] = sortedPositionSlippageTuple[i];
     const delta = position * slippage;
-    sigma_pl.push((sigma_pl.at(-1) ?? 0) + delta);
+    sigma_pl[i] = (sigma_pl[i - 1] ?? 0) + delta;
   }
-  for (let i = sortedPositionSlippageTuple.length - 1; i >= 0; i--) {
+  for (let i = n - 1; i >= 0; i--) {
     const [position, slippage] = sortedPositionSlippageTuple[i];
     const delta = position * slippage;
-    sigma_pr.push((sigma_pr.at(-1) ?? 0) + delta);
+    sigma_pr[i] = (sigma_pr[i + 1] ?? 0) + delta;
   }
 
-  for (let i = 0; i + 1 < sortedPositionSlippageTuple.length; i++) {
+  for (let i = 0; i + 1 < n; i++) {
     // Assuming p_i<=k<p_{i+1}
     const potentialK = (beta + sigma_pl[i] - sigma_pr[i + 1]) / (phi + s_l[i] - s_r[i + 1]);
     if (
-      sortedPositionSlippageTuple[i][0] <= potentialK &&
-      potentialK < sortedPositionSlippageTuple[i + 1][0]
+      sortedPositionSlippageTuple[i][0] - TOLERANCE <= potentialK &&
+      potentialK < sortedPositionSlippageTuple[i + 1][0] + TOLERANCE
     ) {
       return potentialK;
     }
