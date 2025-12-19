@@ -22,14 +22,16 @@ export type AggregateDataIterator = AsyncGenerator<{ bar: Bar; bytesProcessed: n
 };
 
 export function getAggregateDataIterator({
-  filename,
-  startByte,
   endByte,
+  filename,
+  parseStrictly,
+  startByte,
   verboseLogging = false,
 }: {
-  filename: string;
-  startByte?: number;
   endByte?: number;
+  filename: string;
+  parseStrictly: boolean;
+  startByte?: number;
   verboseLogging?: boolean;
 }): AggregateDataIterator {
   if (!fs.existsSync(filename)) {
@@ -56,19 +58,26 @@ export function getAggregateDataIterator({
       }
 
       const stringifiedLine = current.value!;
-      const parsedLine = trySync(() => stringifiedBarSchema.parse(stringifiedLine.split(',')));
-      if (!parsedLine.ok) {
-        console.error(
-          `Error parsing file '${filename}' line '${stringifiedLine}'`,
-          parsedLine.error,
-        );
-        throw parsedLine.error;
-      }
-      const bar = parsedLine.data;
-
       // Account for \r\n, but not for the first line
       const bytesProcessed = Buffer.byteLength(stringifiedLine) + (linesProcessed > 1 ? 2 : 0);
-      yield { bar, bytesProcessed };
+
+      if (parseStrictly) {
+        const parsedLine = trySync(() => stringifiedBarSchema.parse(stringifiedLine.split(',')));
+        if (!parsedLine.ok) {
+          console.error(
+            `Error parsing file '${filename}' line '${stringifiedLine}'`,
+            parsedLine.error,
+          );
+          throw parsedLine.error;
+        }
+        const bar = parsedLine.data;
+        yield { bar, bytesProcessed };
+      } else {
+        const split = stringifiedLine.split(',');
+        const bar = [split[0], ...split.slice(1, 6).map(Number)] as Bar;
+        yield { bar, bytesProcessed };
+      }
+
       current = await iter.next();
     }
     return null;

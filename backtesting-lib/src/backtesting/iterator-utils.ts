@@ -191,11 +191,13 @@ export function getTickerIteratorsByTicker({
   distinctTickers,
   filenameByTicker,
   iteratorBoundsByTicker,
+  parseStrictly,
   verboseLogging = false,
 }: {
   distinctTickers: Ticker[];
   filenameByTicker: Record<Ticker, string>;
   iteratorBoundsByTicker: Record<Ticker, [number, number]>;
+  parseStrictly: boolean;
   verboseLogging?: boolean;
 }): Record<Ticker, AggregateDataIterator> {
   return distinctTickers.reduce(
@@ -209,9 +211,10 @@ export function getTickerIteratorsByTicker({
 
       const getIteratorResponse = trySync(() =>
         getAggregateDataIterator({
-          filename: tickDataFilename,
-          startByte,
           endByte,
+          filename: tickDataFilename,
+          parseStrictly,
+          startByte,
           verboseLogging,
         }),
       );

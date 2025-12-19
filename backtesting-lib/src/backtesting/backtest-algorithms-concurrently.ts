@@ -62,6 +62,7 @@ const BYTES_PROGRESS_UPDATE_INTERVAL = 10_000;
 
 export async function backtestAlgorithmsConcurrently({
   algorithms,
+  iteratorStrictParsing = false,
   performanceFn,
   tickerData = [],
   timespan,
@@ -69,6 +70,7 @@ export async function backtestAlgorithmsConcurrently({
   verboseLogging = false,
 }: {
   algorithms: Algorithm[];
+  iteratorStrictParsing?: boolean;
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   tickerData?: TickerData[];
   timespan?: [string | null, string | null];
@@ -179,6 +181,7 @@ export async function backtestAlgorithmsConcurrently({
         distinctTickers: distinctTickersByAggregate[aggregate],
         filenameByTicker: filenameByAggregateByTicker[aggregate],
         iteratorBoundsByTicker: iteratorBoundsByAggregateByTicker[aggregate],
+        parseStrictly: iteratorStrictParsing,
         verboseLogging,
       }),
     );

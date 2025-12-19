@@ -28,7 +28,11 @@ export async function createContextMap<T>({
   const timespanDays: [string | null, string | null] = toValidTimespan(timespan);
 
   const getIteratorResponse = trySync(() =>
-    getAggregateDataIterator(tickDataFilename, verboseLogging),
+    getAggregateDataIterator({
+      filename: tickDataFilename,
+      parseStrictly: false,
+      verboseLogging,
+    }),
   );
   if (!getIteratorResponse.ok) {
     throw getIteratorResponse.error;
@@ -37,7 +41,7 @@ export async function createContextMap<T>({
 
   const outcomeByHistoryEncoded = new Map<T, [sum: number, count: number]>();
   const previousBars: Bar[] = [];
-  for await (const bar of iterator) {
+  for await (const { bar } of iterator) {
     // If bar is before start of timespan, skip
     if (timespanDays[0] != null && bar[0] < timespanDays[0]) {
       continue;
