@@ -13,14 +13,13 @@ export function computeEMA(bars: Bar[], period: number): (number | null)[] {
   for (let i = 0; i < period; i++) {
     sum += bars[i][4];
   }
-  const sma = sum / period;
-  ema[period - 1] = sma;
+  ema[period - 1] = sum / period;
 
   // Compute all remaining EMA values
-  for (let i = 0; i < bars.length; i++) {
+  for (let i = period; i < bars.length; i++) {
     const price = bars[i][4];
     // EMA_current = (Price_current * k) + (EMA_previous * (1 - k))
-    ema.push(price * k + ema[i - 1]! * (1 - k));
+    ema[i] = price * k + ema[i - 1]! * (1 - k);
   }
 
   return ema;
