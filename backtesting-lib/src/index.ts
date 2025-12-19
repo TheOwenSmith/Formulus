@@ -17,6 +17,7 @@ import {
 } from './algorithms/examples/green-red-bars';
 import { ifGreenAlgorithm } from './algorithms/examples/if-green';
 import { longShortAlgorithm } from './algorithms/examples/long-short';
+import { noMondaysAlgorithm } from './algorithms/examples/no-mondays';
 import { overboughtOversoldAlgorithm } from './algorithms/examples/overbought-oversold';
 import { regressionLineAlgorithm } from './algorithms/examples/regression-line';
 import { superTrendDirectionAlgorithm } from './algorithms/examples/super-trend-direction';
@@ -105,7 +106,7 @@ if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
 }
 
 if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
-  for (const aggregate of ['60min'] as const /* aggregateTimestamps */) {
+  for (const aggregate of aggregateTimestamps) {
     // Populate algorithms with if green algorithm
     algorithms.push(
       createAlgorithmFromSimpleMarketInvariantAlgorithm(ifGreenAlgorithm, aggregate, 'SPY'),
@@ -132,6 +133,11 @@ if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
     // Populate algorithms with super trend direction algorithm
     algorithms.push(
       createAlgorithmFromMarketInvariantAlgorithm(superTrendDirectionAlgorithm, aggregate, tickers),
+    );
+
+    // Populate algorithms with no Mondays algorithm
+    algorithms.push(
+      createAlgorithmFromSimpleMarketInvariantAlgorithm(noMondaysAlgorithm, aggregate, 'SPY'),
     );
   }
 }
