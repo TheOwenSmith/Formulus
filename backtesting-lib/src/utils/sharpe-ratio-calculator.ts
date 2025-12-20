@@ -52,7 +52,7 @@ export class SharpeRatioCalculator {
   sharpe(yearsOfData: number) {
     const mean = this.returns.mean;
     const volatility = this.volatility();
-    if (volatility == null) {
+    if (volatility == null || volatility === 0) {
       return null;
     }
 

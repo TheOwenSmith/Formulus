@@ -61,7 +61,8 @@ const DESCRIPTION_METRIC_TO_STRING: {
   tradesMade: (tradesMade: number) => `Trades made: ${withCommas(tradesMade)}`,
   volatility: (volatility: number | null) =>
     `Volatility: ${volatility != null ? withCommasRounded(volatility * 100) + '%' : 'unknown'}`,
-  winRate: (winRate: number) => `Win rate: ${withCommasRounded(winRate * 100)}%`,
+  winRate: (winRate: number | null) =>
+    `Win rate: ${winRate != null ? withCommasRounded(winRate * 100) + '%' : 'unknown'}`,
 };
 
 type DescriptionMetricOptions = {

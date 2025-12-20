@@ -77,7 +77,7 @@ export type DescriptionMetrics = {
   timespan: [string, string];
   tradesMade: number;
   volatility: number | null;
-  winRate: number;
+  winRate: number | null;
 };
 
 export async function getAlgorithmSelectionOptionWithPerformance({
@@ -157,7 +157,8 @@ export async function getAlgorithmSelectionOptionWithPerformance({
     timespan,
     tradesMade: trades,
     volatility: sharpeRatioCalculator.volatility(),
-    winRate: winsLosses[0] / (winsLosses[0] + winsLosses[1]),
+    winRate:
+      winsLosses[0] + winsLosses[1] > 0 ? winsLosses[0] / (winsLosses[0] + winsLosses[1]) : null,
   };
 
   const performance = await performanceFn(descriptionMetrics);
