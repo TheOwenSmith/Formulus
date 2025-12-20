@@ -1,6 +1,23 @@
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeATR(bars: Bar[], period = 14): (number | null)[] {
+declare module '@/backtesting/algorithm-metadata' {
+  export interface AlgorithmMetadataParts {
+    atr?: {
+      atr: number;
+    };
+  }
+}
+
+export function computeATR({
+  bars,
+  period = 14,
+  metadata,
+}: {
+  bars: Bar[];
+  period?: number;
+  metadata: AlgorithmMetadata;
+}): (number | null)[] {
   if (bars.length < period) {
     throw new Error(`Must have at least ${period} bars to compute ATR`);
   }

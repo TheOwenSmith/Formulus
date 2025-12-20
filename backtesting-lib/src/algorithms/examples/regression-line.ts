@@ -1,5 +1,6 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
 import { linearRegression } from '@/algorithms/indicators/linear-regression';
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker } from '@/fetch/types';
 
@@ -9,6 +10,7 @@ export const regressionLineAlgorithm: MarketInvariantAlgorithm = {
   implementation: (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
+    _metadata: AlgorithmMetadata,
   ): Record<Ticker, Action> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {

@@ -1,5 +1,6 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
 import { computeSMA } from '@/algorithms/indicators/sma';
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker } from '@/fetch/types';
 
@@ -9,10 +10,11 @@ export const aboveBelowSmaAlgorithm: MarketInvariantAlgorithm = {
   implementation: (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
+    metadata: AlgorithmMetadata,
   ): Record<Ticker, Action> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
-      const sma = computeSMA(context[ticker], 20).at(-1)!;
+      const sma = computeSMA({ bars: context[ticker], period: 20, metadata }).at(-1)!;
       const latestPrice = context[ticker].at(-1)![4];
 
       if (latestPrice > sma) {

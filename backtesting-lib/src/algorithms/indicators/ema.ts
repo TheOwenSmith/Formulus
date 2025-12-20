@@ -1,6 +1,23 @@
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeEMA(bars: Bar[], period: number): (number | null)[] {
+declare module '@/backtesting/algorithm-metadata' {
+  export interface AlgorithmMetadataParts {
+    ema?: {
+      ema: number;
+    };
+  }
+}
+
+export function computeEMA({
+  bars,
+  period = 12,
+  metadata,
+}: {
+  bars: Bar[];
+  period?: number;
+  metadata: AlgorithmMetadata;
+}): (number | null)[] {
   if (bars.length < period) {
     throw new Error(`Must have context length of at least ${period} to compute ${period}-EMA`);
   }

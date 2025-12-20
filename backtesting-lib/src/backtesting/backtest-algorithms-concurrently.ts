@@ -3,6 +3,7 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/algorithm';
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
@@ -50,6 +51,7 @@ export type AlgorithmData = {
   cumulativeProfitLoss: [profit: number, loss: number];
   entracePriceExitPriceByTickerPosition: Record<Ticker, [entryPrice: number, exitPrice: number]>;
   entraceTimeByTickerPosition: Record<Ticker, number>;
+  metadata: AlgorithmMetadata;
   positions: Record<Ticker, number>;
   positionsClosed: number;
   sharpeRatioCalculator: SharpeRatioCalculator;
@@ -218,6 +220,7 @@ export async function backtestAlgorithmsConcurrently({
           algorithmsByAggregate[aggregate][algorithmIndex].tickers,
           (_ticker) => 0,
         ),
+        metadata: {},
         positions: createIndexByTicker(
           algorithmsByAggregate[aggregate][algorithmIndex].tickers,
           (_ticker) => 0,
@@ -334,6 +337,7 @@ export async function backtestAlgorithmsConcurrently({
           contextLength,
           algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
         } = algorithm;
+        const algorithmData = algorithmDataByAlgorithm[algorithmIndex];
 
         const positions = algorithmDataByAlgorithm[algorithmIndex].positions;
         const priceByTicker: Record<Ticker, number> = tickers.reduce(
@@ -355,11 +359,11 @@ export async function backtestAlgorithmsConcurrently({
           );
 
           // Get actions from implementation
-          const actions = algorithm.implementation(context, positions);
+          const actions = algorithm.implementation(context, positions, algorithmData.metadata);
 
           updatePosition({
             actions,
-            algorithmData: algorithmDataByAlgorithm[algorithmIndex],
+            algorithmData,
             algorithmMaxHoldingProportion,
             algorithmTickers: tickers,
             priceByTicker,
@@ -368,7 +372,7 @@ export async function backtestAlgorithmsConcurrently({
           });
         } else if (!hasNextBar) {
           closeAllPositions({
-            algorithmData: algorithmDataByAlgorithm[algorithmIndex],
+            algorithmData,
             priceByTicker,
             slippageByTicker,
             ticks,

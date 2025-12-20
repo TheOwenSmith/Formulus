@@ -1,12 +1,19 @@
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
+
+export type SimpleAlgorithmImplementation = (
+  context: Bar[],
+  position: number,
+  metadata: AlgorithmMetadata,
+) => Action;
 
 export type SimpleAlgorithm = {
   aggregate: Timestamp;
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
-  implementation: (context: Bar[], position: number) => Action;
+  implementation: SimpleAlgorithmImplementation;
   name: string;
   ticker: Ticker;
 };
@@ -23,9 +30,13 @@ export function createAlgorithmFromSimpleAlgorithm({
     aggregate,
     algorithmMaxHoldingProportion,
     contextLength,
-    implementation: (context: Record<Ticker, Bar[]>, position: Record<Ticker, number>) =>
+    implementation: (
+      context: Record<Ticker, Bar[]>,
+      position: Record<Ticker, number>,
+      algorithmMetadata: AlgorithmMetadata,
+    ) =>
       ({
-        [ticker]: implementation(context[ticker], position[ticker]),
+        [ticker]: implementation(context[ticker], position[ticker], algorithmMetadata),
       }) as Record<Ticker, Action>,
     name,
     tickers: [ticker],
@@ -35,7 +46,7 @@ export function createAlgorithmFromSimpleAlgorithm({
 export type SimpleMarketInvariantAlgorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
-  implementation: (context: Bar[], position: number) => Action;
+  implementation: SimpleAlgorithmImplementation;
   name: string;
 };
 export function createAlgorithmFromSimpleMarketInvariantAlgorithm(

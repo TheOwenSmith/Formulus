@@ -1,3 +1,4 @@
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 
@@ -10,6 +11,7 @@ export const enum Action {
 export type AlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,
   positions: Record<Ticker, number>,
+  metadata: AlgorithmMetadata,
 ) => Record<Ticker, Action>;
 
 export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;

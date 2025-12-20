@@ -1,5 +1,6 @@
 import { Action, type Algorithm } from '@/algorithms/algorithm';
 import { computeRSI } from '@/algorithms/indicators/rsi';
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker } from '@/fetch/types';
 
@@ -9,10 +10,11 @@ export const longShortAlgorithm: Algorithm = {
   implementation: (
     context: Record<Ticker, Bar[]>,
     positions: Record<Ticker, number>,
+    metadata: AlgorithmMetadata,
   ): Record<Ticker, Action> => {
     const haveSH = positions['SH'] > 0;
 
-    const spyRSI = computeRSI(context['SPY'], 14).at(-1)!;
+    const spyRSI = computeRSI({ bars: context['SPY'], metadata }).at(-1)!;
     if (haveSH) {
       if (spyRSI < 45) {
         return { SPY: Action.BUY, SH: Action.SELL } as Record<Ticker, Action>;

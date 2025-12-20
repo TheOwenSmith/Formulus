@@ -1,16 +1,20 @@
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { Heap } from '@/utils/heap';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
 
+export type TopKAlgorithmImplementation = (
+  context: Record<Ticker, Bar[]>,
+  positions: Record<Ticker, number>,
+  algorithmMetadata: AlgorithmMetadata,
+) => Record<Ticker, number>;
+
 export type TopKAlgorithm = {
   aggregate: Timestamp;
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
-  implementation: (
-    context: Record<Ticker, Bar[]>,
-    positions: Record<Ticker, number>,
-  ) => Record<Ticker, number>;
+  implementation: TopKAlgorithmImplementation;
   k: number;
   name: string;
   tickers: [Ticker, ...Ticker[]];
@@ -28,8 +32,13 @@ export function createAlgorithmFromTopKAlgorithm({
   function algorithmImplementation(
     context: Record<Ticker, Bar[]>,
     positions: Record<Ticker, number>,
+    algorithmMetadata: AlgorithmMetadata,
   ) {
-    const scoresByTicker: Record<Ticker, number> = implementation(context, positions);
+    const scoresByTicker: Record<Ticker, number> = implementation(
+      context,
+      positions,
+      algorithmMetadata,
+    );
     const maxHeap = new Heap<[Ticker, number]>(
       (a: [Ticker, number], b: [Ticker, number]) => a[1] - b[1],
     );

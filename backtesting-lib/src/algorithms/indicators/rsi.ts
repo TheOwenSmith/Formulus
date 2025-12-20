@@ -1,6 +1,23 @@
+import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-export function computeRSI(bars: Bar[], period: number = 14): (number | null)[] {
+declare module '@/backtesting/algorithm-metadata' {
+  export interface AlgorithmMetadataParts {
+    rsi?: {
+      rsi: number;
+    };
+  }
+}
+
+export function computeRSI({
+  bars,
+  period = 14,
+  metadata,
+}: {
+  bars: Bar[];
+  period?: number;
+  metadata: AlgorithmMetadata;
+}): (number | null)[] {
   if (bars.length < period + 1) {
     throw new Error(`Must have context length of at least ${period + 1} to compute RSI`);
   }
