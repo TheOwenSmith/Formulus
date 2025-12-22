@@ -10,11 +10,11 @@ export const regressionLineAlgorithm: MarketInvariantAlgorithm = {
   implementation: (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
-    _metadata: AlgorithmMetadata,
+    metadata: AlgorithmMetadata,
   ): Record<Ticker, Action> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
-      const regressionLine = linearRegression(context[ticker]);
+      const regressionLine = linearRegression({ bars: context[ticker], metadata });
       const latestPrice = context[ticker].at(-1)![4];
 
       // Buy if the latest price is below the regression line
