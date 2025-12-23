@@ -3,7 +3,7 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/algorithm';
-import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
+import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';

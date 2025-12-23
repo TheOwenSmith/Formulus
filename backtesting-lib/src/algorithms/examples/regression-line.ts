@@ -1,6 +1,6 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
+import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
 import { computeLinearRegression } from '@/algorithms/indicators/linear-regression';
-import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker } from '@/fetch/types';
 

@@ -1,4 +1,4 @@
-import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
+import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';

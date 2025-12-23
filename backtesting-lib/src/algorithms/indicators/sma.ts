@@ -1,7 +1,7 @@
-import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
+import type { IndicatorMetadata } from './indicator-metadata';
 
-declare module '@/backtesting/indicator-metadata' {
+declare module './indicator-metadata' {
   export interface IndicatorMetadataParts {
     sma?: Record<
       number,
