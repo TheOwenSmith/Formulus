@@ -3,7 +3,7 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/algorithm';
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
 import { type SelectionOption } from '@/utils/cli';
@@ -51,7 +51,6 @@ export type AlgorithmData = {
   cumulativeProfitLoss: [profit: number, loss: number];
   entracePriceExitPriceByTickerPosition: Record<Ticker, [entryPrice: number, exitPrice: number]>;
   entraceTimeByTickerPosition: Record<Ticker, number>;
-  metadata: AlgorithmMetadata;
   positions: Record<Ticker, number>;
   positionsClosed: number;
   sharpeRatioCalculator: SharpeRatioCalculator;
@@ -204,6 +203,12 @@ export async function backtestAlgorithmsConcurrently({
       }
     }
 
+    // Initialize indicator metadata
+    const indicatorMetadataByTicker: Record<Ticker, IndicatorMetadata> = createIndexByTicker(
+      distinctTickersByAggregate[aggregate],
+      (_ticker) => ({}),
+    );
+
     // Algorithm tracking variables
     const algorithmDataByAlgorithm: AlgorithmData[] = Array.from(
       { length: algorithmsByAggregate[aggregate].length },
@@ -220,7 +225,6 @@ export async function backtestAlgorithmsConcurrently({
           algorithmsByAggregate[aggregate][algorithmIndex].tickers,
           (_ticker) => 0,
         ),
-        metadata: {},
         positions: createIndexByTicker(
           algorithmsByAggregate[aggregate][algorithmIndex].tickers,
           (_ticker) => 0,
@@ -359,7 +363,7 @@ export async function backtestAlgorithmsConcurrently({
           );
 
           // Get actions from implementation
-          const actions = algorithm.implementation(context, positions, algorithmData.metadata);
+          const actions = algorithm.implementation(context, positions, indicatorMetadataByTicker);
 
           updatePosition({
             actions,

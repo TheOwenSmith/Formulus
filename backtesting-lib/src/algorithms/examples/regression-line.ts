@@ -1,6 +1,6 @@
 import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
-import { linearRegression } from '@/algorithms/indicators/linear-regression';
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import { computeLinearRegression } from '@/algorithms/indicators/linear-regression';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker } from '@/fetch/types';
 
@@ -10,11 +10,15 @@ export const regressionLineAlgorithm: MarketInvariantAlgorithm = {
   implementation: (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
-    metadata: AlgorithmMetadata,
+    metadata: Record<Ticker, IndicatorMetadata>,
   ): Record<Ticker, Action> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
-      const regressionLine = linearRegression({ bars: context[ticker], metadata });
+      const regressionLine = computeLinearRegression({
+        bars: context[ticker],
+        period: 50,
+        metadata: metadata[ticker],
+      });
       const latestPrice = context[ticker].at(-1)![4];
 
       // Buy if the latest price is below the regression line

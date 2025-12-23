@@ -1,11 +1,15 @@
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-declare module '@/backtesting/algorithm-metadata' {
-  export interface AlgorithmMetadataParts {
-    ema?: {
-      ema: (number | null)[];
-    };
+declare module '@/backtesting/indicator-metadata' {
+  export interface IndicatorMetadataParts {
+    ema?: Record<
+      number,
+      {
+        ema: (number | null)[];
+        timestamp: string;
+      }
+    >;
   }
 }
 
@@ -16,15 +20,19 @@ export function computeEMA({
 }: {
   bars: Bar[];
   period?: number;
-  metadata: AlgorithmMetadata;
+  metadata: IndicatorMetadata;
 }): (number | null)[] {
+  if (period < 1) {
+    throw new Error('Period must be at least 1 to compute EMA');
+  }
   if (bars.length < period) {
-    throw new Error(`Must have context length of at least ${period} to compute ${period}-EMA`);
+    throw new Error(`Must have context length of at least ${period} to compute EMA(${period})`);
   }
 
   const k = 2 / (period + 1);
 
-  const emaMetadata = metadata.ema;
+  const timestamp = bars.at(-1)![0];
+  const emaMetadata = metadata.ema?.[period];
   if (emaMetadata == undefined) {
     const ema: (number | null)[] = Array(bars.length).fill(null);
 
@@ -42,19 +50,30 @@ export function computeEMA({
       ema[i] = price * k + ema[i - 1]! * (1 - k);
     }
 
-    metadata.ema = { ema };
+    if (!('ema' in metadata)) {
+      metadata.ema = {};
+    }
+    metadata.ema![period] = { ema, timestamp };
     return ema;
   } else {
     // Compute using metadata
     const { ema } = emaMetadata;
+    const lastUpdateTimestamp = emaMetadata.timestamp;
+
+    // If the timestamp is the same as the last update, return cached result
+    if (timestamp === lastUpdateTimestamp) {
+      return ema;
+    }
 
     const prevEma = ema.at(-1)!;
     const price = bars.at(-1)![4];
 
     // Compute new EMA using Wilder's smoothing
-    const nextEma = (prevEma * (period - 1) + price) / period;
-    ema.push(nextEma);
+    const nextEma = price * k + prevEma * (1 - k);
     ema.shift();
+    ema.push(nextEma);
+
+    emaMetadata.timestamp = timestamp;
     return ema;
   }
 }

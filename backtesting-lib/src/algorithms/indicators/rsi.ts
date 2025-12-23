@@ -1,13 +1,17 @@
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-declare module '@/backtesting/algorithm-metadata' {
-  export interface AlgorithmMetadataParts {
-    rsi?: {
-      rsi: (number | null)[];
-      avgGain: number;
-      avgLoss: number;
-    };
+declare module '@/backtesting/indicator-metadata' {
+  export interface IndicatorMetadataParts {
+    rsi?: Record<
+      number,
+      {
+        rsi: (number | null)[];
+        avgGain: number;
+        avgLoss: number;
+        timestamp: string;
+      }
+    >;
   }
 }
 
@@ -18,13 +22,17 @@ export function computeRSI({
 }: {
   bars: Bar[];
   period?: number;
-  metadata: AlgorithmMetadata;
+  metadata: IndicatorMetadata;
 }): (number | null)[] {
+  if (period < 1) {
+    throw new Error('Period must be at least 1 to compute RSI');
+  }
   if (bars.length < period + 1) {
-    throw new Error(`Must have context length of at least ${period + 1} to compute RSI`);
+    throw new Error(`Must have context length of at least ${period + 1} to compute RSI(${period})`);
   }
 
-  const rsiMetadata = metadata.rsi;
+  const timestamp = bars.at(-1)![0];
+  const rsiMetadata = metadata.rsi?.[period];
   if (rsiMetadata == undefined) {
     const rsi: (number | null)[] = new Array(bars.length).fill(null);
 
@@ -54,14 +62,19 @@ export function computeRSI({
       rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
     }
 
-    metadata.rsi = {
-      rsi,
-      avgGain,
-      avgLoss,
-    };
+    if (!('rsi' in metadata)) {
+      metadata.rsi = {};
+    }
+    metadata.rsi![period] = { rsi, avgGain, avgLoss, timestamp };
     return rsi;
   } else {
     const { rsi } = rsiMetadata;
+    const lastUpdateTimestamp = rsiMetadata.timestamp;
+
+    // If the timestamp is the same as the last update, return cached result
+    if (timestamp === lastUpdateTimestamp) {
+      return rsi;
+    }
 
     // Compute new rsi using Wilder's smoothing
     const prevAvgGain = rsiMetadata.avgGain;
@@ -73,15 +86,22 @@ export function computeRSI({
     const avgGain = (prevAvgGain * (period - 1) + gain) / period;
     const avgLoss = (prevAvgLoss * (period - 1) + loss) / period;
 
-    const rsiValue = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    let rsiValue: number;
+    if (avgGain === 0 && avgLoss === 0) {
+      rsiValue = 50;
+    } else if (avgLoss === 0) {
+      rsiValue = 100;
+    } else {
+      rsiValue = 100 - 100 / (1 + avgGain / avgLoss);
+    }
 
-    rsi.push(rsiValue);
     rsi.shift();
+    rsi.push(rsiValue);
 
     // Update metadata
     rsiMetadata.avgGain = avgGain;
     rsiMetadata.avgLoss = avgLoss;
-
+    rsiMetadata.timestamp = timestamp;
     return rsi;
   }
 }

@@ -1,4 +1,4 @@
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
@@ -6,7 +6,7 @@ import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from
 export type SimpleAlgorithmImplementation = (
   context: Bar[],
   position: number,
-  metadata: AlgorithmMetadata,
+  metadata: Record<Ticker, IndicatorMetadata>,
 ) => Action;
 
 export type SimpleAlgorithm = {
@@ -33,10 +33,10 @@ export function createAlgorithmFromSimpleAlgorithm({
     implementation: (
       context: Record<Ticker, Bar[]>,
       position: Record<Ticker, number>,
-      algorithmMetadata: AlgorithmMetadata,
+      metadata: Record<Ticker, IndicatorMetadata>,
     ) =>
       ({
-        [ticker]: implementation(context[ticker], position[ticker], algorithmMetadata),
+        [ticker]: implementation(context[ticker], position[ticker], metadata),
       }) as Record<Ticker, Action>,
     name,
     tickers: [ticker],

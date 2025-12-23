@@ -1,74 +1,114 @@
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-declare module '@/backtesting/algorithm-metadata' {
-  export interface AlgorithmMetadataParts {
-    linearRegression?: {
-      sumX: number;
-      sumYWithoutLast: number;
-      sumXYWithoutLast: number;
-      denominator: number;
-    };
+declare module '@/backtesting/indicator-metadata' {
+  export interface IndicatorMetadataParts {
+    linearRegression?: Record<
+      number,
+      {
+        denominator: number;
+        intercept: number;
+        prevSumXY: number;
+        slope: number;
+        sumX: number;
+        sumYWithoutLast: number;
+        timestamp: string;
+      }
+    >;
   }
 }
 
-export function linearRegression({
+export function computeLinearRegression({
   bars,
+  period,
   metadata,
 }: {
   bars: Bar[];
-  metadata: AlgorithmMetadata;
+  period: number;
+  metadata: IndicatorMetadata;
 }): (x: number) => number {
-  const n = bars.length;
-  if (n < 2) {
-    throw new Error('Must have at least 2 bars to perform linear regression');
+  if (period < 2) {
+    throw new Error('Period must be at least 2 to compute LinearRegression');
+  }
+  const b = bars.length;
+  if (b < period) {
+    throw new Error(`Must have at least ${period} bars to compute LinearRegression(${period})`);
   }
 
   // Use the correct object for metadata
-  const linearRegressionMetadata = metadata.linearRegression;
+  const timestamp = bars.at(-1)![0];
+  const linearRegressionMetadata = metadata.linearRegression?.[bars.length];
   if (linearRegressionMetadata == undefined) {
     // Compute sumX, sumXX, and denominator with formulas
-    const sumX = (n * (n - 1)) / 2; // \sum_{x=0}^{n-1} x = (n-1)n/2
-    const sumXX = (n * (n - 1) * (2 * n - 1)) / 6; // \sum_{x=0}^{n-1} x^2 = (n-1)n(2n-1)/6
-    const denominator = n * sumXX - sumX * sumX;
+    const sumX = (period * (period - 1)) / 2; // \sum_{x=0}^{p-1} x = p(p-1)/2
+    const sumXX = (period * (period - 1) * (2 * period - 1)) / 6; // \sum_{x=0}^{p-1} x^2 = p(p-1)(2p-1)/6
+    const denominator = period * sumXX - sumX * sumX;
 
     let sumY = 0;
     let sumXY = 0;
-    for (let i = 0; i < n; i++) {
-      const x = i;
+    for (let i = b - period; i < b; i++) {
+      const x = i - (b - period);
       const y = bars[i][4];
       sumY += y;
       sumXY += x * y;
     }
 
-    metadata.linearRegression = {
-      sumX,
-      sumYWithoutLast: sumY - bars[0][4],
-      // \sum_{i=0}^{n-1} i*y_i = \sum_{i=0}^{n-2} (i+1)*y_{i+1}
-      // \implies sumXY = sumXYWithoutLast + sumY
-      // \implies sumXYWithoutLast = sumXY - sumY
-      sumXYWithoutLast: sumXY - sumY,
+    const slope = (period * sumXY - sumX * sumY) / denominator;
+    const interceptUnshifted = (sumY - slope * sumX) / period;
+    // Actual regression line is shifted by (b - period) to the left
+    // slope*(i + (b-p)) + intercept = slope*i + (slope*(b-p) + intercept)
+    const intercept = slope * (b - period) + interceptUnshifted;
+
+    if (!('linearRegression' in metadata)) {
+      metadata.linearRegression = {};
+    }
+    metadata.linearRegression![bars.length] = {
       denominator,
+      intercept,
+      prevSumXY: sumXY,
+      slope,
+      sumX,
+      sumYWithoutLast: sumY - bars[b - period][4],
+      timestamp,
     };
 
-    const slope = (n * sumXY - sumX * sumY) / denominator;
-    const intercept = (sumY - slope * sumX) / n;
-    return (x: number) => slope * x + intercept;
+    // Shift the regression line by (b - period) to the left
+    return (i: number) => slope * i + intercept;
   } else {
-    const { sumX, denominator, sumYWithoutLast, sumXYWithoutLast } = linearRegressionMetadata;
+    const { sumX, denominator, sumYWithoutLast, prevSumXY } = linearRegressionMetadata;
+    const lastUpdateTimestamp = linearRegressionMetadata.timestamp;
 
-    // Incremental update assumes only one new bar is added
-    const x = n - 1;
-    const y = bars.at(-1)![4];
-    const sumY = sumYWithoutLast + y;
-    const sumXY = sumXYWithoutLast + x * y;
+    // If the timestamp is the same as the last update, return cached result
+    if (timestamp === lastUpdateTimestamp) {
+      const { slope, intercept } = linearRegressionMetadata;
+      return (x: number) => slope * x + intercept;
+    }
+
+    // Compute constants
+    const y_p1 = bars.at(-1)![4];
+    const sumY = sumYWithoutLast + y_p1;
+    // prevSumXY = \sum_{x=0}^{p-1} x*y_{x-1}
+    //           = \sum_{x=-1}^{p-2} (x+1)*y_x
+    //           = \sum_{x=-1}^{p-2} x*y_x + \sum_{x=-1}^{p-2} y_x
+    //           = [(\sum_{x=0}^{p-1} x*y_x) - (p-1)*y_{p-1} + (-1)*y_{-1}] +
+    //             [(\sum_{x=0}^{p-1} y_x) - y_{p-1} + y_{-1}]
+    //           = sumXY + sumY - p*y_{p-1}
+    // \implies sumXY = prevSumXY - sumY + p*y_{p-1}
+    const sumXY = prevSumXY - sumY + period * y_p1;
+
+    // Compute slope and intercept
+    const slope = (period * sumXY - sumX * sumY) / denominator;
+    const interceptUnshifted = (sumY - slope * sumX) / period;
+    // Apply shift
+    const intercept = slope * (b - period) + interceptUnshifted;
 
     // Update metadata
-    linearRegressionMetadata.sumYWithoutLast = sumY - bars[0][4];
-    linearRegressionMetadata.sumXYWithoutLast = sumXY - sumY;
+    linearRegressionMetadata.intercept = intercept;
+    linearRegressionMetadata.prevSumXY = sumXY;
+    linearRegressionMetadata.slope = slope;
+    linearRegressionMetadata.sumYWithoutLast = sumY - bars[b - period][4];
+    linearRegressionMetadata.timestamp = timestamp;
 
-    const slope = (n * sumXY - sumX * sumY) / denominator;
-    const intercept = (sumY - slope * sumX) / n;
     return (x: number) => slope * x + intercept;
   }
 }

@@ -1,58 +1,137 @@
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import { computeATR } from './atr';
+
+declare module '@/backtesting/indicator-metadata' {
+  export interface IndicatorMetadataParts {
+    superTrend?: Record<
+      string,
+      {
+        superTrend: ({ superTrendValue: number; direction: Direction } | null)[];
+        timestamp: string;
+      }
+    >;
+  }
+}
 
 export const enum Direction {
   UP,
   DOWN,
 }
 
-export function computeSuperTrend(
-  bars: Bar[],
+export function computeSuperTrend({
+  bars,
   period = 10,
   multiplier = 3,
-): ({ superTrend: number; direction: Direction } | null)[] {
-  if (bars.length < period + 1) {
-    throw new Error(`Must have context length of at least ${period + 1} to compute SuperTrend`);
+  metadata,
+}: {
+  bars: Bar[];
+  period?: number;
+  multiplier?: number;
+  metadata: IndicatorMetadata;
+}): ({ superTrendValue: number; direction: Direction } | null)[] {
+  if (period < 1) {
+    throw new Error('Period must be at least 1 to compute SuperTrend');
   }
-
-  const result: ({ superTrend: number; direction: Direction } | null)[] = Array(bars.length).fill(
-    null,
-  );
+  if (bars.length < period + 1) {
+    throw new Error(
+      `Must have context length of at least ${period + 1} to compute SuperTrend(${period},${multiplier})`,
+    );
+  }
 
   // Compute ATR
-  const atrs: (number | null)[] = computeATR(bars, period);
+  const atrs: (number | null)[] = computeATR({ bars, period, metadata });
 
-  for (let i = period; i < bars.length; i++) {
-    const high = bars[i][2];
-    const low = bars[i][3];
-    const close = bars[i][4];
+  const timestamp = bars.at(-1)![0];
+  const key = `${period},${multiplier}`;
+  const superTrendMetadata = metadata.superTrend?.[key];
+
+  if (superTrendMetadata == undefined) {
+    const superTrend: ({ superTrendValue: number; direction: Direction } | null)[] = Array(
+      bars.length,
+    ).fill(null);
+
+    for (let i = period; i < bars.length; i++) {
+      const atr = atrs[i];
+      if (atr == null) {
+        continue;
+      }
+
+      const high = bars[i][2];
+      const low = bars[i][3];
+      const close = bars[i][4];
+      const hl2 = (high + low) / 2;
+
+      const upperBand = hl2 + multiplier * atr;
+      const lowerBand = hl2 - multiplier * atr;
+
+      let superTrendValue: number;
+      let direction: Direction;
+
+      const prev = superTrend[i - 1];
+      if (prev == null) {
+        if (close <= upperBand) {
+          superTrendValue = lowerBand;
+          direction = Direction.UP;
+        } else {
+          superTrendValue = upperBand;
+          direction = Direction.DOWN;
+        }
+      } else {
+        if (prev.direction == Direction.UP) {
+          superTrendValue = Math.max(lowerBand, prev.superTrendValue);
+          direction = close < superTrendValue ? Direction.DOWN : Direction.UP;
+        } else {
+          superTrendValue = Math.min(upperBand, prev.superTrendValue);
+          direction = close > superTrendValue ? Direction.UP : Direction.DOWN;
+        }
+      }
+      superTrend[i] = { superTrendValue, direction };
+    }
+
+    if (!('superTrend' in metadata)) {
+      metadata.superTrend = {};
+    }
+    metadata.superTrend![key] = {
+      superTrend,
+      timestamp,
+    };
+    return superTrend;
+  } else {
+    const superTrend = superTrendMetadata.superTrend;
+    const lastUpdateTimestamp = superTrendMetadata.timestamp;
+
+    // If the timestamp is the same as the last update, return cached result
+    if (timestamp === lastUpdateTimestamp) {
+      return superTrend;
+    }
+
+    const high = bars.at(-1)![2];
+    const low = bars.at(-1)![3];
+    const close = bars.at(-1)![4];
     const hl2 = (high + low) / 2;
 
-    const upperBand = hl2 + multiplier * atrs[i]!;
-    const lowerBand = hl2 - multiplier * atrs[i]!;
+    const atr = atrs.at(-1)!;
+    const upperBand = hl2 + multiplier * atr;
+    const lowerBand = hl2 - multiplier * atr;
 
-    let superTrend: number;
+    // Compute next super trend
+    let superTrendValue: number;
     let direction: Direction;
 
-    const prev = result[i - 1];
-    if (prev == null) {
-      if (close <= upperBand) {
-        superTrend = lowerBand;
-        direction = Direction.UP;
-      } else {
-        superTrend = upperBand;
-        direction = Direction.DOWN;
-      }
+    const prev = superTrend.at(-1)!;
+    if (prev.direction == Direction.UP) {
+      superTrendValue = Math.max(lowerBand, prev.superTrendValue);
+      direction = close < superTrendValue ? Direction.DOWN : Direction.UP;
     } else {
-      if (prev.direction == Direction.UP) {
-        superTrend = Math.max(lowerBand, prev.superTrend);
-        direction = close < superTrend ? Direction.DOWN : Direction.UP;
-      } else {
-        superTrend = Math.min(upperBand, prev.superTrend);
-        direction = close > superTrend ? Direction.UP : Direction.DOWN;
-      }
+      superTrendValue = Math.min(upperBand, prev.superTrendValue);
+      direction = close > superTrendValue ? Direction.UP : Direction.DOWN;
     }
-    result[i] = { superTrend, direction };
+
+    superTrend.shift();
+    superTrend.push({ superTrendValue, direction });
+
+    superTrendMetadata.timestamp = timestamp;
+    return superTrend;
   }
-  return result;
 }

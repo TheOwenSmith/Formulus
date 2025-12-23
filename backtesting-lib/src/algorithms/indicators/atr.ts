@@ -1,11 +1,15 @@
-import type { AlgorithmMetadata } from '@/backtesting/algorithm-metadata';
+import type { IndicatorMetadata } from '@/backtesting/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 
-declare module '@/backtesting/algorithm-metadata' {
-  export interface AlgorithmMetadataParts {
-    atr?: {
-      atr: (number | null)[];
-    };
+declare module '@/backtesting/indicator-metadata' {
+  export interface IndicatorMetadataParts {
+    atr?: Record<
+      number,
+      {
+        atr: (number | null)[];
+        timestamp: string;
+      }
+    >;
   }
 }
 
@@ -16,13 +20,17 @@ export function computeATR({
 }: {
   bars: Bar[];
   period?: number;
-  metadata: AlgorithmMetadata;
+  metadata: IndicatorMetadata;
 }): (number | null)[] {
+  if (period < 1) {
+    throw new Error('Period must be at least 1 to compute ATR');
+  }
   if (bars.length < period + 1) {
-    throw new Error(`Must have at least ${period + 1} bars to compute ATR`);
+    throw new Error(`Must have at least ${period + 1} bars to compute ATR(${period})`);
   }
 
-  const atrMetadata = metadata.atr;
+  const timestamp = bars.at(-1)![0];
+  const atrMetadata = metadata.atr?.[period];
   if (atrMetadata == undefined) {
     const atr: (number | null)[] = Array(bars.length).fill(null);
     let atrSum = 0;
@@ -37,7 +45,7 @@ export function computeATR({
         // Accumulate initial TRs for first ATR
         atrSum += tr;
         if (i === period) {
-          atr[i] = atrSum / period;
+          atr[period] = atrSum / period;
         }
       } else {
         // Compute subsequent ATR using Wilder's smoothing
@@ -45,11 +53,20 @@ export function computeATR({
       }
     }
 
-    metadata.atr = { atr };
+    if (!('atr' in metadata)) {
+      metadata.atr = {};
+    }
+    metadata.atr![period] = { atr, timestamp };
     return atr;
   } else {
     // Compute using metadata
     const { atr } = atrMetadata;
+    const lastUpdateTimestamp = atrMetadata.timestamp;
+
+    // If the timestamp is the same as the last update, return cached result
+    if (timestamp === lastUpdateTimestamp) {
+      return atr;
+    }
 
     // Calculate TR for the new bar
     const currentBar = bars.at(-1)!;
@@ -61,8 +78,10 @@ export function computeATR({
     // Compute new ATR using Wilder's smoothing
     const prevAtr = atr.at(-1)!;
     const nextAtr = (prevAtr * (period - 1) + tr) / period;
-    atr.push(nextAtr);
     atr.shift();
+    atr.push(nextAtr);
+
+    atrMetadata.timestamp = timestamp;
     return atr;
   }
 }
