@@ -14,22 +14,25 @@ export const longShortAlgorithm: Algorithm = {
     const haveSH = positions['SH'] > 0;
 
     const spyRSI = indicators['SPY']['RSI(14)']!.at(-1)!;
+    if (spyRSI < 25) {
+      return { SPY: Action.BUY, SH: Action.SELL } as Record<Ticker, Action>;
+    }
+
     if (haveSH) {
-      if (spyRSI < 45) {
-        return { SPY: Action.BUY, SH: Action.SELL } as Record<Ticker, Action>;
-      } else {
+      if (spyRSI < 50) {
         return { SPY: Action.HOLD, SH: Action.SELL } as Record<Ticker, Action>;
+      } else {
+        return { SPY: Action.HOLD, SH: Action.HOLD } as Record<Ticker, Action>;
       }
     }
 
-    if (spyRSI < 30) {
-      return { SPY: Action.BUY, SH: Action.SELL } as Record<Ticker, Action>;
-    } else if (spyRSI > 90) {
+    if (spyRSI > 85) {
       return { SPY: Action.SELL, SH: Action.BUY } as Record<Ticker, Action>;
+    } else if (spyRSI > 75) {
+      return { SPY: Action.SELL, SH: Action.HOLD } as Record<Ticker, Action>;
     }
 
-    // Would never happen (exhaustive check)
-    return { SPY: Action.HOLD, SH: Action.SELL } as Record<Ticker, Action>;
+    return { SPY: Action.HOLD, SH: Action.HOLD } as Record<Ticker, Action>;
   },
   indicators: ['RSI(14)'],
   name: 'Long/Short',
