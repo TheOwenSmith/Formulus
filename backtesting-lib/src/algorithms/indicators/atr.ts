@@ -13,6 +13,12 @@ declare module './indicator-metadata' {
   }
 }
 
+declare module './indicator' {
+  export interface IndicatorResultByIndicator {
+    [x: `ATR(${number})`]: (number | null)[];
+  }
+}
+
 export function computeATR({
   bars,
   period = 14,

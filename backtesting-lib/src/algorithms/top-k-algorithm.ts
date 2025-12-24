@@ -1,13 +1,13 @@
-import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { Heap } from '@/utils/heap';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
+import type { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
 
 export type TopKAlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,
   positions: Record<Ticker, number>,
-  metadata: Record<Ticker, IndicatorMetadata>,
+  indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
 ) => Record<Ticker, number>;
 
 export type TopKAlgorithm = {
@@ -15,6 +15,7 @@ export type TopKAlgorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
   implementation: TopKAlgorithmImplementation;
+  indicators?: Indicator[];
   k: number;
   name: string;
   tickers: [Ticker, ...Ticker[]];
@@ -25,6 +26,7 @@ export function createAlgorithmFromTopKAlgorithm({
   algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   contextLength,
   implementation,
+  indicators,
   k,
   name,
   tickers,
@@ -32,9 +34,9 @@ export function createAlgorithmFromTopKAlgorithm({
   function algorithmImplementation(
     context: Record<Ticker, Bar[]>,
     positions: Record<Ticker, number>,
-    metadata: Record<Ticker, IndicatorMetadata>,
+    indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
   ) {
-    const scoresByTicker: Record<Ticker, number> = implementation(context, positions, metadata);
+    const scoresByTicker: Record<Ticker, number> = implementation(context, positions, indicators);
     const maxHeap = new Heap<[Ticker, number]>(
       (a: [Ticker, number], b: [Ticker, number]) => a[1] - b[1],
     );
@@ -63,6 +65,7 @@ export function createAlgorithmFromTopKAlgorithm({
     algorithmMaxHoldingProportion,
     contextLength,
     implementation: algorithmImplementation,
+    indicators,
     name,
     tickers,
   };
@@ -71,10 +74,8 @@ export function createAlgorithmFromTopKAlgorithm({
 export type TopKMarketInvariantAlgorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
-  implementation: (
-    context: Record<Ticker, Bar[]>,
-    positions: Record<Ticker, number>,
-  ) => Record<Ticker, number>;
+  implementation: TopKAlgorithmImplementation;
+  indicators?: Indicator[];
   k: number;
   name: string;
 };
@@ -83,13 +84,16 @@ export function createAlgorithmFromTopKMarketInvariantAlgorithm(
   aggregate: Timestamp,
   tickers: [Ticker, ...Ticker[]],
 ) {
+  const { algorithmMaxHoldingProportion, contextLength, implementation, indicators, k, name } =
+    marketInvariantAlgorithm;
   return createAlgorithmFromTopKAlgorithm({
     aggregate,
-    algorithmMaxHoldingProportion: marketInvariantAlgorithm.algorithmMaxHoldingProportion,
-    contextLength: marketInvariantAlgorithm.contextLength,
-    implementation: marketInvariantAlgorithm.implementation,
-    k: marketInvariantAlgorithm.k,
-    name: marketInvariantAlgorithm.name,
+    algorithmMaxHoldingProportion,
+    contextLength,
+    implementation,
+    indicators,
+    k,
+    name,
     tickers,
   });
 }

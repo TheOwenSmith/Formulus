@@ -15,6 +15,12 @@ declare module './indicator-metadata' {
   }
 }
 
+declare module './indicator' {
+  export interface IndicatorResultByIndicator {
+    [x: `RSI(${number})`]: (number | null)[];
+  }
+}
+
 export function computeRSI({
   bars,
   period = 14,

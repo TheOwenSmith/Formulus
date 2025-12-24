@@ -18,6 +18,12 @@ declare module './indicator-metadata' {
   }
 }
 
+declare module './indicator' {
+  export interface IndicatorResultByIndicator {
+    [x: `LinearRegression(${number})`]: (i: number) => number;
+  }
+}
+
 export function computeLinearRegression({
   bars,
   period,
@@ -26,7 +32,7 @@ export function computeLinearRegression({
   bars: Bar[];
   period: number;
   metadata: IndicatorMetadata;
-}): (x: number) => number {
+}): (i: number) => number {
   if (period < 2) {
     throw new Error('Period must be at least 2 to compute LinearRegression');
   }

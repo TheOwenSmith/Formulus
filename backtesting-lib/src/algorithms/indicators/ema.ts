@@ -1,4 +1,5 @@
 import type { Bar } from '@/backtesting/read-data';
+import type { Indicator } from './indicator';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -10,6 +11,12 @@ declare module './indicator-metadata' {
         timestamp: string;
       }
     >;
+  }
+}
+
+declare module './indicator' {
+  export interface IndicatorResultByIndicator {
+    [x: `EMA(${number})`]: (number | null)[];
   }
 }
 

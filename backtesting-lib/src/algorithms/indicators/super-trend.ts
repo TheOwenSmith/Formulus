@@ -14,6 +14,15 @@ declare module './indicator-metadata' {
   }
 }
 
+declare module './indicator' {
+  export interface IndicatorResultByIndicator {
+    [x: `SuperTrend(${number},${number})`]: ({
+      superTrendValue: number;
+      direction: Direction;
+    } | null)[];
+  }
+}
+
 export const enum Direction {
   UP,
   DOWN,

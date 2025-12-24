@@ -5,7 +5,7 @@ import type { Bar } from '@/backtesting/read-data';
 
 export const noMondaysAlgorithm: SimpleMarketInvariantAlgorithm = {
   contextLength: 1,
-  implementation: (context: Bar[], _position: number): Action => {
+  implementation: (context: Bar[]): Action => {
     const timestamp = context[0][0];
     if (dayOfWeek(timestamp) === 'Monday') {
       return Action.SELL;

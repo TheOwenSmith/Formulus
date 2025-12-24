@@ -1,4 +1,4 @@
-import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
+import type { Indicator, IndicatorResultByIndicator } from '@/algorithms/indicators/indicator';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 
@@ -11,7 +11,7 @@ export const enum Action {
 export type AlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,
   positions: Record<Ticker, number>,
-  metadata: Record<Ticker, IndicatorMetadata>,
+  indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
 ) => Record<Ticker, Action>;
 
 export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;
@@ -21,6 +21,7 @@ export type Algorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
   implementation: AlgorithmImplementation;
+  indicators?: Indicator[];
   name: string;
   tickers: [Ticker, ...Ticker[]];
 };
@@ -29,6 +30,7 @@ export type MarketInvariantAlgorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
   implementation: AlgorithmImplementation;
+  indicators?: Indicator[];
   name: string;
 };
 export function createAlgorithmFromMarketInvariantAlgorithm(
@@ -36,12 +38,15 @@ export function createAlgorithmFromMarketInvariantAlgorithm(
   aggregate: Timestamp,
   tickers: [Ticker, ...Ticker[]],
 ): Algorithm {
+  const { algorithmMaxHoldingProportion, contextLength, implementation, indicators, name } =
+    marketInvariantAlgorithm;
   return {
     aggregate,
-    algorithmMaxHoldingProportion: marketInvariantAlgorithm.algorithmMaxHoldingProportion,
-    contextLength: marketInvariantAlgorithm.contextLength,
-    implementation: marketInvariantAlgorithm.implementation,
-    name: marketInvariantAlgorithm.name,
+    algorithmMaxHoldingProportion,
+    contextLength,
+    implementation,
+    indicators,
+    name,
     tickers,
   };
 }

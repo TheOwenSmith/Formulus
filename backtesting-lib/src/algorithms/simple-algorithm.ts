@@ -1,12 +1,12 @@
-import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
 import type { Bar } from '@/backtesting/read-data';
 import type { Ticker, Timestamp } from '@/fetch/types';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
+import type { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
 
 export type SimpleAlgorithmImplementation = (
   context: Bar[],
   position: number,
-  metadata: Record<Ticker, IndicatorMetadata>,
+  indicators: Partial<IndicatorResultByIndicator>,
 ) => Action;
 
 export type SimpleAlgorithm = {
@@ -14,6 +14,7 @@ export type SimpleAlgorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
   implementation: SimpleAlgorithmImplementation;
+  indicators?: Indicator[];
   name: string;
   ticker: Ticker;
 };
@@ -23,6 +24,7 @@ export function createAlgorithmFromSimpleAlgorithm({
   algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   contextLength,
   implementation,
+  indicators,
   name,
   ticker,
 }: SimpleAlgorithm): Algorithm {
@@ -33,11 +35,12 @@ export function createAlgorithmFromSimpleAlgorithm({
     implementation: (
       context: Record<Ticker, Bar[]>,
       position: Record<Ticker, number>,
-      metadata: Record<Ticker, IndicatorMetadata>,
+      indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
     ) =>
       ({
-        [ticker]: implementation(context[ticker], position[ticker], metadata),
+        [ticker]: implementation(context[ticker], position[ticker], indicators[ticker]),
       }) as Record<Ticker, Action>,
+    indicators,
     name,
     tickers: [ticker],
   };
@@ -47,6 +50,7 @@ export type SimpleMarketInvariantAlgorithm = {
   algorithmMaxHoldingProportion?: number;
   contextLength: number;
   implementation: SimpleAlgorithmImplementation;
+  indicators?: Indicator[];
   name: string;
 };
 export function createAlgorithmFromSimpleMarketInvariantAlgorithm(
@@ -54,12 +58,15 @@ export function createAlgorithmFromSimpleMarketInvariantAlgorithm(
   aggregate: Timestamp,
   ticker: Ticker,
 ) {
+  const { algorithmMaxHoldingProportion, contextLength, implementation, indicators, name } =
+    marketInvariantAlgorithm;
   return createAlgorithmFromSimpleAlgorithm({
     aggregate,
-    algorithmMaxHoldingProportion: marketInvariantAlgorithm.algorithmMaxHoldingProportion,
-    contextLength: marketInvariantAlgorithm.contextLength,
-    implementation: marketInvariantAlgorithm.implementation,
-    name: marketInvariantAlgorithm.name,
+    algorithmMaxHoldingProportion,
+    contextLength,
+    implementation,
+    indicators,
+    name,
     ticker,
   });
 }

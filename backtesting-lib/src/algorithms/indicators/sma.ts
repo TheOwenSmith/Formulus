@@ -14,6 +14,12 @@ declare module './indicator-metadata' {
   }
 }
 
+declare module './indicator' {
+  export interface IndicatorResultByIndicator {
+    [x: `SMA(${number})`]: (number | null)[];
+  }
+}
+
 export function computeSMA({
   bars,
   period = 20,

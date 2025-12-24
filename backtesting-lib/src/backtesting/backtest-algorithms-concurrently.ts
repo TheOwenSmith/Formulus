@@ -3,6 +3,10 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@/algorithms/algorithm';
+import {
+  indicatorsToIndicatorResultsFunction,
+  type IndicatorResultByIndicator,
+} from '@/algorithms/indicators/indicator';
 import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
 import type { SimplePlot } from '@/lib/nodeplotlib';
@@ -51,6 +55,10 @@ export type AlgorithmData = {
   cumulativeProfitLoss: [profit: number, loss: number];
   entracePriceExitPriceByTickerPosition: Record<Ticker, [entryPrice: number, exitPrice: number]>;
   entraceTimeByTickerPosition: Record<Ticker, number>;
+  indicatorResultsFunction: (
+    bars: Bar[],
+    metadata: IndicatorMetadata,
+  ) => Partial<IndicatorResultByIndicator>;
   positions: Record<Ticker, number>;
   positionsClosed: number;
   sharpeRatioCalculator: SharpeRatioCalculator;
@@ -192,9 +200,38 @@ export async function backtestAlgorithmsConcurrently({
     const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
       getTickerIteratorByTickerResponse.data;
 
+    // Algorithm tracking variables
+    const currentAlgorithms = algorithmsByAggregate[aggregate];
+    const algorithmDataByAlgorithm: AlgorithmData[] = Array.from(
+      { length: currentAlgorithms.length },
+      (_, algorithmIndex) =>
+        ({
+          algorithmYs: [],
+          balance: 100,
+          cumulativeHoldingTime: 0,
+          cumulativeProfitLoss: [0, 0],
+          entracePriceExitPriceByTickerPosition: createIndexByTicker(
+            currentAlgorithms[algorithmIndex].tickers,
+            (_ticker) => [0, 0],
+          ),
+          entraceTimeByTickerPosition: createIndexByTicker(
+            currentAlgorithms[algorithmIndex].tickers,
+            (_ticker) => 0,
+          ),
+          indicatorResultsFunction: indicatorsToIndicatorResultsFunction(
+            currentAlgorithms[algorithmIndex].indicators ?? [],
+          ),
+          positions: createIndexByTicker(currentAlgorithms[algorithmIndex].tickers, (_ticker) => 0),
+          positionsClosed: 0,
+          sharpeRatioCalculator: new SharpeRatioCalculator(),
+          trades: 0,
+          winsLosses: [0, 0],
+        }) satisfies AlgorithmData,
+    );
+
     // Calculate maximum context length for all algorithms
     const maxContextLengthByTicker = {} as Record<Ticker, number>;
-    for (const algorithm of algorithmsByAggregate[aggregate]) {
+    for (const algorithm of currentAlgorithms) {
       for (const ticker of algorithm.tickers) {
         maxContextLengthByTicker[ticker] = Math.max(
           maxContextLengthByTicker[ticker] ?? 1,
@@ -207,33 +244,6 @@ export async function backtestAlgorithmsConcurrently({
     const indicatorMetadataByTicker: Record<Ticker, IndicatorMetadata> = createIndexByTicker(
       distinctTickersByAggregate[aggregate],
       (_ticker) => ({}),
-    );
-
-    // Algorithm tracking variables
-    const algorithmDataByAlgorithm: AlgorithmData[] = Array.from(
-      { length: algorithmsByAggregate[aggregate].length },
-      (_, algorithmIndex) => ({
-        algorithmYs: [],
-        balance: 100,
-        cumulativeHoldingTime: 0,
-        cumulativeProfitLoss: [0, 0],
-        entracePriceExitPriceByTickerPosition: createIndexByTicker(
-          algorithmsByAggregate[aggregate][algorithmIndex].tickers,
-          (_ticker) => [0, 0],
-        ),
-        entraceTimeByTickerPosition: createIndexByTicker(
-          algorithmsByAggregate[aggregate][algorithmIndex].tickers,
-          (_ticker) => 0,
-        ),
-        positions: createIndexByTicker(
-          algorithmsByAggregate[aggregate][algorithmIndex].tickers,
-          (_ticker) => 0,
-        ),
-        positionsClosed: 0,
-        sharpeRatioCalculator: new SharpeRatioCalculator(),
-        trades: 0,
-        winsLosses: [0, 0],
-      }),
     );
 
     // Plotting variables
@@ -332,7 +342,6 @@ export async function backtestAlgorithmsConcurrently({
       }
 
       // Execute algorithm trades
-      const currentAlgorithms = algorithmsByAggregate[aggregate];
       const slippageByTicker = slippageByAggregateByTicker[aggregate];
       for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
         const algorithm = currentAlgorithms[algorithmIndex];
@@ -362,8 +371,17 @@ export async function backtestAlgorithmsConcurrently({
             {} as Record<Ticker, Bar[]>,
           );
 
+          // Calculate indicators
+          const indicators = createIndexByTicker(algorithm.tickers, (ticker) => {
+            const indicatorResults = algorithmData.indicatorResultsFunction(
+              context[ticker],
+              indicatorMetadataByTicker[ticker],
+            );
+            return indicatorResults;
+          });
+
           // Get actions from implementation
-          const actions = algorithm.implementation(context, positions, indicatorMetadataByTicker);
+          const actions = algorithm.implementation(context, positions, indicators);
 
           updatePosition({
             actions,
@@ -430,15 +448,11 @@ export async function backtestAlgorithmsConcurrently({
 
     // Compile algorithm plots
     const yearsBetweenStartAndEnd = yearsBetween(actualTimespan[1], actualTimespan[0]);
-    for (
-      let algorithmIndex = 0;
-      algorithmIndex < algorithmsByAggregate[aggregate].length;
-      algorithmIndex++
-    ) {
+    for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
       const algorithmSelectionOptionWithPerformance =
         await getAlgorithmSelectionOptionWithPerformance({
           aggregate,
-          algorithm: algorithmsByAggregate[aggregate][algorithmIndex],
+          algorithm: currentAlgorithms[algorithmIndex],
           algorithmData: algorithmDataByAlgorithm[algorithmIndex],
           performanceFn,
           timespan: actualTimespan,
