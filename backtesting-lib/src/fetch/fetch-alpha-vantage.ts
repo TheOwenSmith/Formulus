@@ -3,7 +3,6 @@ import { config } from '@/lib/config';
 import { tryAsync, trySync } from '@/utils/errorHandling';
 import { retryWithBackoff } from '@/utils/retry';
 import { zodSafeFetch } from '@/utils/zod-safe-fetch';
-import { spawnSync } from 'child_process';
 import fs from 'fs';
 import z from 'zod';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
@@ -42,8 +41,7 @@ export async function fetchAlphaVantageData({
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
   const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
 
-  const writeToFilename = `${ticker}_${timestamp}.csv`;
-  const writeToFile = `./data/uncleaned/${writeToFilename}`;
+  const writeToFile = `./data/uncleaned/${ticker}_${timestamp}.csv`;
   if (!fs.existsSync('./data/uncleaned')) {
     const makeDirResponse = trySync(() => fs.mkdirSync('./data/uncleaned', { recursive: true }));
     if (!makeDirResponse.ok) throw makeDirResponse.error;
@@ -117,20 +115,5 @@ export async function fetchAlphaVantageData({
       const fileWriteResponse = trySync(() => fs.appendFileSync(writeToFile, content));
       if (!fileWriteResponse.ok) throw fileWriteResponse.error;
     }
-  }
-
-  console.log(`Cleaning data for '${ticker}' (${timestamp})...`);
-  cleanData(writeToFilename, timestamp);
-}
-
-export function cleanData(writeToFilename: string, timestamp: Timestamp) {
-  const pythonScriptResponse = trySync(() =>
-    spawnSync('python', ['../clean-data/clean-data.py', writeToFilename, timestamp], {
-      stdio: 'inherit',
-    }),
-  );
-  if (!pythonScriptResponse.ok) {
-    console.error('Error running python script to clean data');
-    throw pythonScriptResponse.error;
   }
 }
