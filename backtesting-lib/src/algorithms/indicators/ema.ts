@@ -1,5 +1,4 @@
 import type { Bar } from '@/backtesting/read-data';
-import type { Indicator } from './indicator';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
