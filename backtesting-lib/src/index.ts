@@ -23,11 +23,8 @@ import { regressionLineAlgorithm } from './algorithms/examples/regression-line';
 import { superTrendDirectionAlgorithm } from './algorithms/examples/super-trend-direction';
 import { chooseToPlot } from './algorithms/plot';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from './algorithms/simple-algorithm';
-import {
-  backtestAlgorithmsConcurrently,
-  type TickerData,
-} from './backtesting/backtest-algorithms-concurrently';
-import { aggregateTimestamps, type Ticker } from './fetch/types';
+import { backtestAlgorithmsConcurrently } from './backtesting/backtest-algorithms-concurrently';
+import { type Ticker } from './fetch/types';
 import { tryAsync, trySync } from './utils/errorHandling';
 
 const algorithms: Algorithm[] = [];
@@ -146,10 +143,6 @@ console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
-    tickerData: aggregateTimestamps.reduce((acc, aggregate) => {
-      acc.push(...tickers.map((ticker) => ({ ticker, aggregate, slippage: 5 })));
-      return acc;
-    }, [] as TickerData[]),
     timespan: ONLY_TEST_MARKET_INVARIANT_ALGORITHMS ? undefined : ['2019-01-01', null],
   }),
 );

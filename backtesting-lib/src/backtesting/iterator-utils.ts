@@ -99,13 +99,13 @@ async function getLongestPossibleTimespan(
 
 export async function getIteratorBounds(
   indexByAggregateByTicker: IndexedByAggregateByTicker<string>,
-  timespan?: [string | null, string | null] | undefined,
+  userInputtedTimespan?: [string | null, string | null] | undefined,
 ): Promise<{
-  actualTimespan: [string, string];
+  timespan: [string, string];
   iteratorBoundsByAggregateByTicker: IndexedByAggregateByTicker<[number, number]>;
 }> {
   // Ensure timespan is valid
-  const correctedTimespan: [string | null, string | null] = toValidTimespan(timespan);
+  const correctedTimespan: [string | null, string | null] = toValidTimespan(userInputtedTimespan);
 
   // Get the longest possible timespan
   const longestPossibleTimespan = await getLongestPossibleTimespan(indexByAggregateByTicker);
@@ -135,7 +135,7 @@ export async function getIteratorBounds(
     }
   }
 
-  let actualTimespan: [string, string] | null = null;
+  let timespan: [string, string] | null = null;
   const iteratorBoundsByAggregateByTicker = emptyIndexByAggregateByTicker<[number, number]>();
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in indexByAggregateByTicker[aggregate]) {
@@ -152,15 +152,15 @@ export async function getIteratorBounds(
         Bound.FIRST_LESS_OR_EQUAL,
       );
 
-      if (actualTimespan == null) {
-        actualTimespan = [startDay, endDay];
-      } else if (startDay !== actualTimespan[0]) {
+      if (timespan == null) {
+        timespan = [startDay, endDay];
+      } else if (startDay !== timespan[0]) {
         throw new Error(
-          `Failed to match iterator '${ticker}' (${aggregate}) to the start day; expected '${startDay}' but got '${actualTimespan[0]}'`,
+          `Failed to match iterator '${ticker}' (${aggregate}) to the start day; expected '${startDay}' but got '${timespan[0]}'`,
         );
-      } else if (endDay !== actualTimespan[1]) {
+      } else if (endDay !== timespan[1]) {
         throw new Error(
-          `Failed to match iterator '${ticker}' (${aggregate}) to the end day; expected '${endDay}' but got '${actualTimespan[1]}'`,
+          `Failed to match iterator '${ticker}' (${aggregate}) to the end day; expected '${endDay}' but got '${timespan[1]}'`,
         );
       }
 
@@ -171,7 +171,7 @@ export async function getIteratorBounds(
       ];
     }
   }
-  return { actualTimespan: actualTimespan!, iteratorBoundsByAggregateByTicker };
+  return { timespan: timespan!, iteratorBoundsByAggregateByTicker };
 }
 
 export function countBytesToProcess(

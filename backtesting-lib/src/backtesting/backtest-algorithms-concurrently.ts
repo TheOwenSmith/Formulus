@@ -33,15 +33,16 @@ import {
 } from './statistics';
 import {
   createIndexByTicker,
+  getAllTickers,
   getDistinctTickersByAggregate,
-  getTickerDataByAggregateByTicker,
+  getFilenameAndIndexByAggregateByTicker,
+  getMarketSlippageByTicker,
 } from './ticker-utils';
 
 export type TickerData = {
   ticker: Ticker;
   aggregate: Timestamp;
 } & AtLeastOne<{
-  slippage: number;
   filename: string;
   index: string;
 }>;
@@ -69,22 +70,26 @@ export type AlgorithmData = {
 export const MAX_POINTS_PER_PLOT = 1_000;
 const BYTES_PROGRESS_UPDATE_INTERVAL = 10_000;
 
-export async function backtestAlgorithmsConcurrently({
-  algorithms,
-  iteratorStrictParsing = false,
-  performanceFn,
-  tickerData = [],
-  timespan,
-  trackProgress,
-  verboseLogging = false,
-}: {
-  algorithms: Algorithm[];
+export type BacktestingAlgorithmsConcurrentlyOptions = {
   iteratorStrictParsing?: boolean;
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
+  slippageByTicker?: Partial<Record<Ticker, number>>;
   tickerData?: TickerData[];
   timespan?: [string | null, string | null];
   trackProgress?: boolean;
   verboseLogging?: boolean;
+};
+
+export async function backtestAlgorithmsConcurrently({
+  algorithms,
+  timespan: userInputtedTimespan,
+  slippageMapFn,
+  options = {},
+}: {
+  algorithms: Algorithm[];
+  timespan?: [string | null, string | null];
+  slippageMapFn?: (marketSlippage: number, price: number) => number;
+  options?: BacktestingAlgorithmsConcurrentlyOptions;
 }): Promise<
   [
     algorithmGraphSelectionOptions: SelectionOption<{
@@ -96,7 +101,14 @@ export async function backtestAlgorithmsConcurrently({
     tickerGraphSelectionOptionsByAggregate: Record<Timestamp, SelectionOption<SimplePlot>[]>,
   ]
 > {
-  trackProgress ??= !verboseLogging;
+  const {
+    iteratorStrictParsing = false,
+    performanceFn,
+    slippageByTicker: userInuttedSlippageByTicker,
+    tickerData = [],
+    verboseLogging = false,
+  } = options;
+  const trackProgress = options.trackProgress ?? !verboseLogging;
 
   if (verboseLogging && trackProgress) {
     throw new Error('Verbose logging and tracking progress cannot be used together');
@@ -133,16 +145,19 @@ export async function backtestAlgorithmsConcurrently({
 
   const distinctTickersByAggregate: Record<Timestamp, Ticker[]> =
     getDistinctTickersByAggregate(algorithmsByAggregate);
+  const allTickers: Ticker[] = getAllTickers(distinctTickersByAggregate);
 
-  const { slippageByAggregateByTicker, filenameByAggregateByTicker, indexByAggregateByTicker } =
-    getTickerDataByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
+  // Get filename and index by aggregate by ticker and slippage by ticker
+  const { filenameByAggregateByTicker, indexByAggregateByTicker } =
+    getFilenameAndIndexByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
+  const marketSlippageByTicker = getMarketSlippageByTicker(allTickers, userInuttedSlippageByTicker);
 
   // Get ticker iterator bounds
-  const { actualTimespan, iteratorBoundsByAggregateByTicker } = await getIteratorBounds(
+  const { timespan, iteratorBoundsByAggregateByTicker } = await getIteratorBounds(
     indexByAggregateByTicker,
-    timespan,
+    userInputtedTimespan,
   );
-  console.log(`Testing timespan: ${actualTimespan[0]} to ${actualTimespan[1]}`);
+  console.log(`Testing timespan: ${timespan[0]} to ${timespan[1]}`);
   const bytesToProcess = countBytesToProcess(iteratorBoundsByAggregateByTicker);
   console.log(`Bytes to process: ${withCommas(bytesToProcess)}`);
 
@@ -241,8 +256,9 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Initialize indicator metadata
+    const distinctTickers = distinctTickersByAggregate[aggregate];
     const indicatorMetadataByTicker: Record<Ticker, IndicatorMetadata> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
+      distinctTickers,
       (_ticker) => ({}),
     );
 
@@ -260,15 +276,15 @@ export async function backtestAlgorithmsConcurrently({
 
     // Tracking variables
     const contextByTicker: Record<Ticker, Bar[]> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
+      distinctTickers,
       (_ticker) => [],
     );
     const firstPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
+      distinctTickers,
       (_ticker) => null,
     );
     const lastPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
-      distinctTickersByAggregate[aggregate],
+      distinctTickers,
       (_ticker) => null,
     );
 
@@ -341,8 +357,26 @@ export async function backtestAlgorithmsConcurrently({
         }
       }
 
+      // Get latest prices and ticker
+      const priceByTicker: Record<Ticker, number> = distinctTickers.reduce(
+        (acc, ticker) => {
+          acc[ticker] = contextByTicker[ticker].at(-1)![4];
+          return acc;
+        },
+        {} as Record<Ticker, number>,
+      );
+
+      const slippageByTicker: Record<Ticker, number> = distinctTickers.reduce(
+        (acc, ticker) => {
+          const price = priceByTicker[ticker];
+          const marketSlippage = marketSlippageByTicker[ticker];
+          acc[ticker] = slippageMapFn?.(marketSlippage, price) ?? marketSlippage;
+          return acc;
+        },
+        {} as Record<Ticker, number>,
+      );
+
       // Execute algorithm trades
-      const slippageByTicker = slippageByAggregateByTicker[aggregate];
       for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
         const algorithm = currentAlgorithms[algorithmIndex];
         const {
@@ -353,13 +387,6 @@ export async function backtestAlgorithmsConcurrently({
         const algorithmData = algorithmDataByAlgorithm[algorithmIndex];
 
         const positions = algorithmDataByAlgorithm[algorithmIndex].positions;
-        const priceByTicker: Record<Ticker, number> = tickers.reduce(
-          (acc, ticker) => {
-            acc[ticker] = contextByTicker[ticker].at(-1)![4];
-            return acc;
-          },
-          {} as Record<Ticker, number>,
-        );
 
         // Ensure enough context to execute algorithm
         if (hasNextBar && ticks + 1 >= contextLength) {
@@ -447,7 +474,7 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Compile algorithm plots
-    const yearsBetweenStartAndEnd = yearsBetween(actualTimespan[1], actualTimespan[0]);
+    const yearsBetweenStartAndEnd = yearsBetween(timespan[1], timespan[0]);
     for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
       const algorithmSelectionOptionWithPerformance =
         await getAlgorithmSelectionOptionWithPerformance({
@@ -455,7 +482,7 @@ export async function backtestAlgorithmsConcurrently({
           algorithm: currentAlgorithms[algorithmIndex],
           algorithmData: algorithmDataByAlgorithm[algorithmIndex],
           performanceFn,
-          timespan: actualTimespan,
+          timespan,
           xs,
           yearsBetweenStartAndEnd,
         });

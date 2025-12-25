@@ -1,6 +1,8 @@
 import { type Algorithm } from '@/algorithms/algorithm';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
+import { trySync } from '@/utils/errorHandling';
 import fs from 'fs';
+import z from 'zod';
 import type { TickerData } from './backtest-algorithms-concurrently';
 
 export type IndexedByAggregateByTicker<T> = Record<Timestamp, Record<Ticker, T>>;
@@ -42,22 +44,29 @@ export function getDistinctTickersByAggregate(
   );
 }
 
-export function getTickerDataByAggregateByTicker(
+export function getAllTickers(distinctTickersByAggregate: Record<Timestamp, Ticker[]>): Ticker[] {
+  return Array.from(
+    aggregateTimestamps.reduce((acc, aggregate) => {
+      distinctTickersByAggregate[aggregate].forEach((ticker) => acc.add(ticker));
+      return acc;
+    }, new Set<Ticker>()),
+  );
+}
+
+export function getFilenameAndIndexByAggregateByTicker(
   tickerData: TickerData[],
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
   verboseLogging = false,
 ): {
-  slippageByAggregateByTicker: IndexedByAggregateByTicker<number>;
   filenameByAggregateByTicker: IndexedByAggregateByTicker<string>;
   indexByAggregateByTicker: IndexedByAggregateByTicker<string>;
 } {
   const userInputtedDataByAggregateByTicker = emptyIndexByAggregateByTicker<{
-    slippage: number;
     filename: string;
     index: string;
   }>();
   for (const tickData of tickerData) {
-    const { ticker, aggregate, slippage = 0, filename, index } = tickData;
+    const { ticker, aggregate, filename, index } = tickData;
     if (ticker in userInputtedDataByAggregateByTicker[aggregate]) {
       throw new Error(`Duplicate data for '${ticker}' (${aggregate}) provided`);
     }
@@ -88,32 +97,27 @@ export function getTickerDataByAggregateByTicker(
     }
 
     userInputtedDataByAggregateByTicker[aggregate][ticker] = {
-      slippage,
       filename: resolvedFilename,
       index: resolvedIndex,
     };
   }
 
-  const slippageByAggregateByTicker = emptyIndexByAggregateByTicker<number>();
   const filenameByAggregateByTicker = emptyIndexByAggregateByTicker<string>();
   const indexByAggregateByTicker = emptyIndexByAggregateByTicker<string>();
   for (const aggregate of aggregateTimestamps) {
     for (const ticker of distinctTickersByAggregate[aggregate]) {
       if (ticker in userInputtedDataByAggregateByTicker[aggregate]) {
-        slippageByAggregateByTicker[aggregate][ticker] =
-          userInputtedDataByAggregateByTicker[aggregate][ticker].slippage;
         filenameByAggregateByTicker[aggregate][ticker] =
           userInputtedDataByAggregateByTicker[aggregate][ticker].filename;
         indexByAggregateByTicker[aggregate][ticker] =
           userInputtedDataByAggregateByTicker[aggregate][ticker].index;
       } else {
-        const impliedSlippage = 0;
         const impliedFilename = `./data/cleaned/${ticker}_${aggregate}.csv`;
         const impliedIndex = `./data/index/${ticker}_${aggregate}.idx`;
 
         if (verboseLogging) {
           console.warn(
-            `Missing data for '${ticker}' (${aggregate}); assuming slippage ${impliedSlippage}bps, filename '${impliedFilename}', and index '${impliedIndex}'`,
+            `Missing data for '${ticker}' (${aggregate}); assuming filename '${impliedFilename}' and index '${impliedIndex}'`,
           );
         }
 
@@ -123,7 +127,6 @@ export function getTickerDataByAggregateByTicker(
         if (!fs.existsSync(impliedIndex)) {
           throw new Error(`Assumed index '${impliedIndex}' does not exist`);
         }
-        slippageByAggregateByTicker[aggregate][ticker] = impliedSlippage;
         filenameByAggregateByTicker[aggregate][ticker] = impliedFilename;
         indexByAggregateByTicker[aggregate][ticker] = impliedIndex;
       }
@@ -133,7 +136,6 @@ export function getTickerDataByAggregateByTicker(
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in userInputtedDataByAggregateByTicker[aggregate]) {
       if (
-        !(ticker in slippageByAggregateByTicker[aggregate]) ||
         !(ticker in filenameByAggregateByTicker[aggregate]) ||
         !(ticker in indexByAggregateByTicker[aggregate])
       ) {
@@ -144,10 +146,55 @@ export function getTickerDataByAggregateByTicker(
     }
   }
   return {
-    slippageByAggregateByTicker,
     filenameByAggregateByTicker,
     indexByAggregateByTicker,
   };
+}
+
+const slippageJsonlLineSchema = z.object({
+  ticker: z.string(),
+  slippage: z.number(),
+});
+export function getMarketSlippageByTicker(
+  allTickers: Ticker[],
+  userInputtedSlippageByTicker: Partial<Record<Ticker, number>> = {},
+): Record<Ticker, number> {
+  if (!fs.existsSync(`./data/slippage.jsonl`)) {
+    throw new Error(`Slippage file './data/slippage.jsonl' does not exist`);
+  }
+
+  const defaultSlippageByTicker = fs
+    .readFileSync(`./data/slippage.jsonl`, { encoding: 'utf8' })
+    .split('\n')
+    .reduce(
+      (acc, line) => {
+        // Parse JSONL line
+        if (line === '') return acc;
+
+        const parseJsonResponse = trySync(() => JSON.parse(line));
+        if (!parseJsonResponse.ok) throw parseJsonResponse.error;
+        const parsedJson = parseJsonResponse.data;
+
+        const zodParseResponse = trySync(() => slippageJsonlLineSchema.parse(parsedJson));
+        if (!zodParseResponse.ok) throw zodParseResponse.error;
+        const { ticker, slippage } = zodParseResponse.data;
+
+        // Add to slippage by ticker
+        acc[ticker] = slippage;
+        return acc;
+      },
+      {} as Record<Ticker, number>,
+    );
+
+  const marketSlippageByTicker = {} as Record<Ticker, number>;
+  for (const ticker of allTickers) {
+    if (ticker in userInputtedSlippageByTicker) {
+      marketSlippageByTicker[ticker] = userInputtedSlippageByTicker[ticker] ?? 0;
+    } else {
+      marketSlippageByTicker[ticker] = defaultSlippageByTicker[ticker];
+    }
+  }
+  return marketSlippageByTicker;
 }
 
 const MAX_TICKERS_TO_SHOW = 3;
