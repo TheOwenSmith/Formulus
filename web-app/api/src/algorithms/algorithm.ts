@@ -1,6 +1,6 @@
-import type { Indicator, IndicatorResultByIndicator } from '@/algorithms/indicators/indicator';
-import type { Bar } from '@/backtesting/read-data';
-import type { Ticker, Timestamp } from '@/fetch/types';
+import type { Indicator, IndicatorResultByIndicator } from '@api/algorithms/indicators/indicator';
+import type { Bar } from '@api/backtesting/read-data';
+import type { Ticker, Timestamp } from '@api/fetch/types';
 
 export const enum Action {
   BUY,

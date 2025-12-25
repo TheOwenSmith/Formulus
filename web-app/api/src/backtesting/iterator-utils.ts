@@ -1,7 +1,7 @@
-import { DATE_LENGTH, LINE_LENGTH } from '@/fetch/create-search-index';
-import { aggregateTimestamps, type Ticker } from '@/fetch/types';
-import { toValidTimespan } from '@/utils/date-utils';
-import { trySync } from '@/utils/errorHandling';
+import { DATE_LENGTH, LINE_LENGTH } from '@api/fetch/create-search-index';
+import { aggregateTimestamps, type Ticker } from '@api/fetch/types';
+import { toValidTimespan } from '@api/utils/date-utils';
+import { trySync } from '@api/utils/errorHandling';
 import fsp from 'fs/promises';
 import { getAggregateDataIterator, type AggregateDataIterator } from './read-data';
 import { emptyIndexByAggregateByTicker, type IndexedByAggregateByTicker } from './ticker-utils';

@@ -1,7 +1,7 @@
-import { createTopKAlgorithmFromContextMaps } from '@/algorithms/context-maps/context-map';
-import { createAlgorithmFromTopKAlgorithm } from '@/algorithms/top-k-algorithm';
-import { type Bar } from '@/backtesting/read-data';
-import type { Ticker, Timestamp } from '@/fetch/types';
+import { createTopKAlgorithmFromContextMaps } from '@api/algorithms/context-maps/context-map';
+import { createAlgorithmFromTopKAlgorithm } from '@api/algorithms/top-k-algorithm';
+import { type Bar } from '@api/backtesting/read-data';
+import type { Ticker, Timestamp } from '@api/fetch/types';
 import type { Algorithm } from '../algorithm';
 
 export const greenRedBarsAlgorithm = ({

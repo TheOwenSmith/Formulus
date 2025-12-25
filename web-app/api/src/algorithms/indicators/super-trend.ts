@@ -1,4 +1,4 @@
-import type { Bar } from '@/backtesting/read-data';
+import type { Bar } from '@api/backtesting/read-data';
 import { computeATR } from './atr';
 import type { IndicatorMetadata } from './indicator-metadata';
 

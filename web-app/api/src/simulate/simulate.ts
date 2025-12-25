@@ -1,8 +1,8 @@
 /* eslint-disable */
 
-import { deserializeContextMap } from '@/algorithms/examples/green-red-bars';
-import type { SimplePlot } from '@/lib/nodeplotlib';
-import { trySync } from '@/utils/errorHandling';
+import { deserializeContextMap } from '@api/algorithms/examples/green-red-bars';
+import type { SimplePlot } from '@api/lib/nodeplotlib';
+import { trySync } from '@api/utils/errorHandling';
 import fs from 'fs';
 import { plot } from 'nodeplotlib';
 

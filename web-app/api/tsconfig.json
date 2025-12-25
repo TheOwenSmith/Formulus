@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
     // Environment setup & latest features
     "lib": ["ESNext"],
@@ -25,12 +26,8 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true,
 
-    "baseUrl": ".",
     "rootDir": "src",
     "outDir": "dist",
-    "paths": {
-      "@/*": ["./src/*"],
-    },
   },
   "exclude": ["node_modules", "vendor", "eslint.config.mjs"]
 }

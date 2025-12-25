@@ -1,8 +1,8 @@
-import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from '@/algorithms/algorithm';
-import type { Ticker, Timestamp } from '@/fetch/types';
-import type { SimplePlot } from '@/lib/nodeplotlib';
-import type { SelectionOption } from '@/utils/cli';
-import { withCommasRounded } from '@/utils/number-utils';
+import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from '@api/algorithms/algorithm';
+import type { Ticker, Timestamp } from '@api/fetch/types';
+import type { SimplePlot } from '@api/lib/nodeplotlib';
+import type { SelectionOption } from '@api/utils/cli';
+import { withCommasRounded } from '@api/utils/number-utils';
 import {
   MAX_POINTS_PER_PLOT,
   type AlgorithmData,

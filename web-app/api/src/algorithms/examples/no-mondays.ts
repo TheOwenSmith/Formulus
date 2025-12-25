@@ -1,7 +1,7 @@
-import { Action } from '@/algorithms/algorithm';
-import { dayOfWeek } from '@/algorithms/indicators/day-of-week';
-import type { SimpleMarketInvariantAlgorithm } from '@/algorithms/simple-algorithm';
-import type { Bar } from '@/backtesting/read-data';
+import { Action } from '@api/algorithms/algorithm';
+import { dayOfWeek } from '@api/algorithms/indicators/day-of-week';
+import type { SimpleMarketInvariantAlgorithm } from '@api/algorithms/simple-algorithm';
+import type { Bar } from '@api/backtesting/read-data';
 
 export const noMondaysAlgorithm: SimpleMarketInvariantAlgorithm = {
   contextLength: 1,

@@ -1,8 +1,8 @@
-import type { Bar } from '@/backtesting/read-data';
-import { config } from '@/lib/config';
-import { tryAsync, trySync } from '@/utils/errorHandling';
-import { retryWithBackoff } from '@/utils/retry';
-import { zodSafeFetch } from '@/utils/zod-safe-fetch';
+import type { Bar } from '@api/backtesting/read-data';
+import { config } from '@api/lib/config';
+import { tryAsync, trySync } from '@api/utils/errorHandling';
+import { retryWithBackoff } from '@api/utils/retry';
+import { zodSafeFetch } from '@api/utils/zod-safe-fetch';
 import fs from 'fs';
 import z from 'zod';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';

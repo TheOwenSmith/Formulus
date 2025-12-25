@@ -1,5 +1,5 @@
-import { trySync } from '@/utils/errorHandling';
-import { withCommas } from '@/utils/number-utils';
+import { trySync } from '@api/utils/errorHandling';
+import { withCommas } from '@api/utils/number-utils';
 import fs from 'fs';
 import readline from 'readline';
 import z from 'zod';

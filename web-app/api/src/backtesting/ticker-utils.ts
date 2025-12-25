@@ -1,6 +1,6 @@
-import { type Algorithm } from '@/algorithms/algorithm';
-import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
-import { trySync } from '@/utils/errorHandling';
+import { type Algorithm } from '@api/algorithms/algorithm';
+import { aggregateTimestamps, type Ticker, type Timestamp } from '@api/fetch/types';
+import { trySync } from '@api/utils/errorHandling';
 import fs from 'fs';
 import z from 'zod';
 import type { TickerData } from './backtest-algorithms-concurrently';

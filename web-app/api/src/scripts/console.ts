@@ -1,6 +1,6 @@
-import { estimateSlippageBps } from '@/fetch/estimate-slippage';
-import { aggregateTimestamps, type Ticker } from '@/fetch/types';
-import { roundToDecimal } from '@/utils/number-utils';
+import { estimateSlippageBps } from '@api/fetch/estimate-slippage';
+import { aggregateTimestamps, type Ticker } from '@api/fetch/types';
+import { roundToDecimal } from '@api/utils/number-utils';
 import fs from 'fs';
 
 const tickers: Ticker[] = [

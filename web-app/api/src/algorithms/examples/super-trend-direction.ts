@@ -1,8 +1,8 @@
-import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
-import type { IndicatorResultByIndicator } from '@/algorithms/indicators/indicator';
-import { Direction } from '@/algorithms/indicators/super-trend';
-import type { Bar } from '@/backtesting/read-data';
-import type { Ticker } from '@/fetch/types';
+import { Action, type MarketInvariantAlgorithm } from '@api/algorithms/algorithm';
+import type { IndicatorResultByIndicator } from '@api/algorithms/indicators/indicator';
+import { Direction } from '@api/algorithms/indicators/super-trend';
+import type { Bar } from '@api/backtesting/read-data';
+import type { Ticker } from '@api/fetch/types';
 
 export const superTrendDirectionAlgorithm: MarketInvariantAlgorithm = {
   name: 'Super Trend Direction',

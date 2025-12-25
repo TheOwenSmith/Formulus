@@ -2,22 +2,21 @@ import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
-} from '@/algorithms/algorithm';
+} from '@api/algorithms/algorithm';
 import {
   indicatorsToIndicatorResultsFunction,
   type IndicatorResultByIndicator,
-} from '@/algorithms/indicators/indicator';
-import type { IndicatorMetadata } from '@/algorithms/indicators/indicator-metadata';
-import { aggregateTimestamps, type Ticker, type Timestamp } from '@/fetch/types';
-import type { SimplePlot } from '@/lib/nodeplotlib';
-import { type SelectionOption } from '@/utils/cli';
-import { yearsBetween } from '@/utils/date-utils';
-import { trySync } from '@/utils/errorHandling';
-import { groupBy } from '@/utils/groupBy';
-import { withCommas } from '@/utils/number-utils';
-import { SharpeRatioCalculator } from '@/utils/sharpe-ratio-calculator';
-import type { AtLeastOne } from '@/utils/types';
-import cliProgress, { Presets } from 'cli-progress';
+} from '@api/algorithms/indicators/indicator';
+import type { IndicatorMetadata } from '@api/algorithms/indicators/indicator-metadata';
+import { aggregateTimestamps, type Ticker, type Timestamp } from '@api/fetch/types';
+import type { SimplePlot } from '@api/lib/nodeplotlib';
+import { type SelectionOption } from '@api/utils/cli';
+import { yearsBetween } from '@api/utils/date-utils';
+import { trySync } from '@api/utils/errorHandling';
+import { groupBy } from '@api/utils/groupBy';
+import { withCommas } from '@api/utils/number-utils';
+import { SharpeRatioCalculator } from '@api/utils/sharpe-ratio-calculator';
+import type { AtLeastOne } from '@api/utils/types';
 import {
   countBytesToProcess,
   getIteratorBounds,

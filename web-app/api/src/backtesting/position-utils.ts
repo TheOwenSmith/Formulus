@@ -1,5 +1,5 @@
-import { Action } from '@/algorithms/algorithm';
-import type { Ticker } from '@/fetch/types';
+import { Action } from '@api/algorithms/algorithm';
+import type { Ticker } from '@api/fetch/types';
 import type { AlgorithmData } from './backtest-algorithms-concurrently';
 
 // See docs/Phoenix_Trader_Position_Management_System.pdf

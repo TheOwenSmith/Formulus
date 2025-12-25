@@ -1,7 +1,7 @@
-import { Action, type MarketInvariantAlgorithm } from '@/algorithms/algorithm';
-import type { IndicatorResultByIndicator } from '@/algorithms/indicators/indicator';
-import type { Bar } from '@/backtesting/read-data';
-import type { Ticker } from '@/fetch/types';
+import { Action, type MarketInvariantAlgorithm } from '@api/algorithms/algorithm';
+import type { IndicatorResultByIndicator } from '@api/algorithms/indicators/indicator';
+import type { Bar } from '@api/backtesting/read-data';
+import type { Ticker } from '@api/fetch/types';
 
 export const overboughtOversoldAlgorithm: MarketInvariantAlgorithm = {
   name: 'Overbought/Oversold',

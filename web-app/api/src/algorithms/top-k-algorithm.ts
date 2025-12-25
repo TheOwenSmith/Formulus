@@ -1,6 +1,6 @@
-import type { Bar } from '@/backtesting/read-data';
-import type { Ticker, Timestamp } from '@/fetch/types';
-import { Heap } from '@/utils/heap';
+import type { Bar } from '@api/backtesting/read-data';
+import type { Ticker, Timestamp } from '@api/fetch/types';
+import { Heap } from '@api/utils/heap';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
 import type { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
 

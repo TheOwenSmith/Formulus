@@ -32,7 +32,6 @@
     "cli-progress": "^3.12.0",
     "dotenv": "^17.2.3",
     "inquirer": "^12.10.0",
-    "nodeplotlib": "file:./vendor/nodeplotlib",
     "zod": "^4.1.12"
   }
 }
