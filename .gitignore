@@ -16,7 +16,7 @@ downloads/
 eggs/
 .eggs/
 lib/
-!backtesting-lib/**/lib/
+!api/**/lib/
 lib64/
 parts/
 sdist/

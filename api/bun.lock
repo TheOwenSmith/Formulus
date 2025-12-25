@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "backtesting-lib",
+      "name": "api",
       "dependencies": {
         "@polygon.io/client-js": "^8.2.0",
         "@types/cli-progress": "^3.11.6",
