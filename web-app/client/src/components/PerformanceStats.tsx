@@ -1,4 +1,5 @@
-import type { Graph } from '../types';
+import type { Graph } from '@client/types';
+import { withCommasRounded } from '@client/utils/numberUtils';
 
 interface PerformanceStatsProps {
   data: Graph;
@@ -12,22 +13,29 @@ export function PerformanceStats({ data }: PerformanceStatsProps) {
 
   const initialAlgorithmValue = data.algorithmPlot.y[0];
   const finalAlgorithmValue = data.algorithmPlot.y[data.algorithmPlot.y.length - 1];
+
+  // Calculate algorithm return from plot data for outperformance calculation
   const algorithmReturn =
     ((finalAlgorithmValue - initialAlgorithmValue) / initialAlgorithmValue) * 100;
 
-  const outperformance = algorithmReturn - tickerReturn;
+  // Format growth rate with APY
+  const growthRateFormatted = `${withCommasRounded(data.growthRate * 100)}% APY`;
+
+  // Format Sharpe ratio
+  const sharpeRatio = data.sharpeRatio;
+  const sharpeRatioFormatted = sharpeRatio != null ? withCommasRounded(sharpeRatio) : 'N/A';
 
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-6 mb-8 animate-[fadeInUp_0.8s_ease-out_0.4s_both]">
       <div className="stat-card stat-card-primary bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-emerald-500/20 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
         <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
-          Algorithm Return
+          Growth Rate
         </div>
         <div
           className={`text-3xl font-bold mb-2 tracking-tight ${algorithmReturn >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
         >
           {algorithmReturn >= 0 ? '+' : ''}
-          {algorithmReturn.toFixed(2)}%
+          {growthRateFormatted}
         </div>
         <div className="text-base text-white/80 font-medium">
           $
@@ -40,13 +48,13 @@ export function PerformanceStats({ data }: PerformanceStatsProps) {
 
       <div className="stat-card bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
         <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
-          {data.tickerPlot.name} Return
+          {data.tickerPlot.name} Growth Rate
         </div>
         <div
           className={`text-3xl font-bold mb-2 tracking-tight ${tickerReturn >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
         >
           {tickerReturn >= 0 ? '+' : ''}
-          {tickerReturn.toFixed(2)}%
+          {withCommasRounded(tickerReturn)}% APY
         </div>
         <div className="text-base text-white/80 font-medium">
           $
@@ -59,20 +67,31 @@ export function PerformanceStats({ data }: PerformanceStatsProps) {
 
       <div className="stat-card stat-card-accent bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-blue-500/20 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
         <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
-          Outperformance
+          Sharpe Ratio
         </div>
         <div
-          className={`text-3xl font-bold mb-2 tracking-tight ${outperformance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+          className={`text-3xl font-bold mb-2 tracking-tight ${
+            sharpeRatio != null && sharpeRatio >= 1
+              ? 'text-emerald-500'
+              : sharpeRatio != null && sharpeRatio >= 0
+                ? 'text-yellow-500'
+                : sharpeRatio != null
+                  ? 'text-red-500'
+                  : 'text-white/60'
+          }`}
         >
-          {outperformance >= 0 ? '+' : ''}
-          {outperformance.toFixed(2)}%
+          {sharpeRatioFormatted}
         </div>
         <div className="text-sm text-white/50 mt-2">
-          {outperformance >= 0 ? 'Algorithm outperformed' : 'Algorithm underperformed'}{' '}
-          benchmark
+          {sharpeRatio != null
+            ? sharpeRatio >= 1
+              ? 'Excellent risk-adjusted return'
+              : sharpeRatio >= 0
+                ? 'Acceptable risk-adjusted return'
+                : 'Poor risk-adjusted return'
+            : 'Not available'}
         </div>
       </div>
     </div>
   );
 }
-

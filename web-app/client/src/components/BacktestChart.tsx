@@ -1,7 +1,8 @@
+import '@client/styles/BacktestChart.css';
+import type { Graph } from '@client/types';
+import { withCommasRounded } from '@client/utils/numberUtils';
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
-import '../styles/BacktestChart.css';
-import type { Graph } from '../types';
 
 // Format timestamp string to YYYY-MM-DD HH:mm:ss with 12-hour format
 function formatTimestamp(timestamp: string): string {
@@ -41,10 +42,11 @@ function formatTimestamp(timestamp: string): string {
 
 interface BacktestChartProps {
   data: Graph;
+  growthRate: number; // As a decimal (e.g., 0.385 for 38.5%)
   onResetZoom?: () => void;
 }
 
-export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
+export function BacktestChart({ data, growthRate, onResetZoom }: BacktestChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -497,9 +499,12 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
 
         const tickerReturn =
           ((point.tickerValue - dataPoints[0].tickerValue) / dataPoints[0].tickerValue) * 100;
-        const algorithmReturn =
+        const pointAlgorithmReturn =
           ((point.algorithmValue - dataPoints[0].algorithmValue) / dataPoints[0].algorithmValue) *
           100;
+
+        // Format growth rate with APY
+        const growthRateFormatted = `${withCommasRounded(growthRate * 100)}% APY`;
 
         tooltip
           .style('opacity', 1)
@@ -516,8 +521,8 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
             <div>
               <span style="color: #10b981; font-weight: 500;">${algorithmPlot.name}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.algorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span style="margin-left: 8px; color: ${algorithmReturn >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
-                (${algorithmReturn >= 0 ? '+' : ''}${algorithmReturn.toFixed(2)}%)
+              <span style="margin-left: 8px; color: ${pointAlgorithmReturn >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
+                (${growthRateFormatted})
               </span>
             </div>
           `,
@@ -546,7 +551,7 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
     return () => {
       tooltip.remove();
     };
-  }, [data, dimensions, zoomDomain, onResetZoom]);
+  }, [data, dimensions, zoomDomain, growthRate, onResetZoom]);
 
   const handleResetZoom = () => {
     setZoomDomain(null);

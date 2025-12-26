@@ -32,6 +32,8 @@ const sampleData: Graph = {
     'Positions closed: 1,189',
     'Trades made: 1,234',
   ],
+  growthRate: 0.385, // 38.5%
+  sharpeRatio: 1.85, // Sharpe ratio
   tickerPlot: {
     name: 'SPY',
     y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
