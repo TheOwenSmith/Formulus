@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
-import type { Graph } from '../types';
 import '../styles/BacktestChart.css';
+import type { Graph } from '../types';
 
 // Format timestamp string to YYYY-MM-DD HH:mm:ss with 12-hour format
 function formatTimestamp(timestamp: string): string {
@@ -177,24 +177,12 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
       .attr('stop-color', '#10b981')
       .attr('stop-opacity', 0);
 
-    // Grid lines
-    const xAxisGrid = d3
-      .axisBottom(xScale)
-      .ticks(10)
-      .tickSize(-innerHeight)
-      .tickFormat(() => '');
+    // Grid lines (horizontal only)
     const yAxisGrid = d3
       .axisLeft(yScale)
       .ticks(10)
       .tickSize(-innerWidth)
       .tickFormat(() => '');
-
-    g.append('g')
-      .attr('class', 'grid')
-      .attr('transform', `translate(0,${innerHeight})`)
-      .call(xAxisGrid)
-      .attr('stroke', 'rgba(255, 255, 255, 0.1)')
-      .attr('stroke-width', 1);
 
     g.append('g')
       .attr('class', 'grid')
@@ -334,10 +322,10 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
 
     // Calculate legend dimensions
     const legendItemHeight = 25;
-    const legendPadding = 12;
+    const legendPadding = 4;
     const legendLineWidth = 30;
     const legendTextOffset = 40;
-    const legendRightMargin = 20; // Margin from right edge
+    const legendRightMargin = 10; // Margin from right edge
 
     // Estimate text width (add some buffer for safety)
     const maxLabelWidth = Math.max(
@@ -348,7 +336,7 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
 
     // Position legend - ensure it doesn't go off screen
     // Position from right edge, but ensure it stays within bounds
-    const legendX = innerWidth * 0.925 - legendWidth - legendRightMargin;
+    const legendX = innerWidth - legendWidth - legendRightMargin;
     // If legend would be too wide, position from left instead
     const finalLegendX = legendX < legendRightMargin ? legendRightMargin : legendX;
     const legendY = 10;
@@ -374,19 +362,26 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
         .append('g')
         .attr('transform', `translate(0, ${i * legendItemHeight})`);
 
+      // Center the line vertically within the item height
+      const lineY = legendItemHeight / 2;
+      const lineOffset = 4; // Offset to move line to the right
+
       legendItem
         .append('line')
-        .attr('x1', 0)
-        .attr('x2', legendLineWidth)
-        .attr('y1', 0)
-        .attr('y2', 0)
+        .attr('x1', lineOffset)
+        .attr('x2', legendLineWidth + lineOffset)
+        .attr('y1', lineY)
+        .attr('y2', lineY)
         .attr('stroke', item.color)
         .attr('stroke-width', 3);
 
+      // Center text vertically
+      // SVG text y position is from baseline, so we need to adjust for vertical centering
       legendItem
         .append('text')
         .attr('x', legendTextOffset)
-        .attr('y', 5)
+        .attr('y', lineY)
+        .attr('dy', '0.35em') // Adjust for vertical centering (moves text up by ~35% of font size)
         .style('fill', 'rgba(255, 255, 255, 0.95)')
         .style('font-size', '13px')
         .style('font-weight', '500')
@@ -583,4 +578,3 @@ export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
     </div>
   );
 }
-
