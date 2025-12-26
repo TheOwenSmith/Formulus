@@ -10,7 +10,7 @@ const sampleData: Graph = {
     name: 'Algorithm',
     y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
       const base = 100;
-      const trend = (i / MULTIPLIER) * 0.8;
+      const trend = (i / MULTIPLIER) * 0.12;
       const noise = Math.sin(i / MULTIPLIER / 8) * 4 + Math.random() * 2;
       return base + trend + noise;
     }),
@@ -32,13 +32,13 @@ const sampleData: Graph = {
     'Positions closed: 1,189',
     'Trades made: 1,234',
   ],
-  growthRate: 0.385, // 38.5%
-  sharpeRatio: 1.85, // Sharpe ratio
+  growthRate: 0.22, // 43.55%
+  sharpeRatio: 0.9, // Sharpe ratio
   tickerPlot: {
     name: 'SPY',
     y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
       const base = 100;
-      const trend = (i / MULTIPLIER) * 0.5;
+      const trend = (i / MULTIPLIER) * 0.1;
       const noise = Math.sin(i / MULTIPLIER / 10) * 5 + Math.random() * 3;
       return base + trend + noise;
     }),
