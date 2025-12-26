@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { MetricKey } from './metricUtils';
 import { DEFAULT_METRIC_OPTIONS, METRIC_LABELS } from './metricUtils';
 
@@ -14,13 +14,64 @@ export function MetricTogglePanel({
   availableMetrics,
 }: MetricTogglePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const allMetrics = Object.keys(METRIC_LABELS) as MetricKey[];
   const availableMetricsList = allMetrics.filter((metric) => availableMetrics.has(metric));
 
   const enabledCount = availableMetricsList.filter((metric) => enabledMetrics[metric]).length;
   const totalCount = availableMetricsList.length;
+
+  // Calculate position to keep panel within viewport
+  useEffect(() => {
+    if (isOpen && buttonRef.current && dropdownRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const dropdown = dropdownRef.current;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const dropdownWidth = dropdown.offsetWidth || 500;
+      const dropdownHeight = dropdown.offsetHeight || 400;
+
+      // Calculate right position - ensure it doesn't go off right edge
+      const rightEdge = viewportWidth - buttonRect.right;
+      const leftEdge = buttonRect.left;
+      
+      // Position from right, but ensure it doesn't overflow
+      let right = Math.max(8, Math.min(rightEdge, viewportWidth - dropdownWidth - 8));
+      
+      // If there's not enough space on the right, position from left
+      if (rightEdge < dropdownWidth + 8) {
+        right = 'auto';
+        const left = Math.max(8, Math.min(leftEdge, viewportWidth - dropdownWidth - 8));
+        setPanelStyle({ left: `${left}px`, right: 'auto' });
+      } else {
+        setPanelStyle({ right: `${right}px`, left: 'auto' });
+      }
+
+      // Check if there's enough space below, otherwise position above
+      const spaceBelow = viewportHeight - buttonRect.bottom;
+      const spaceAbove = buttonRect.top;
+      
+      if (spaceBelow < dropdownHeight + 8 && spaceAbove > spaceBelow) {
+        // Position above
+        setPanelStyle((prev) => ({
+          ...prev,
+          bottom: `${viewportHeight - buttonRect.top + 8}px`,
+          top: 'auto',
+        }));
+      } else {
+        // Position below (default)
+        setPanelStyle((prev) => ({
+          ...prev,
+          top: `${buttonRect.bottom + 8}px`,
+          bottom: 'auto',
+        }));
+      }
+    }
+  }, [isOpen]);
 
   // Close panel when clicking outside
   useEffect(() => {
@@ -32,16 +83,21 @@ export function MetricTogglePanel({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('resize', () => setIsOpen(false));
+      window.addEventListener('scroll', () => setIsOpen(false), true);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', () => setIsOpen(false));
+      window.removeEventListener('scroll', () => setIsOpen(false), true);
     };
   }, [isOpen]);
 
   return (
     <div className="relative" ref={panelRef}>
       <button
+        ref={buttonRef}
         className="flex items-center gap-3 px-4 py-3 bg-slate-900/60 border border-white/10 rounded-xl text-white/90 text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] w-full justify-between hover:bg-slate-900/80 hover:border-white/20 hover:-translate-y-px"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Toggle metric visibility options"
@@ -87,7 +143,11 @@ export function MetricTogglePanel({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-[90vw] sm:w-[500px] min-w-[350px] bg-slate-900/95 border border-white/10 rounded-xl p-5 backdrop-blur-[10px] shadow-[0_20px_60px_rgba(0,0,0,0.5)] z-50 animate-[slideDown_0.2s_ease-out] max-h-[80vh] overflow-y-auto">
+        <div
+          ref={dropdownRef}
+          className="fixed w-[90vw] sm:w-[500px] min-w-[350px] max-w-[calc(100vw-16px)] bg-slate-900/95 border border-white/10 rounded-xl p-5 backdrop-blur-[10px] shadow-[0_20px_60px_rgba(0,0,0,0.5)] z-50 animate-[slideDown_0.2s_ease-out] max-h-[80vh] overflow-y-auto"
+          style={panelStyle}
+        >
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
             <h4 className="text-base font-semibold text-white/95 m-0">Display Metrics</h4>
             <div className="flex gap-2 flex-wrap w-full sm:w-auto">

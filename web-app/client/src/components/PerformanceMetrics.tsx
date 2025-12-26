@@ -1,6 +1,10 @@
-import { MetricTogglePanel } from '@client/MetricTogglePanel';
-import { createMetricMap, DEFAULT_METRIC_OPTIONS, type MetricKey } from '@client/metricUtils';
 import { useMemo, useState } from 'react';
+import { MetricTogglePanel } from './MetricTogglePanel/MetricTogglePanel';
+import {
+  createMetricMap,
+  DEFAULT_METRIC_OPTIONS,
+  type MetricKey,
+} from './MetricTogglePanel/metricUtils';
 
 interface PerformanceMetricsProps {
   description: string[];
