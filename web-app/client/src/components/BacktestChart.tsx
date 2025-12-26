@@ -44,31 +44,51 @@ interface BacktestChartProps {
   data: Graph;
   growthRate: number; // As a decimal (e.g., 0.385 for 38.5%)
   onResetZoom?: () => void;
+  hasShowMetricsButton?: boolean;
 }
 
-export function BacktestChart({ data, growthRate, onResetZoom }: BacktestChartProps) {
+export function BacktestChart({
+  data,
+  growthRate,
+  onResetZoom,
+  hasShowMetricsButton = false,
+}: BacktestChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgContainerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [zoomDomain, setZoomDomain] = useState<[number, number] | null>(null);
   const isBrushingRef = useRef(false);
 
-  // Handle resize
+  // Handle resize - use ResizeObserver to detect container size changes
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !svgContainerRef.current) return;
 
     const updateDimensions = () => {
-      if (containerRef.current) {
+      if (containerRef.current && svgContainerRef.current) {
+        // Get the actual available space for the SVG
+        const svgContainer = svgContainerRef.current;
         setDimensions({
-          width: containerRef.current.clientWidth,
-          height: 600,
+          width: svgContainer.clientWidth,
+          height: svgContainer.clientHeight || 600,
         });
       }
     };
 
     updateDimensions();
+
+    // Use ResizeObserver to detect container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions();
+    });
+
+    resizeObserver.observe(svgContainerRef.current);
     window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
   }, []);
 
   useEffect(() => {
@@ -234,7 +254,7 @@ export function BacktestChart({ data, growthRate, onResetZoom }: BacktestChartPr
       .attr('d', tickerLine)
       .attr('opacity', 0)
       .transition()
-      .duration(350)
+      .duration(100)
       .attr('opacity', 1);
 
     g.append('path')
@@ -245,8 +265,8 @@ export function BacktestChart({ data, growthRate, onResetZoom }: BacktestChartPr
       .attr('d', algorithmLine)
       .attr('opacity', 0)
       .transition()
-      .duration(350)
-      .delay(50)
+      .duration(100)
+      .delay(15)
       .attr('opacity', 1);
 
     // Axes
@@ -564,10 +584,14 @@ export function BacktestChart({ data, growthRate, onResetZoom }: BacktestChartPr
 
   return (
     <div
-      className="backtest-chart-container bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.2s_both] relative overflow-hidden"
+      className="backtest-chart-container bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.2s_both] relative overflow-hidden h-full flex flex-col"
       ref={containerRef}
+      style={{ height: '100%', maxHeight: '100%' }}
     >
-      <div className="flex justify-between items-center mb-4 py-2">
+      <div className="absolute top-6 right-4 flex flex-col items-end flex-shrink-0 gap-2 z-10">
+        <div className="text-xs text-white/50 italic">
+          Click and drag to select a range, double-click to reset
+        </div>
         <button
           className="bg-blue-500/20 border border-blue-500/40 text-blue-400 px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-all duration-200 font-sans hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed"
           onClick={handleResetZoom}
@@ -575,11 +599,10 @@ export function BacktestChart({ data, growthRate, onResetZoom }: BacktestChartPr
         >
           Reset Zoom
         </button>
-        <div className="text-xs text-white/50 italic">
-          Click and drag to select a range, double-click to reset
-        </div>
       </div>
-      <svg ref={svgRef} className="w-full h-[600px] block" />
+      <div className="flex-1 min-h-0 pt-12" ref={svgContainerRef}>
+        <svg ref={svgRef} className="w-full h-full block" />
+      </div>
     </div>
   );
 }
