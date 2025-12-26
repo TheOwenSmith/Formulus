@@ -1,4 +1,4 @@
-import { BacktestVisualization } from './BacktestVisualization';
+import { BacktestPage } from './pages/BacktestPage';
 import type { Graph } from './types';
 
 const MULTIPLIER = 10;
@@ -57,5 +57,5 @@ const sampleData: Graph = {
 };
 
 export function App() {
-  return <BacktestVisualization data={sampleData} />;
+  return <BacktestPage data={sampleData} />;
 }

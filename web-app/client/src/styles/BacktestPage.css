@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-/* Tailwind handles box-sizing, margin, padding reset via its base layer */
-/* Custom styles that Tailwind doesn't cover */
-
 /* Custom animations - cannot be done with Tailwind */
 @keyframes fadeInDown {
   from {
@@ -37,18 +34,7 @@
   }
 }
 
-/* Pseudo-elements and complex gradients - must stay as CSS */
-.backtest-chart-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #3b82f6, #10b981, transparent);
-  opacity: 0.6;
-}
-
+/* Stat card pseudo-elements */
 .stat-card::before {
   content: '';
   position: absolute;
@@ -75,25 +61,6 @@
   opacity: 0.6;
 }
 
-/* Tooltip - dynamically created by D3, needs CSS class */
-.backtest-tooltip {
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(10px);
-  pointer-events: none;
-  z-index: 1000;
-  font-size: 13px;
-  line-height: 1.6;
-  min-width: 200px;
-}
-
-.hover-line {
-  pointer-events: none;
-}
-
 /* Custom scrollbar - cannot be done with Tailwind */
 ::-webkit-scrollbar {
   width: 10px;
@@ -115,28 +82,5 @@
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .backtest-visualization {
-    padding: 1rem;
-  }
-
-  .backtest-title {
-    font-size: 2rem;
-  }
-
-  .backtest-chart-container {
-    padding: 1rem;
-  }
-
-  .backtest-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .description-list {
-    grid-template-columns: 1fr;
-  }
 }
 

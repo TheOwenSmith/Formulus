@@ -1,9 +1,7 @@
 import * as d3 from 'd3';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import './BacktestVisualization.css';
-import { MetricTogglePanel } from './MetricTogglePanel';
-import { createMetricMap, DEFAULT_METRIC_OPTIONS, type MetricKey } from './metricUtils';
-import type { Graph } from './types';
+import { useEffect, useRef, useState } from 'react';
+import type { Graph } from '../types';
+import '../styles/BacktestChart.css';
 
 // Format timestamp string to YYYY-MM-DD HH:mm:ss with 12-hour format
 function formatTimestamp(timestamp: string): string {
@@ -41,49 +39,17 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
-interface BacktestVisualizationProps {
+interface BacktestChartProps {
   data: Graph;
+  onResetZoom?: () => void;
 }
 
-export function BacktestVisualization({ data }: BacktestVisualizationProps) {
+export function BacktestChart({ data, onResetZoom }: BacktestChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const zoomDomainRef = useRef<[number, number] | null>(null);
+  const [zoomDomain, setZoomDomain] = useState<[number, number] | null>(null);
   const isBrushingRef = useRef(false);
-
-  // Metric toggle state
-  const metricMap = useMemo(() => createMetricMap(data.description), [data.description]);
-  const availableMetrics = useMemo(() => new Set(metricMap.keys()), [metricMap]);
-
-  const [enabledMetrics, setEnabledMetrics] = useState<Record<MetricKey, boolean>>(() => {
-    const initial: Record<MetricKey, boolean> = { ...DEFAULT_METRIC_OPTIONS };
-    // Only enable metrics that are actually available in the data
-    const tempMetricMap = createMetricMap(data.description);
-    const availableSet = new Set(tempMetricMap.keys());
-    for (const metric of availableSet) {
-      initial[metric] = DEFAULT_METRIC_OPTIONS[metric];
-    }
-    return initial;
-  });
-
-  const handleToggleMetric = (metric: MetricKey, enabled: boolean) => {
-    setEnabledMetrics((prev) => ({ ...prev, [metric]: enabled }));
-  };
-
-  // Filter displayed metrics based on toggle state
-  const displayedMetrics = useMemo(() => {
-    return data.description.filter((desc) => {
-      // Try to identify the metric
-      for (const [metricKey, metricDesc] of metricMap.entries()) {
-        if (desc === metricDesc) {
-          return enabledMetrics[metricKey];
-        }
-      }
-      // If we can't identify it, show it by default (fallback)
-      return true;
-    });
-  }, [data.description, metricMap, enabledMetrics]);
 
   // Handle resize
   useEffect(() => {
@@ -133,7 +99,7 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
     // Original domain for reset
     const originalXDomain: [number, number] = [0, dataPoints.length - 1];
-    const currentXDomain = zoomDomainRef.current ?? originalXDomain;
+    const currentXDomain = zoomDomain ?? originalXDomain;
 
     // Get visible data points for y-scale calculation and drawing
     const startIndex = Math.max(0, Math.floor(currentXDomain[0]));
@@ -487,9 +453,7 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
         // Only zoom if selection is meaningful (at least 2 data points)
         if (endIndex - startIndex >= 2) {
-          zoomDomainRef.current = [startIndex, endIndex];
-          // Trigger re-render by updating dimensions slightly
-          setDimensions((prev) => ({ ...prev }));
+          setZoomDomain([startIndex, endIndex]);
         }
 
         // Clear brush selection and hide handles
@@ -577,147 +541,46 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
     // Double-click to reset zoom
     brushOverlay.on('dblclick', () => {
-      zoomDomainRef.current = null;
-      setDimensions((prev) => ({ ...prev }));
+      setZoomDomain(null);
+      if (onResetZoom) {
+        onResetZoom();
+      }
     });
 
     // Cleanup
     return () => {
       tooltip.remove();
     };
-  }, [data, dimensions]);
+  }, [data, dimensions, zoomDomain, onResetZoom]);
 
-  // Calculate performance metrics
-  const initialTickerValue = data.tickerPlot.y[0];
-  const finalTickerValue = data.tickerPlot.y[data.tickerPlot.y.length - 1];
-  const tickerReturn = ((finalTickerValue - initialTickerValue) / initialTickerValue) * 100;
+  const handleResetZoom = () => {
+    setZoomDomain(null);
+    if (onResetZoom) {
+      onResetZoom();
+    }
+  };
 
-  const initialAlgorithmValue = data.algorithmPlot.y[0];
-  const finalAlgorithmValue = data.algorithmPlot.y[data.algorithmPlot.y.length - 1];
-  const algorithmReturn =
-    ((finalAlgorithmValue - initialAlgorithmValue) / initialAlgorithmValue) * 100;
-
-  const outperformance = algorithmReturn - tickerReturn;
+  const hasZoom = zoomDomain !== null;
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 font-sans text-white"
+      className="backtest-chart-container bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.2s_both] relative overflow-hidden"
       ref={containerRef}
     >
-      <div className="text-center mb-12 animate-[fadeInDown_0.8s_ease-out]">
-        <h1 className="text-4xl font-bold mb-2 m-0 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent tracking-tight">
-          {data.algorithmName}
-        </h1>
-        <div className="text-base text-white/60 font-normal tracking-wider uppercase">
-          Backtesting Performance Analysis
+      <div className="flex justify-between items-center mb-4 py-2">
+        <button
+          className="bg-blue-500/20 border border-blue-500/40 text-blue-400 px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-all duration-200 font-sans hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={handleResetZoom}
+          disabled={!hasZoom}
+        >
+          Reset Zoom
+        </button>
+        <div className="text-xs text-white/50 italic">
+          Click and drag to select a range, double-click to reset
         </div>
       </div>
-
-      <div className="max-w-[1400px] mx-auto">
-        <div className="backtest-chart-container bg-slate-900/60 rounded-2xl p-8 mb-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.2s_both] relative overflow-hidden">
-          <div className="flex justify-between items-center mb-4 py-2">
-            <button
-              className="bg-blue-500/20 border border-blue-500/40 text-blue-400 px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-all duration-200 font-sans hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={() => {
-                zoomDomainRef.current = null;
-                setDimensions((prev) => ({ ...prev }));
-              }}
-              disabled={zoomDomainRef.current === null}
-            >
-              Reset Zoom
-            </button>
-            <div className="text-xs text-white/50 italic">
-              Click and drag to select a range, double-click to reset
-            </div>
-          </div>
-          <svg ref={svgRef} className="w-full h-[600px] block" />
-        </div>
-
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-6 mb-8 animate-[fadeInUp_0.8s_ease-out_0.4s_both]">
-          <div className="stat-card stat-card-primary bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-emerald-500/20 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
-            <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
-              Algorithm Return
-            </div>
-            <div
-              className={`text-3xl font-bold mb-2 tracking-tight ${algorithmReturn >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
-            >
-              {algorithmReturn >= 0 ? '+' : ''}
-              {algorithmReturn.toFixed(2)}%
-            </div>
-            <div className="text-base text-white/80 font-medium">
-              $
-              {finalAlgorithmValue.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-
-          <div className="stat-card bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
-            <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
-              {data.tickerPlot.name} Return
-            </div>
-            <div
-              className={`text-3xl font-bold mb-2 tracking-tight ${tickerReturn >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
-            >
-              {tickerReturn >= 0 ? '+' : ''}
-              {tickerReturn.toFixed(2)}%
-            </div>
-            <div className="text-base text-white/80 font-medium">
-              $
-              {finalTickerValue.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-accent bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-blue-500/20 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
-            <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
-              Outperformance
-            </div>
-            <div
-              className={`text-3xl font-bold mb-2 tracking-tight ${outperformance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
-            >
-              {outperformance >= 0 ? '+' : ''}
-              {outperformance.toFixed(2)}%
-            </div>
-            <div className="text-sm text-white/50 mt-2">
-              {outperformance >= 0 ? 'Algorithm outperformed' : 'Algorithm underperformed'}{' '}
-              benchmark
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-900/60 rounded-xl p-8 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.6s_both]">
-          <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-            <h3 className="text-xl font-semibold m-0 text-white/90 tracking-tight">
-              Performance Metrics
-            </h3>
-            <MetricTogglePanel
-              enabledMetrics={enabledMetrics}
-              onToggle={handleToggleMetric}
-              availableMetrics={availableMetrics}
-            />
-          </div>
-          {displayedMetrics.length > 0 ? (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-              {displayedMetrics.map((metric, index) => (
-                <div
-                  key={index}
-                  className="py-3 px-4 bg-white/3 rounded-lg border border-white/5 text-sm text-white/80 transition-all duration-200 hover:bg-white/5 hover:border-white/10 hover:translate-x-1"
-                >
-                  {metric}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-white/50 text-sm">
-              No metrics selected. Use the toggle panel above to enable metrics.
-            </div>
-          )}
-        </div>
-      </div>
+      <svg ref={svgRef} className="w-full h-[600px] block" />
     </div>
   );
 }
+
