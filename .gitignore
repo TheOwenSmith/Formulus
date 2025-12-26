@@ -16,7 +16,6 @@ downloads/
 eggs/
 .eggs/
 lib/
-!api/**/lib/
 lib64/
 parts/
 sdist/
@@ -207,3 +206,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Ignore web-app
+!web-app/**
