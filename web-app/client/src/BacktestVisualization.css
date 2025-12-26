@@ -26,6 +26,17 @@
   }
 }
 
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Pseudo-elements and complex gradients - must stay as CSS */
 .backtest-chart-container::before {
   content: '';
