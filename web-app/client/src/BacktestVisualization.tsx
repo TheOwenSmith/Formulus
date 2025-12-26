@@ -565,17 +565,24 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
   const outperformance = algorithmReturn - tickerReturn;
 
   return (
-    <div className="backtest-visualization" ref={containerRef}>
-      <div className="backtest-header">
-        <h1 className="backtest-title">{data.algorithmName}</h1>
-        <div className="backtest-subtitle">Backtesting Performance Analysis</div>
+    <div
+      className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 font-sans text-white"
+      ref={containerRef}
+    >
+      <div className="text-center mb-12 animate-[fadeInDown_0.8s_ease-out]">
+        <h1 className="text-4xl font-bold mb-2 m-0 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent tracking-tight">
+          {data.algorithmName}
+        </h1>
+        <div className="text-base text-white/60 font-normal tracking-wider uppercase">
+          Backtesting Performance Analysis
+        </div>
       </div>
 
-      <div className="backtest-content">
-        <div className="backtest-chart-container">
-          <div className="chart-controls">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="backtest-chart-container bg-slate-900/60 rounded-2xl p-8 mb-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.2s_both] relative overflow-hidden">
+          <div className="flex justify-between items-center mb-4 py-2">
             <button
-              className="zoom-reset-button"
+              className="bg-blue-500/20 border border-blue-500/40 text-blue-400 px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-all duration-200 font-sans hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => {
                 zoomDomainRef.current = null;
                 setDimensions((prev) => ({ ...prev }));
@@ -584,21 +591,25 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
             >
               Reset Zoom
             </button>
-            <div className="zoom-hint">Click and drag to select a range, double-click to reset</div>
+            <div className="text-xs text-white/50 italic">
+              Click and drag to select a range, double-click to reset
+            </div>
           </div>
-          <svg ref={svgRef} className="backtest-chart" />
+          <svg ref={svgRef} className="w-full h-[600px] block" />
         </div>
 
-        <div className="backtest-stats">
-          <div className="stat-card stat-card-primary">
-            <div className="stat-label">Algorithm Return</div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-6 mb-8 animate-[fadeInUp_0.8s_ease-out_0.4s_both]">
+          <div className="stat-card stat-card-primary bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-emerald-500/20 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
+            <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
+              Algorithm Return
+            </div>
             <div
-              className={`stat-value ${algorithmReturn >= 0 ? 'stat-positive' : 'stat-negative'}`}
+              className={`text-3xl font-bold mb-2 tracking-tight ${algorithmReturn >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
             >
               {algorithmReturn >= 0 ? '+' : ''}
               {algorithmReturn.toFixed(2)}%
             </div>
-            <div className="stat-amount">
+            <div className="text-base text-white/80 font-medium">
               $
               {finalAlgorithmValue.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
@@ -607,13 +618,17 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-label">{data.tickerPlot.name} Return</div>
-            <div className={`stat-value ${tickerReturn >= 0 ? 'stat-positive' : 'stat-negative'}`}>
+          <div className="stat-card bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
+            <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
+              {data.tickerPlot.name} Return
+            </div>
+            <div
+              className={`text-3xl font-bold mb-2 tracking-tight ${tickerReturn >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
+            >
               {tickerReturn >= 0 ? '+' : ''}
               {tickerReturn.toFixed(2)}%
             </div>
-            <div className="stat-amount">
+            <div className="text-base text-white/80 font-medium">
               $
               {finalTickerValue.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
@@ -622,26 +637,33 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
             </div>
           </div>
 
-          <div className="stat-card stat-card-accent">
-            <div className="stat-label">Outperformance</div>
+          <div className="stat-card stat-card-accent bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-blue-500/20 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.1)]">
+            <div className="text-sm text-white/60 uppercase tracking-wider font-medium mb-3">
+              Outperformance
+            </div>
             <div
-              className={`stat-value ${outperformance >= 0 ? 'stat-positive' : 'stat-negative'}`}
+              className={`text-3xl font-bold mb-2 tracking-tight ${outperformance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}
             >
               {outperformance >= 0 ? '+' : ''}
               {outperformance.toFixed(2)}%
             </div>
-            <div className="stat-subtext">
+            <div className="text-sm text-white/50 mt-2">
               {outperformance >= 0 ? 'Algorithm outperformed' : 'Algorithm underperformed'}{' '}
               benchmark
             </div>
           </div>
         </div>
 
-        <div className="backtest-description">
-          <h3 className="description-title">Performance Metrics</h3>
-          <div className="description-list">
+        <div className="bg-slate-900/60 rounded-xl p-8 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.6s_both]">
+          <h3 className="text-xl font-semibold m-0 mb-6 text-white/90 tracking-tight">
+            Performance Metrics
+          </h3>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
             {data.description.map((metric, index) => (
-              <div key={index} className="description-item">
+              <div
+                key={index}
+                className="py-3 px-4 bg-white/3 rounded-lg border border-white/5 text-sm text-white/80 transition-all duration-200 hover:bg-white/5 hover:border-white/10 hover:translate-x-1"
+              >
                 {metric}
               </div>
             ))}
