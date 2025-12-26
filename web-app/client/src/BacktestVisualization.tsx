@@ -1,7 +1,43 @@
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
-import type { Graph } from './types';
 import './BacktestVisualization.css';
+import type { Graph } from './types';
+
+// Format timestamp string to YYYY-MM-DD HH:mm:ss with 12-hour format
+function formatTimestamp(timestamp: string): string {
+  try {
+    // Parse timestamp - handle both ISO and YYYY-MM-DD HH:mm:ss formats
+    let date: Date;
+    if (timestamp.includes('T')) {
+      date = new Date(timestamp);
+    } else {
+      // Replace space with T for ISO parsing
+      date = new Date(timestamp.replace(' ', 'T'));
+    }
+
+    if (isNaN(date.getTime())) {
+      return timestamp; // Return as-is if parsing fails
+    }
+
+    // Format as YYYY-MM-DD with 12-hour time format
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    // Convert to 12-hour format
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 should be 12
+    const hours12 = String(hours);
+
+    return `${year}-${month}-${day} ${hours12}:${minutes}:${seconds} ${ampm}`;
+  } catch {
+    return timestamp; // Return as-is if parsing fails
+  }
+}
 
 interface BacktestVisualizationProps {
   data: Graph;
@@ -11,6 +47,8 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const zoomDomainRef = useRef<[number, number] | null>(null);
+  const isBrushingRef = useRef(false);
 
   // Handle resize
   useEffect(() => {
@@ -39,17 +77,15 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
     svg.selectAll('*').remove();
 
     const container = containerRef.current;
-    const width = dimensions.width || container.clientWidth;
-    const height = dimensions.height || 600;
+    const width = dimensions.width ?? container.clientWidth;
+    const height = dimensions.height ?? 600;
     const margin = { top: 60, right: 80, bottom: 80, left: 100 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
     svg.attr('width', width).attr('height', height);
 
-    const g = svg
-      .append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
     // Prepare data
     const { tickerPlot, algorithmPlot, timestamps } = data;
@@ -60,18 +96,25 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       index: i,
     }));
 
-    // Scales
-    const xScale = d3
-      .scaleLinear()
-      .domain([0, dataPoints.length - 1])
-      .range([0, innerWidth]);
+    // Original domain for reset
+    const originalXDomain: [number, number] = [0, dataPoints.length - 1];
+    const currentXDomain = zoomDomainRef.current ?? originalXDomain;
 
-    const allValues = [
-      ...tickerPlot.y,
-      ...algorithmPlot.y,
-    ];
-    const yMin = d3.min(allValues)!;
-    const yMax = d3.max(allValues)!;
+    // Get visible data points for y-scale calculation and drawing
+    const startIndex = Math.max(0, Math.floor(currentXDomain[0]));
+    const endIndex = Math.min(dataPoints.length - 1, Math.ceil(currentXDomain[1]));
+    const visibleDataPoints = dataPoints.slice(startIndex, endIndex + 1);
+
+    // Scales
+    const xScale = d3.scaleLinear().domain(currentXDomain).range([0, innerWidth]);
+
+    // Calculate y-scale based on visible data points only
+    const visibleTickerValues = visibleDataPoints.map((d) => d.tickerValue);
+    const visibleAlgorithmValues = visibleDataPoints.map((d) => d.algorithmValue);
+    const allVisibleValues = [...visibleTickerValues, ...visibleAlgorithmValues];
+
+    const yMin = d3.min(allVisibleValues)!;
+    const yMax = d3.max(allVisibleValues)!;
     const yPadding = (yMax - yMin) * 0.1;
 
     const yScale = d3
@@ -79,15 +122,15 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .domain([yMin - yPadding, yMax + yPadding])
       .range([innerHeight, 0]);
 
-    // Line generators
+    // Line generators - use only visible data points to prevent overflow
     const tickerLine = d3
-      .line<typeof dataPoints[0]>()
+      .line<(typeof dataPoints)[0]>()
       .x((d) => xScale(d.index))
       .y((d) => yScale(d.tickerValue))
       .curve(d3.curveMonotoneX);
 
     const algorithmLine = d3
-      .line<typeof dataPoints[0]>()
+      .line<(typeof dataPoints)[0]>()
       .x((d) => xScale(d.index))
       .y((d) => yScale(d.algorithmValue))
       .curve(d3.curveMonotoneX);
@@ -103,8 +146,16 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .attr('y1', '0%')
       .attr('x2', '0%')
       .attr('y2', '100%');
-    tickerGradient.append('stop').attr('offset', '0%').attr('stop-color', '#3b82f6').attr('stop-opacity', 0.3);
-    tickerGradient.append('stop').attr('offset', '100%').attr('stop-color', '#3b82f6').attr('stop-opacity', 0);
+    tickerGradient
+      .append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#3b82f6')
+      .attr('stop-opacity', 0.3);
+    tickerGradient
+      .append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#3b82f6')
+      .attr('stop-opacity', 0);
 
     // Algorithm gradient
     const algorithmGradient = defs
@@ -114,8 +165,16 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .attr('y1', '0%')
       .attr('x2', '0%')
       .attr('y2', '100%');
-    algorithmGradient.append('stop').attr('offset', '0%').attr('stop-color', '#10b981').attr('stop-opacity', 0.3);
-    algorithmGradient.append('stop').attr('offset', '100%').attr('stop-color', '#10b981').attr('stop-opacity', 0);
+    algorithmGradient
+      .append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#10b981')
+      .attr('stop-opacity', 0.3);
+    algorithmGradient
+      .append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#10b981')
+      .attr('stop-opacity', 0);
 
     // Grid lines
     const xAxisGrid = d3
@@ -144,59 +203,59 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
     // Area under curves
     const tickerArea = d3
-      .area<typeof dataPoints[0]>()
+      .area<(typeof dataPoints)[0]>()
       .x((d) => xScale(d.index))
       .y0(innerHeight)
       .y1((d) => yScale(d.tickerValue))
       .curve(d3.curveMonotoneX);
 
     const algorithmArea = d3
-      .area<typeof dataPoints[0]>()
+      .area<(typeof dataPoints)[0]>()
       .x((d) => xScale(d.index))
       .y0(innerHeight)
       .y1((d) => yScale(d.algorithmValue))
       .curve(d3.curveMonotoneX);
 
     g.append('path')
-      .datum(dataPoints)
+      .datum(visibleDataPoints)
       .attr('fill', 'url(#ticker-gradient)')
       .attr('d', tickerArea)
       .attr('opacity', 0)
       .transition()
-      .duration(1000)
+      .duration(300)
       .attr('opacity', 1);
 
     g.append('path')
-      .datum(dataPoints)
+      .datum(visibleDataPoints)
       .attr('fill', 'url(#algorithm-gradient)')
       .attr('d', algorithmArea)
       .attr('opacity', 0)
       .transition()
-      .duration(1000)
+      .duration(300)
       .attr('opacity', 1);
 
-    // Draw lines
+    // Draw lines - use only visible data points to prevent overflow
     g.append('path')
-      .datum(dataPoints)
+      .datum(visibleDataPoints)
       .attr('fill', 'none')
       .attr('stroke', '#3b82f6')
       .attr('stroke-width', 2.5)
       .attr('d', tickerLine)
       .attr('opacity', 0)
       .transition()
-      .duration(1200)
+      .duration(350)
       .attr('opacity', 1);
 
     g.append('path')
-      .datum(dataPoints)
+      .datum(visibleDataPoints)
       .attr('fill', 'none')
       .attr('stroke', '#10b981')
       .attr('stroke-width', 2.5)
       .attr('d', algorithmLine)
       .attr('opacity', 0)
       .transition()
-      .duration(1200)
-      .delay(200)
+      .duration(350)
+      .delay(50)
       .attr('opacity', 1);
 
     // Axes
@@ -206,8 +265,22 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .tickFormat((d) => {
         const index = Math.round(Number(d));
         if (index >= 0 && index < timestamps.length) {
-          const date = new Date(timestamps[index]);
-          return d3.timeFormat('%m/%d')(date);
+          const timestamp = timestamps[index];
+          // Parse YYYY-MM-DD HH:mm:ss format
+          try {
+            const date = new Date(timestamp.replace(' ', 'T'));
+            if (!isNaN(date.getTime())) {
+              return d3.timeFormat('%m/%d')(date);
+            }
+            // If parsing fails, try to extract date part
+            const datePart = timestamp.split(' ')[0];
+            if (datePart) {
+              return datePart.substring(5); // Return MM-DD
+            }
+          } catch {
+            // Fallback to showing part of timestamp
+            return timestamp.substring(5, 10); // Return MM-DD if possible
+          }
         }
         return '';
       });
@@ -252,21 +325,58 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .style('font-weight', '500')
       .text('Portfolio Value ($)');
 
-    // Legend
-    const legend = g.append('g').attr('class', 'legend').attr('transform', `translate(${innerWidth - 200}, 20)`);
-
+    // Legend with background
     const legendItems = [
       { color: '#3b82f6', label: tickerPlot.name },
       { color: '#10b981', label: algorithmPlot.name },
     ];
 
+    // Calculate legend dimensions
+    const legendItemHeight = 25;
+    const legendPadding = 12;
+    const legendLineWidth = 30;
+    const legendTextOffset = 40;
+    const legendRightMargin = 20; // Margin from right edge
+
+    // Estimate text width (add some buffer for safety)
+    const maxLabelWidth = Math.max(
+      ...legendItems.map((item) => item.label.length * 9), // Slightly more per character for safety
+    );
+    const legendWidth = legendTextOffset + maxLabelWidth + legendPadding * 2;
+    const legendHeight = legendItems.length * legendItemHeight + legendPadding * 2;
+
+    // Position legend - ensure it doesn't go off screen
+    // Position from right edge, but ensure it stays within bounds
+    const legendX = innerWidth * 0.925 - legendWidth - legendRightMargin;
+    // If legend would be too wide, position from left instead
+    const finalLegendX = legendX < legendRightMargin ? legendRightMargin : legendX;
+    const legendY = 10;
+
+    // Create background rectangle
+    g.append('rect')
+      .attr('x', finalLegendX)
+      .attr('y', legendY)
+      .attr('width', legendWidth)
+      .attr('height', legendHeight)
+      .attr('fill', 'rgba(15, 23, 42, 0.95)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.2)')
+      .attr('stroke-width', 1)
+      .attr('rx', 6);
+
+    const legend = g
+      .append('g')
+      .attr('class', 'legend')
+      .attr('transform', `translate(${finalLegendX + legendPadding}, ${legendY + legendPadding})`);
+
     legendItems.forEach((item, i) => {
-      const legendItem = legend.append('g').attr('transform', `translate(0, ${i * 25})`);
+      const legendItem = legend
+        .append('g')
+        .attr('transform', `translate(0, ${i * legendItemHeight})`);
 
       legendItem
         .append('line')
         .attr('x1', 0)
-        .attr('x2', 30)
+        .attr('x2', legendLineWidth)
         .attr('y1', 0)
         .attr('y2', 0)
         .attr('stroke', item.color)
@@ -274,9 +384,9 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
       legendItem
         .append('text')
-        .attr('x', 40)
+        .attr('x', legendTextOffset)
         .attr('y', 5)
-        .style('fill', 'rgba(255, 255, 255, 0.9)')
+        .style('fill', 'rgba(255, 255, 255, 0.95)')
         .style('font-size', '13px')
         .style('font-weight', '500')
         .text(item.label);
@@ -291,15 +401,7 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .style('position', 'absolute')
       .style('pointer-events', 'none');
 
-    // Interactive overlay for hover
-    const overlay = g
-      .append('rect')
-      .attr('width', innerWidth)
-      .attr('height', innerHeight)
-      .attr('fill', 'transparent')
-      .style('cursor', 'crosshair');
-
-    // Hover line
+    // Hover line (created before brush so brush can be on top)
     const hoverLine = g
       .append('line')
       .attr('class', 'hover-line')
@@ -310,43 +412,138 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
       .attr('y2', innerHeight)
       .style('opacity', 0);
 
-    overlay.on('mousemove', function (event) {
+    // Brush for zoom selection - using d3's native brush behavior
+    const brush = d3
+      .brushX()
+      .extent([
+        [0, 0],
+        [innerWidth, innerHeight],
+      ])
+      .on('start', function () {
+        isBrushingRef.current = true;
+        // Hide tooltip during brush
+        tooltip.style('opacity', 0);
+        hoverLine.style('opacity', 0);
+        // Show handles when brushing starts
+        brushGroup.selectAll('.handle').style('display', null);
+      })
+      .on('brush', function (event) {
+        if (!event.selection) {
+          // If no selection, hide handles
+          brushGroup.selectAll('.handle').style('display', 'none');
+          return;
+        }
+        // Show handles during brush
+        brushGroup.selectAll('.handle').style('display', null);
+      })
+      .on('end', function (event) {
+        isBrushingRef.current = false;
+
+        if (!event.selection) {
+          hoverLine.style('opacity', 0);
+          // Hide handles when brush ends with no selection
+          brushGroup.selectAll('.handle').style('display', 'none');
+          return;
+        }
+
+        const [x0, x1] = event.selection;
+        const startIndex = Math.max(0, Math.floor(xScale.invert(x0)));
+        const endIndex = Math.min(dataPoints.length - 1, Math.ceil(xScale.invert(x1)));
+
+        // Only zoom if selection is meaningful (at least 2 data points)
+        if (endIndex - startIndex >= 2) {
+          zoomDomainRef.current = [startIndex, endIndex];
+          // Trigger re-render by updating dimensions slightly
+          setDimensions((prev) => ({ ...prev }));
+        }
+
+        // Clear brush selection and hide handles
+        d3.select(this).call(brush.move, null);
+        brushGroup.selectAll('.handle').style('display', 'none');
+        hoverLine.style('opacity', 0);
+      });
+
+    const brushGroup = g.append('g').attr('class', 'brush').call(brush);
+
+    // Style the brush
+    brushGroup
+      .selectAll('.selection')
+      .attr('fill', 'rgba(59, 130, 246, 0.2)')
+      .attr('stroke', '#3b82f6')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '5,5');
+
+    brushGroup
+      .selectAll('.handle')
+      .attr('fill', '#3b82f6')
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 2)
+      .attr('width', 8)
+      .attr('height', innerHeight);
+
+    // Hide brush handles by default - only show when actively brushing
+    brushGroup.selectAll('.handle').style('display', 'none');
+
+    // Get the brush overlay (d3 creates this automatically)
+    const brushOverlay = brushGroup.selectAll('.overlay');
+
+    // Style the brush overlay
+    brushOverlay.style('cursor', 'crosshair').style('fill', 'transparent');
+
+    // Add hover functionality to brush overlay - works when not actively brushing
+    brushOverlay.on('mousemove', function (event) {
+      // Only show hover if not currently brushing
+      if (isBrushingRef.current) return;
+
       const [mouseX] = d3.pointer(event);
       const index = Math.round(xScale.invert(mouseX));
       if (index >= 0 && index < dataPoints.length) {
         const point = dataPoints[index];
         hoverLine.attr('x1', xScale(index)).attr('x2', xScale(index)).style('opacity', 1);
 
-        const tickerReturn = ((point.tickerValue - dataPoints[0].tickerValue) / dataPoints[0].tickerValue) * 100;
-        const algorithmReturn = ((point.algorithmValue - dataPoints[0].algorithmValue) / dataPoints[0].algorithmValue) * 100;
+        const tickerReturn =
+          ((point.tickerValue - dataPoints[0].tickerValue) / dataPoints[0].tickerValue) * 100;
+        const algorithmReturn =
+          ((point.algorithmValue - dataPoints[0].algorithmValue) / dataPoints[0].algorithmValue) *
+          100;
 
         tooltip
           .style('opacity', 1)
-          .html(`
-            <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">${new Date(point.timestamp).toLocaleDateString()}</div>
+          .html(
+            `
+            <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.95);">${formatTimestamp(point.timestamp)}</div>
             <div style="margin-bottom: 4px;">
               <span style="color: #3b82f6; font-weight: 500;">${tickerPlot.name}:</span>
-              <span style="margin-left: 8px;">$${point.tickerValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span style="margin-left: 8px; color: ${tickerReturn >= 0 ? '#10b981' : '#ef4444'};">
+              <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.tickerValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span style="margin-left: 8px; color: ${tickerReturn >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
                 (${tickerReturn >= 0 ? '+' : ''}${tickerReturn.toFixed(2)}%)
               </span>
             </div>
             <div>
               <span style="color: #10b981; font-weight: 500;">${algorithmPlot.name}:</span>
-              <span style="margin-left: 8px;">$${point.algorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span style="margin-left: 8px; color: ${algorithmReturn >= 0 ? '#10b981' : '#ef4444'};">
+              <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.algorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span style="margin-left: 8px; color: ${algorithmReturn >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
                 (${algorithmReturn >= 0 ? '+' : ''}${algorithmReturn.toFixed(2)}%)
               </span>
             </div>
-          `)
+          `,
+          )
           .style('left', `${event.pageX + 10}px`)
           .style('top', `${event.pageY - 10}px`);
       }
     });
 
-    overlay.on('mouseleave', () => {
-      hoverLine.style('opacity', 0);
-      tooltip.style('opacity', 0);
+    brushOverlay.on('mouseleave', () => {
+      if (!isBrushingRef.current) {
+        hoverLine.style('opacity', 0);
+        tooltip.style('opacity', 0);
+      }
+    });
+
+    // Double-click to reset zoom
+    brushOverlay.on('dblclick', () => {
+      zoomDomainRef.current = null;
+      setDimensions((prev) => ({ ...prev }));
     });
 
     // Cleanup
@@ -362,7 +559,8 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
   const initialAlgorithmValue = data.algorithmPlot.y[0];
   const finalAlgorithmValue = data.algorithmPlot.y[data.algorithmPlot.y.length - 1];
-  const algorithmReturn = ((finalAlgorithmValue - initialAlgorithmValue) / initialAlgorithmValue) * 100;
+  const algorithmReturn =
+    ((finalAlgorithmValue - initialAlgorithmValue) / initialAlgorithmValue) * 100;
 
   const outperformance = algorithmReturn - tickerReturn;
 
@@ -375,17 +573,38 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
 
       <div className="backtest-content">
         <div className="backtest-chart-container">
+          <div className="chart-controls">
+            <button
+              className="zoom-reset-button"
+              onClick={() => {
+                zoomDomainRef.current = null;
+                setDimensions((prev) => ({ ...prev }));
+              }}
+              disabled={zoomDomainRef.current === null}
+            >
+              Reset Zoom
+            </button>
+            <div className="zoom-hint">Click and drag to select a range, double-click to reset</div>
+          </div>
           <svg ref={svgRef} className="backtest-chart" />
         </div>
 
         <div className="backtest-stats">
           <div className="stat-card stat-card-primary">
             <div className="stat-label">Algorithm Return</div>
-            <div className={`stat-value ${algorithmReturn >= 0 ? 'stat-positive' : 'stat-negative'}`}>
+            <div
+              className={`stat-value ${algorithmReturn >= 0 ? 'stat-positive' : 'stat-negative'}`}
+            >
               {algorithmReturn >= 0 ? '+' : ''}
               {algorithmReturn.toFixed(2)}%
             </div>
-            <div className="stat-amount">${finalAlgorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="stat-amount">
+              $
+              {finalAlgorithmValue.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
           </div>
 
           <div className="stat-card">
@@ -394,17 +613,26 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
               {tickerReturn >= 0 ? '+' : ''}
               {tickerReturn.toFixed(2)}%
             </div>
-            <div className="stat-amount">${finalTickerValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="stat-amount">
+              $
+              {finalTickerValue.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
           </div>
 
           <div className="stat-card stat-card-accent">
             <div className="stat-label">Outperformance</div>
-            <div className={`stat-value ${outperformance >= 0 ? 'stat-positive' : 'stat-negative'}`}>
+            <div
+              className={`stat-value ${outperformance >= 0 ? 'stat-positive' : 'stat-negative'}`}
+            >
               {outperformance >= 0 ? '+' : ''}
               {outperformance.toFixed(2)}%
             </div>
             <div className="stat-subtext">
-              {outperformance >= 0 ? 'Algorithm outperformed' : 'Algorithm underperformed'} benchmark
+              {outperformance >= 0 ? 'Algorithm outperformed' : 'Algorithm underperformed'}{' '}
+              benchmark
             </div>
           </div>
         </div>
@@ -423,4 +651,3 @@ export function BacktestVisualization({ data }: BacktestVisualizationProps) {
     </div>
   );
 }
-
