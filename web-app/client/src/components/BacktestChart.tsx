@@ -1,6 +1,5 @@
 import '@client/styles/BacktestChart.css';
 import type { Graph } from '@client/types';
-import { withCommasRounded } from '@client/utils/numberUtils';
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
 
@@ -523,9 +522,6 @@ export function BacktestChart({
           ((point.algorithmValue - dataPoints[0].algorithmValue) / dataPoints[0].algorithmValue) *
           100;
 
-        // Format growth rate with APY
-        const growthRateFormatted = `${withCommasRounded(growthRate * 100)}% APY`;
-
         tooltip
           .style('opacity', 1)
           .html(
@@ -534,15 +530,15 @@ export function BacktestChart({
             <div style="margin-bottom: 4px;">
               <span style="color: #3b82f6; font-weight: 500;">${tickerPlot.name}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.tickerValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span style="margin-left: 8px; color: ${tickerReturn >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
+              <span style="margin-left: 8px; color: ${tickerReturn > 0 ? '#10b981' : tickerReturn === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
                 (${tickerReturn >= 0 ? '+' : ''}${tickerReturn.toFixed(2)}%)
               </span>
             </div>
             <div>
               <span style="color: #10b981; font-weight: 500;">${algorithmPlot.name}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.algorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span style="margin-left: 8px; color: ${pointAlgorithmReturn >= 0 ? '#10b981' : '#ef4444'}; font-weight: 500;">
-                (${growthRateFormatted})
+              <span style="margin-left: 8px; color: ${pointAlgorithmReturn > 0 ? '#10b981' : pointAlgorithmReturn === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
+                (${pointAlgorithmReturn >= 0 ? '+' : ''}${pointAlgorithmReturn.toFixed(2)}%)
               </span>
             </div>
           `,
