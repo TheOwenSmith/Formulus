@@ -361,7 +361,7 @@ export function BacktestChart({
 
     // Calculate legend dimensions first (before brush, so we can exclude it from brush)
     const legendItems = [
-      { color: '#3b82f6', label: algorithmPlot.name },
+      { color: '#3b82f6', label: data.algorithmName },
       { color: '#ffffff', label: tickerPlot.name },
     ];
 
@@ -371,7 +371,7 @@ export function BacktestChart({
     const legendTextOffset = 40;
     const legendRightMargin = 10;
 
-    const maxLabelWidth = Math.max(...legendItems.map((item) => item.label.length * 9));
+    const maxLabelWidth = Math.max(...legendItems.map((item) => item.label.length * 7.5));
     const legendWidth = legendTextOffset + maxLabelWidth + legendPadding * 2;
     const legendHeight = legendItems.length * legendItemHeight + legendPadding * 2;
 
@@ -539,7 +539,7 @@ export function BacktestChart({
               </span>
             </div>
             <div>
-              <span style="color: #3b82f6; font-weight: 500;">${algorithmPlot.name}:</span>
+              <span style="color: #3b82f6; font-weight: 500;">${data.algorithmName}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.algorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               <span style="margin-left: 8px; color: ${pointAlgorithmReturn > 0 ? '#10b981' : pointAlgorithmReturn === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
                 (${pointAlgorithmReturn >= 0 ? '+' : ''}${pointAlgorithmReturn.toFixed(2)}%)
