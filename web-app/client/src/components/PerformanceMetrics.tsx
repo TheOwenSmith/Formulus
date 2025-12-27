@@ -8,6 +8,7 @@ interface PerformanceMetricsProps {
   enabledMetrics: Record<MetricKey, boolean>;
   onToggleMetric: (metric: MetricKey, enabled: boolean) => void;
   availableMetrics: Set<MetricKey>;
+  primaryColor?: string; // Primary color for the algorithm (hex format)
 }
 
 export function PerformanceMetrics({
@@ -16,6 +17,7 @@ export function PerformanceMetrics({
   enabledMetrics,
   onToggleMetric,
   availableMetrics,
+  primaryColor = '#3b82f6',
 }: PerformanceMetricsProps) {
   // Metric toggle state is now managed by parent
   const metricMap = useMemo(() => createMetricMap(description), [description]);
@@ -70,6 +72,7 @@ export function PerformanceMetrics({
           enabledMetrics={enabledMetrics}
           onToggle={onToggleMetric}
           availableMetrics={availableMetrics}
+          primaryColor={primaryColor}
         />
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">

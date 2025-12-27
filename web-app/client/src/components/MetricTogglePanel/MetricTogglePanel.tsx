@@ -7,12 +7,14 @@ interface MetricTogglePanelProps {
   enabledMetrics: Record<MetricKey, boolean>;
   onToggle: (metric: MetricKey, enabled: boolean) => void;
   availableMetrics: Set<MetricKey>;
+  primaryColor?: string; // Primary color for the algorithm (hex format)
 }
 
 export function MetricTogglePanel({
   enabledMetrics,
   onToggle,
   availableMetrics,
+  primaryColor = '#3b82f6',
 }: MetricTogglePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
@@ -161,12 +163,13 @@ export function MetricTogglePanel({
         aria-label="Toggle metric visibility options"
       >
         <svg
-          className={`text-blue-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           width="18"
           height="18"
           viewBox="0 0 18 18"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
+          style={{ color: primaryColor }}
         >
           <path
             d="M2.25 4.5H15.75M2.25 9H15.75M2.25 13.5H15.75"

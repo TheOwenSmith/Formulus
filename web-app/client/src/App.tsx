@@ -14,16 +14,23 @@ const generateTickerData = (name: string, baseTrend: number, noiseFactor: number
   }),
 });
 
+// Generate algorithm data with different performance characteristics
+const generateAlgorithmData = (name: string, baseTrend: number, volatility: number, phase: number) => ({
+  name,
+  y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
+    const base = 100;
+    const trend = (i / MULTIPLIER) * baseTrend;
+    const noise = Math.sin((i / MULTIPLIER / 8) + phase) * volatility + Math.random() * (volatility / 2);
+    return base + trend + noise;
+  }),
+});
+
 const sampleData: Graph = {
-  algorithmName: 'Momentum Strategy',
-  algorithmPlot: {
-    name: 'Algorithm',
-    y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
-      const base = 100;
-      const trend = (i / MULTIPLIER) * 0.12;
-      const noise = Math.sin(i / MULTIPLIER / 8) * 4 + Math.random() * 2;
-      return base + trend + noise;
-    }),
+  algorithmPlots: {
+    'Momentum Strategy': generateAlgorithmData('Momentum Strategy', 0.12, 4, 0),
+    'Mean Reversion': generateAlgorithmData('Mean Reversion', 0.08, 3, Math.PI / 2),
+    'Breakout Strategy': generateAlgorithmData('Breakout Strategy', 0.15, 5, Math.PI),
+    'RSI Strategy': generateAlgorithmData('RSI Strategy', 0.10, 3.5, Math.PI * 1.5),
   },
   description: [
     'Aggregate: 1min',
@@ -42,8 +49,8 @@ const sampleData: Graph = {
     'Positions closed: 1,189',
     'Trades made: 1,234',
   ],
-  growthRate: 0.22, // 43.55%
-  sharpeRatio: 0.9, // Sharpe ratio
+  growthRate: 0.22, // Best algorithm's growth rate
+  sharpeRatio: 0.9, // Best algorithm's Sharpe ratio
   tickerPlots: {
     SPY: generateTickerData('SPY', 0.1, 5),
     AAPL: generateTickerData('AAPL', 0.15, 6),
