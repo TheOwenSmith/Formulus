@@ -17,6 +17,7 @@ import { groupBy } from '@api/utils/groupBy';
 import { withCommas } from '@api/utils/number-utils';
 import { SharpeRatioCalculator } from '@api/utils/sharpe-ratio-calculator';
 import type { AtLeastOne } from '@api/utils/types';
+import cliProgress, { Presets } from 'cli-progress';
 import {
   countBytesToProcess,
   getIteratorBounds,

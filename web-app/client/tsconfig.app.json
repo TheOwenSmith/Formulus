@@ -27,7 +27,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    "rootDir": ".."
   },
-  "include": ["src", "../api/src"]
+  "include": ["./src", "../api/src"]
 }

@@ -4,6 +4,6 @@
     "paths": {
       "@api/*": ["./api/src/*"],
       "@client/*": ["./client/src/*"],
-    },
+    }
   }
 }
