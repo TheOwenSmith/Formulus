@@ -75,14 +75,28 @@ export function PerformanceMetrics({
       <div className="flex-1 overflow-hidden flex flex-col">
         {displayedMetrics.length > 0 ? (
           <div className="flex flex-col gap-3 overflow-y-auto flex-1 pr-2">
-            {displayedMetrics.map((metric, index) => (
-              <div
-                key={index}
-                className="py-2 px-4 bg-white/3 rounded-lg border border-white/5 text-sm text-white/80 transition-all duration-200 hover:bg-white/5 hover:border-white/10 flex-shrink-0"
-              >
-                {metric}
-              </div>
-            ))}
+            {displayedMetrics.map((metric, index) => {
+              // Parse metric string to separate label and value
+              const colonIndex = metric.indexOf(':');
+              const label = colonIndex !== -1 ? metric.substring(0, colonIndex + 1) : '';
+              const value = colonIndex !== -1 ? metric.substring(colonIndex + 1).trim() : metric;
+
+              return (
+                <div
+                  key={index}
+                  className="py-2.5 px-4 bg-white/4 rounded-lg border border-white/8 text-sm text-white/85 transition-all duration-200 hover:bg-white/6 hover:border-white/12 flex-shrink-0"
+                >
+                  {colonIndex !== -1 ? (
+                    <div>
+                      <span className="text-white/60">{label} </span>
+                      <span className="text-white/90 font-medium">{value}</span>
+                    </div>
+                  ) : (
+                    <span className="text-white/85">{metric}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="py-8 text-center text-white/50 text-sm">

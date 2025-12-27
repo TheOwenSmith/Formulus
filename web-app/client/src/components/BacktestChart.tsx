@@ -160,7 +160,7 @@ export function BacktestChart({
     // Create gradient definitions
     const defs = svg.append('defs');
 
-    // Ticker gradient
+    // Ticker gradient (white)
     const tickerGradient = defs
       .append('linearGradient')
       .attr('id', 'ticker-gradient')
@@ -171,15 +171,15 @@ export function BacktestChart({
     tickerGradient
       .append('stop')
       .attr('offset', '0%')
-      .attr('stop-color', '#3b82f6')
+      .attr('stop-color', '#ffffff')
       .attr('stop-opacity', 0.3);
     tickerGradient
       .append('stop')
       .attr('offset', '100%')
-      .attr('stop-color', '#3b82f6')
+      .attr('stop-color', '#ffffff')
       .attr('stop-opacity', 0);
 
-    // Algorithm gradient
+    // Algorithm gradient (blue)
     const algorithmGradient = defs
       .append('linearGradient')
       .attr('id', 'algorithm-gradient')
@@ -190,12 +190,12 @@ export function BacktestChart({
     algorithmGradient
       .append('stop')
       .attr('offset', '0%')
-      .attr('stop-color', '#10b981')
+      .attr('stop-color', '#3b82f6')
       .attr('stop-opacity', 0.3);
     algorithmGradient
       .append('stop')
       .attr('offset', '100%')
-      .attr('stop-color', '#10b981')
+      .attr('stop-color', '#3b82f6')
       .attr('stop-opacity', 0);
 
     // Grid lines (horizontal only)
@@ -248,7 +248,7 @@ export function BacktestChart({
     g.append('path')
       .datum(visibleDataPoints)
       .attr('fill', 'none')
-      .attr('stroke', '#3b82f6')
+      .attr('stroke', '#ffffff')
       .attr('stroke-width', 2.5)
       .attr('d', tickerLine)
       .attr('opacity', 0)
@@ -259,7 +259,7 @@ export function BacktestChart({
     g.append('path')
       .datum(visibleDataPoints)
       .attr('fill', 'none')
-      .attr('stroke', '#10b981')
+      .attr('stroke', '#3b82f6')
       .attr('stroke-width', 2.5)
       .attr('d', algorithmLine)
       .attr('opacity', 0)
@@ -271,7 +271,7 @@ export function BacktestChart({
     // Axes
     const xAxis = d3
       .axisBottom(xScale)
-      .ticks(10)
+      .ticks(5)
       .tickFormat((d) => {
         const index = Math.round(Number(d));
         if (index >= 0 && index < timestamps.length) {
@@ -280,12 +280,17 @@ export function BacktestChart({
           try {
             const date = new Date(timestamp.replace(' ', 'T'));
             if (!isNaN(date.getTime())) {
-              return d3.timeFormat('%m/%d')(date);
+              return d3.timeFormat('%m/%d/%Y')(date); // Added year to format
             }
             // If parsing fails, try to extract date part
             const datePart = timestamp.split(' ')[0];
             if (datePart) {
-              return datePart.substring(5); // Return MM-DD
+              // Return MM/DD/YYYY format
+              const parts = datePart.split('-');
+              if (parts.length === 3) {
+                return `${parts[1]}/${parts[2]}/${parts[0]}`;
+              }
+              return datePart.substring(5); // Fallback to MM-DD
             }
           } catch {
             // Fallback to showing part of timestamp
@@ -337,8 +342,8 @@ export function BacktestChart({
 
     // Legend with background
     const legendItems = [
-      { color: '#3b82f6', label: tickerPlot.name },
-      { color: '#10b981', label: algorithmPlot.name },
+      { color: '#3b82f6', label: algorithmPlot.name },
+      { color: '#ffffff', label: tickerPlot.name },
     ];
 
     // Calculate legend dimensions
@@ -530,14 +535,14 @@ export function BacktestChart({
             `
             <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px; color: rgba(255, 255, 255, 0.95);">${formatTimestamp(point.timestamp)}</div>
             <div style="margin-bottom: 4px;">
-              <span style="color: #3b82f6; font-weight: 500;">${tickerPlot.name}:</span>
+              <span style="color: #ffffff; font-weight: 500;">${tickerPlot.name}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.tickerValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               <span style="margin-left: 8px; color: ${tickerReturn > 0 ? '#10b981' : tickerReturn === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
                 (${tickerReturn >= 0 ? '+' : ''}${tickerReturn.toFixed(2)}%)
               </span>
             </div>
             <div>
-              <span style="color: #10b981; font-weight: 500;">${algorithmPlot.name}:</span>
+              <span style="color: #3b82f6; font-weight: 500;">${algorithmPlot.name}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${point.algorithmValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               <span style="margin-left: 8px; color: ${pointAlgorithmReturn > 0 ? '#10b981' : pointAlgorithmReturn === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
                 (${pointAlgorithmReturn >= 0 ? '+' : ''}${pointAlgorithmReturn.toFixed(2)}%)
@@ -586,7 +591,7 @@ export function BacktestChart({
       ref={containerRef}
       style={{ height: '100%', maxHeight: '100%' }}
     >
-      <div className="absolute top-6 right-4 flex flex-col items-end flex-shrink-0 gap-2 z-10">
+      <div className="absolute top-[14px] right-4 flex flex-col items-end flex-shrink-0 gap-2 z-10">
         <div className="text-xs text-white/50 italic">
           Click and drag to select a range, double-click to reset
         </div>

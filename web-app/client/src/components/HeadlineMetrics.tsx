@@ -44,7 +44,7 @@ export function HeadlineMetrics({ data }: HeadlineMetricsProps) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 animate-[fadeInDown_0.8s_ease-out]">
-      <div className="stat-card stat-card-primary bg-slate-900/60 rounded-xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-emerald-500/20">
+      <div className="stat-card stat-card-primary bg-slate-900/60 rounded-xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-emerald-500/20 hover:-translate-y-1">
         <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2">
           Algorithm Growth Rate
         </div>
@@ -54,7 +54,7 @@ export function HeadlineMetrics({ data }: HeadlineMetricsProps) {
         </div>
       </div>
 
-      <div className="stat-card bg-slate-900/60 rounded-xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden">
+      <div className="stat-card bg-slate-900/60 rounded-xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden hover:-translate-y-1">
         <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2">
           {data.tickerPlot.name} Growth Rate
         </div>
@@ -64,7 +64,7 @@ export function HeadlineMetrics({ data }: HeadlineMetricsProps) {
         </div>
       </div>
 
-      <div className="stat-card stat-card-accent bg-slate-900/60 rounded-xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-blue-500/20">
+      <div className="stat-card stat-card-accent bg-slate-900/60 rounded-xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] transition-all duration-300 relative overflow-hidden border border-blue-500/20 hover:-translate-y-1">
         <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2">
           Sharpe Ratio
         </div>
