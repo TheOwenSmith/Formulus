@@ -1,7 +1,9 @@
+import { TickerSelector } from '@client/components/TickerSelector';
 import '@client/styles/BacktestChart.css';
 import type { Graph } from '@client/types';
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 
 // Format timestamp string to YYYY-MM-DD HH:mm:ss with 12-hour format
 function formatTimestamp(timestamp: string): string {
@@ -44,6 +46,9 @@ interface BacktestChartProps {
   growthRate: number; // As a decimal (e.g., 0.385 for 38.5%)
   onResetZoom?: () => void;
   hasShowMetricsButton?: boolean;
+  availableTickers?: string[];
+  selectedTicker?: string;
+  onTickerChange?: (ticker: string) => void;
 }
 
 export function BacktestChart({
@@ -51,6 +56,9 @@ export function BacktestChart({
   growthRate,
   onResetZoom,
   hasShowMetricsButton = false,
+  availableTickers = [],
+  selectedTicker,
+  onTickerChange,
 }: BacktestChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +66,15 @@ export function BacktestChart({
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [zoomDomain, setZoomDomain] = useState<[number, number] | null>(null);
   const isBrushingRef = useRef(false);
+  const tickerSelectorRootRef = useRef<Root | null>(null);
+  const tickerSelectorContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset zoom when ticker changes
+  useEffect(() => {
+    if (selectedTicker) {
+      setZoomDomain(null);
+    }
+  }, [selectedTicker]);
 
   // Handle resize - use ResizeObserver to detect container size changes
   useEffect(() => {
@@ -92,7 +109,8 @@ export function BacktestChart({
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
-    if (data.tickerPlot.y.length === 0 || data.algorithmPlot.y.length === 0) return;
+    if (!data.tickerPlot || data.tickerPlot.y.length === 0 || data.algorithmPlot.y.length === 0)
+      return;
     if (dimensions.width === 0) return;
 
     const svg = d3.select(svgRef.current);
@@ -111,6 +129,7 @@ export function BacktestChart({
 
     // Prepare data
     const { tickerPlot, algorithmPlot, timestamps } = data;
+    if (!tickerPlot) return;
     const dataPoints = tickerPlot.y.map((y, i) => ({
       timestamp: timestamps[i],
       tickerValue: y,
@@ -340,79 +359,25 @@ export function BacktestChart({
       .style('font-weight', '500')
       .text('Portfolio Value ($)');
 
-    // Legend with background
+    // Calculate legend dimensions first (before brush, so we can exclude it from brush)
     const legendItems = [
       { color: '#3b82f6', label: algorithmPlot.name },
       { color: '#ffffff', label: tickerPlot.name },
     ];
 
-    // Calculate legend dimensions
     const legendItemHeight = 25;
     const legendPadding = 4;
     const legendLineWidth = 30;
     const legendTextOffset = 40;
-    const legendRightMargin = 10; // Margin from right edge
+    const legendRightMargin = 10;
 
-    // Estimate text width (add some buffer for safety)
-    const maxLabelWidth = Math.max(
-      ...legendItems.map((item) => item.label.length * 9), // Slightly more per character for safety
-    );
+    const maxLabelWidth = Math.max(...legendItems.map((item) => item.label.length * 9));
     const legendWidth = legendTextOffset + maxLabelWidth + legendPadding * 2;
     const legendHeight = legendItems.length * legendItemHeight + legendPadding * 2;
 
-    // Position legend - ensure it doesn't go off screen
-    // Position from right edge, but ensure it stays within bounds
     const legendX = innerWidth - legendWidth - legendRightMargin;
-    // If legend would be too wide, position from left instead
     const finalLegendX = legendX < legendRightMargin ? legendRightMargin : legendX;
     const legendY = 10;
-
-    // Create background rectangle
-    g.append('rect')
-      .attr('x', finalLegendX)
-      .attr('y', legendY)
-      .attr('width', legendWidth)
-      .attr('height', legendHeight)
-      .attr('fill', 'rgba(15, 23, 42, 0.95)')
-      .attr('stroke', 'rgba(255, 255, 255, 0.2)')
-      .attr('stroke-width', 1)
-      .attr('rx', 6);
-
-    const legend = g
-      .append('g')
-      .attr('class', 'legend')
-      .attr('transform', `translate(${finalLegendX + legendPadding}, ${legendY + legendPadding})`);
-
-    legendItems.forEach((item, i) => {
-      const legendItem = legend
-        .append('g')
-        .attr('transform', `translate(0, ${i * legendItemHeight})`);
-
-      // Center the line vertically within the item height
-      const lineY = legendItemHeight / 2;
-      const lineOffset = 4; // Offset to move line to the right
-
-      legendItem
-        .append('line')
-        .attr('x1', lineOffset)
-        .attr('x2', legendLineWidth + lineOffset)
-        .attr('y1', lineY)
-        .attr('y2', lineY)
-        .attr('stroke', item.color)
-        .attr('stroke-width', 3);
-
-      // Center text vertically
-      // SVG text y position is from baseline, so we need to adjust for vertical centering
-      legendItem
-        .append('text')
-        .attr('x', legendTextOffset)
-        .attr('y', lineY)
-        .attr('dy', '0.35em') // Adjust for vertical centering (moves text up by ~35% of font size)
-        .style('fill', 'rgba(255, 255, 255, 0.95)')
-        .style('font-size', '13px')
-        .style('font-weight', '500')
-        .text(item.label);
-    });
 
     // Tooltip
     const tooltip = d3
@@ -441,7 +406,21 @@ export function BacktestChart({
         [0, 0],
         [innerWidth, innerHeight],
       ])
-      .on('start', function () {
+      .on('start', function (event) {
+        // Check if brush started in legend area and cancel if so
+        if (event.sourceEvent) {
+          const [mouseX, mouseY] = d3.pointer(event.sourceEvent, g.node() as Element);
+          if (
+            mouseX >= finalLegendX &&
+            mouseX <= finalLegendX + legendWidth &&
+            mouseY >= legendY &&
+            mouseY <= legendY + legendHeight
+          ) {
+            // Cancel brush if started in legend area
+            d3.select(this).call(brush.move, null);
+            return;
+          }
+        }
         isBrushingRef.current = true;
         // Hide tooltip during brush
         tooltip.style('opacity', 0);
@@ -510,6 +489,24 @@ export function BacktestChart({
     // Style the brush overlay
     brushOverlay.style('cursor', 'crosshair').style('fill', 'transparent');
 
+    // Exclude legend area from brush - create a clip path or adjust pointer events
+    // The legend is positioned at finalLegendX, legendY with width legendWidth and height legendHeight
+    // We'll add pointer-events handling to prevent brush from interfering with legend clicks
+    brushOverlay.on('mousedown', function (event) {
+      const [mouseX, mouseY] = d3.pointer(event, g.node() as Element);
+      // Check if click is within legend bounds
+      if (
+        mouseX >= finalLegendX &&
+        mouseX <= finalLegendX + legendWidth &&
+        mouseY >= legendY &&
+        mouseY <= legendY + legendHeight
+      ) {
+        // Prevent brush from starting if clicking on legend
+        event.stopPropagation();
+        return;
+      }
+    });
+
     // Add hover functionality to brush overlay - works when not actively brushing
     brushOverlay.on('mousemove', function (event) {
       // Only show hover if not currently brushing
@@ -570,11 +567,120 @@ export function BacktestChart({
       }
     });
 
+    // Create legend AFTER brush so it renders on top and can receive pointer events
+    // Create background rectangle
+    g.append('rect')
+      .attr('x', finalLegendX)
+      .attr('y', legendY)
+      .attr('width', legendWidth)
+      .attr('height', legendHeight)
+      .attr('fill', 'rgba(15, 23, 42, 0.95)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.2)')
+      .attr('stroke-width', 1)
+      .attr('rx', 6)
+      .style('pointer-events', 'none'); // Background doesn't need pointer events
+
+    const legend = g
+      .append('g')
+      .attr('class', 'legend')
+      .attr('transform', `translate(${finalLegendX + legendPadding}, ${legendY + legendPadding})`)
+      .style('pointer-events', 'all'); // Enable pointer events for legend
+
+    legendItems.forEach((item, i) => {
+      const legendItem = legend
+        .append('g')
+        .attr('transform', `translate(0, ${i * legendItemHeight})`);
+
+      // Center the line vertically within the item height
+      const lineY = legendItemHeight / 2;
+      const lineOffset = 4; // Offset to move line to the right
+
+      legendItem
+        .append('line')
+        .attr('x1', lineOffset)
+        .attr('x2', legendLineWidth + lineOffset)
+        .attr('y1', lineY)
+        .attr('y2', lineY)
+        .attr('stroke', item.color)
+        .attr('stroke-width', 3);
+
+      // For the second item (ticker), we'll render it with React component inside foreignObject
+      // So only render text for the first item (algorithm)
+      if (i === 0) {
+        // Center text vertically
+        // SVG text y position is from baseline, so we need to adjust for vertical centering
+        legendItem
+          .append('text')
+          .attr('x', legendTextOffset)
+          .attr('y', lineY)
+          .attr('dy', '0.35em') // Adjust for vertical centering (moves text up by ~35% of font size)
+          .style('fill', 'rgba(255, 255, 255, 0.95)')
+          .style('font-size', '13px')
+          .style('font-weight', '500')
+          .text(item.label);
+      } else if (i === 1 && availableTickers.length > 1 && selectedTicker && onTickerChange) {
+        // Render ticker selector in foreignObject for the second item
+        const foreignObject = legendItem
+          .append('foreignObject')
+          .attr('x', legendTextOffset)
+          .attr('y', 0)
+          .attr('width', 200) // Enough width for the selector
+          .attr('height', legendItemHeight)
+          .style('pointer-events', 'all') // Enable pointer events
+          .style('overflow', 'visible'); // Allow dropdown to overflow
+
+        const div = foreignObject
+          .append('xhtml:div')
+          .style('width', '100%')
+          .style('height', '100%')
+          .style('pointer-events', 'all'); // Enable pointer events on div
+
+        // Create container div for React component
+        const container = document.createElement('div');
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.pointerEvents = 'all'; // Enable pointer events
+        const divNode = div.node();
+        if (divNode && divNode instanceof HTMLElement) {
+          divNode.appendChild(container);
+        }
+
+        // Store reference and render React component
+        tickerSelectorContainerRef.current = container;
+        if (tickerSelectorRootRef.current) {
+          tickerSelectorRootRef.current.unmount();
+        }
+        tickerSelectorRootRef.current = createRoot(container);
+        tickerSelectorRootRef.current.render(
+          <TickerSelector
+            availableTickers={availableTickers}
+            selectedTicker={selectedTicker}
+            onTickerChange={onTickerChange}
+          />,
+        );
+      }
+    });
+
     // Cleanup
     return () => {
       tooltip.remove();
+      if (tickerSelectorRootRef.current) {
+        tickerSelectorRootRef.current.unmount();
+        tickerSelectorRootRef.current = null;
+      }
     };
-  }, [data, dimensions, zoomDomain, growthRate, onResetZoom]);
+  }, [
+    data,
+    dimensions,
+    zoomDomain,
+    growthRate,
+    onResetZoom,
+    availableTickers,
+    selectedTicker,
+    onTickerChange,
+  ]);
 
   const handleResetZoom = () => {
     setZoomDomain(null);

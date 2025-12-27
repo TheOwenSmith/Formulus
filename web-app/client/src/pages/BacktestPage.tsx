@@ -7,7 +7,7 @@ import {
 } from '@client/components/MetricTogglePanel/metricUtils';
 import { PerformanceMetrics } from '@client/components/PerformanceMetrics';
 import '@client/styles/BacktestPage.css';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Graph } from '../types';
 
 interface BacktestPageProps {
@@ -16,6 +16,53 @@ interface BacktestPageProps {
 
 export function BacktestPage({ data }: BacktestPageProps) {
   const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(true);
+
+  // Get available tickers and default ticker
+  const availableTickers = useMemo(() => {
+    if (data.tickerPlots) {
+      return Object.keys(data.tickerPlots);
+    }
+    // Legacy support
+    if (data.tickerPlot) {
+      return [data.tickerPlot.name];
+    }
+    return [];
+  }, [data]);
+
+  const defaultTicker = useMemo(() => {
+    if (data.tickerPlots) {
+      return Object.keys(data.tickerPlots)[0] || '';
+    }
+    return data.tickerPlot?.name || '';
+  }, [data]);
+
+  const [selectedTicker, setSelectedTicker] = useState<string>(defaultTicker);
+
+  // Sync selectedTicker when defaultTicker or availableTickers change (e.g., when data changes)
+  // Also ensure selectedTicker is valid
+  useEffect(() => {
+    if (defaultTicker && (!availableTickers.includes(selectedTicker) || !selectedTicker)) {
+      setSelectedTicker(defaultTicker);
+    }
+  }, [defaultTicker, availableTickers]);
+
+  // Get the selected ticker plot
+  const selectedTickerPlot = useMemo(() => {
+    if (data.tickerPlots && selectedTicker) {
+      return data.tickerPlots[selectedTicker];
+    }
+    // Legacy support
+    return data.tickerPlot;
+  }, [data, selectedTicker]);
+
+  // Create a modified data object with the selected ticker
+  const dataWithSelectedTicker = useMemo(() => {
+    if (!selectedTickerPlot) return data;
+    return {
+      ...data,
+      tickerPlot: selectedTickerPlot,
+    };
+  }, [data, selectedTickerPlot]);
 
   // Lift metrics state to persist across panel visibility toggles
   const metricMap = useMemo(() => createMetricMap(data.description), [data.description]);
@@ -49,7 +96,7 @@ export function BacktestPage({ data }: BacktestPageProps) {
 
       <div className="max-w-[1400px] mx-auto">
         {/* Top headline metrics */}
-        <HeadlineMetrics data={data} />
+        <HeadlineMetrics data={dataWithSelectedTicker} />
 
         {/* Main content area: horizontal split */}
         <div className="flex flex-col lg:flex-row gap-4" style={{ height: '700px' }}>
@@ -101,9 +148,12 @@ export function BacktestPage({ data }: BacktestPageProps) {
               </button>
             )}
             <BacktestChart
-              data={data}
+              data={dataWithSelectedTicker}
               growthRate={data.growthRate}
               hasShowMetricsButton={!isMetricsPanelVisible}
+              availableTickers={availableTickers}
+              selectedTicker={selectedTicker}
+              onTickerChange={setSelectedTicker}
             />
           </div>
         </div>

@@ -4,6 +4,16 @@ import type { Graph } from './types';
 const MULTIPLIER = 10;
 
 // Example usage - replace this with your actual data
+const generateTickerData = (name: string, baseTrend: number, noiseFactor: number) => ({
+  name,
+  y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
+    const base = 100;
+    const trend = (i / MULTIPLIER) * baseTrend;
+    const noise = Math.sin(i / MULTIPLIER / 10) * noiseFactor + Math.random() * (noiseFactor / 2);
+    return base + trend + noise;
+  }),
+});
+
 const sampleData: Graph = {
   algorithmName: 'Momentum Strategy',
   algorithmPlot: {
@@ -34,14 +44,10 @@ const sampleData: Graph = {
   ],
   growthRate: 0.22, // 43.55%
   sharpeRatio: 0.9, // Sharpe ratio
-  tickerPlot: {
-    name: 'SPY',
-    y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
-      const base = 100;
-      const trend = (i / MULTIPLIER) * 0.1;
-      const noise = Math.sin(i / MULTIPLIER / 10) * 5 + Math.random() * 3;
-      return base + trend + noise;
-    }),
+  tickerPlots: {
+    SPY: generateTickerData('SPY', 0.1, 5),
+    AAPL: generateTickerData('AAPL', 0.15, 6),
+    GOOG: generateTickerData('GOOG', 0.08, 4),
   },
   timestamps: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
     const date = new Date('2023-01-01T09:00:00');
