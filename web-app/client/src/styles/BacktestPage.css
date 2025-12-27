@@ -53,12 +53,12 @@
 
 .stat-card-primary::before {
   background: linear-gradient(90deg, #10b981, #34d399);
-  opacity: 0.6;
+  opacity: 0;
 }
 
 .stat-card-accent::before {
   background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  opacity: 0.6;
+  opacity: 0;
 }
 
 /* Custom scrollbar - cannot be done with Tailwind */

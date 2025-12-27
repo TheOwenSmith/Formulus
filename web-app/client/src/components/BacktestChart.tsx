@@ -411,7 +411,7 @@ export function BacktestChart({
 
     // Tooltip
     const tooltip = d3
-      .select('body')
+      .select(containerRef.current)
       .append('div')
       .attr('class', 'backtest-tooltip')
       .style('opacity', 0)
@@ -509,6 +509,7 @@ export function BacktestChart({
     brushOverlay.on('mousemove', function (event) {
       // Only show hover if not currently brushing
       if (isBrushingRef.current) return;
+      if (containerRef.current == null) return;
 
       const [mouseX] = d3.pointer(event);
       const index = Math.round(xScale.invert(mouseX));
@@ -522,6 +523,7 @@ export function BacktestChart({
           ((point.algorithmValue - dataPoints[0].algorithmValue) / dataPoints[0].algorithmValue) *
           100;
 
+        const [tooltipX, tooltipY] = d3.pointer(event, containerRef.current);
         tooltip
           .style('opacity', 1)
           .html(
@@ -543,8 +545,8 @@ export function BacktestChart({
             </div>
           `,
           )
-          .style('left', `${event.pageX + 10}px`)
-          .style('top', `${event.pageY - 10}px`);
+          .style('left', `${tooltipX + 10}px`)
+          .style('top', `${tooltipY + 10}px`);
       }
     });
 
