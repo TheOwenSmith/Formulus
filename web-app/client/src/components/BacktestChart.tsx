@@ -1,6 +1,7 @@
 import { TickerSelector } from '@client/components/TickerSelector';
 import '@client/styles/BacktestChart.css';
 import type { Graph } from '@client/types';
+import { getTailwindColorHex } from '@client/utils/colorUtils';
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -50,6 +51,8 @@ interface BacktestChartProps {
   selectedTicker?: string;
   onTickerChange?: (ticker: string) => void;
   algorithmColor?: string; // Primary color for the algorithm (hex format)
+  gradientFrom?: string; // Tailwind gradient class like "from-blue-500"
+  gradientTo?: string; // Tailwind gradient class like "to-cyan-300"
 }
 
 export function BacktestChart({
@@ -61,6 +64,8 @@ export function BacktestChart({
   selectedTicker,
   onTickerChange,
   algorithmColor = '#3b82f6', // Default to blue
+  gradientFrom = 'from-blue-500',
+  gradientTo = 'to-cyan-300',
 }: BacktestChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -551,8 +556,9 @@ export function BacktestChart({
     const brushGroup = g.append('g').attr('class', 'brush').call(brush);
 
     // Get the primary algorithm color for brush styling
-    const primaryAlgorithmColor = algorithmNames.length > 0 ? algorithmColorMap.get(algorithmNames[0])! : '#3b82f6';
-    
+    const primaryAlgorithmColor =
+      algorithmNames.length > 0 ? algorithmColorMap.get(algorithmNames[0])! : '#3b82f6';
+
     // Convert hex to rgba for brush fill
     const hexToRgba = (hex: string, alpha: number) => {
       const r = parseInt(hex.slice(1, 3), 16);
@@ -777,6 +783,7 @@ export function BacktestChart({
             availableTickers={availableTickers}
             selectedTicker={selectedTicker}
             onTickerChange={onTickerChange}
+            algorithmColor={algorithmColor}
           />,
         );
       } else if (!item.isAlgorithm) {
@@ -796,9 +803,28 @@ export function BacktestChart({
     // Cleanup
     return () => {
       tooltip.remove();
-      if (tickerSelectorRootRef.current) {
-        tickerSelectorRootRef.current.unmount();
+      // Defer unmounting to avoid React rendering conflicts
+      if (tickerSelectorRootRef.current && tickerSelectorContainerRef.current) {
+        const rootToUnmount = tickerSelectorRootRef.current;
+        const container = tickerSelectorContainerRef.current;
         tickerSelectorRootRef.current = null;
+        tickerSelectorContainerRef.current = null;
+
+        // Check if container is still in DOM before unmounting
+        const isInDOM = container.isConnected || document.body.contains(container);
+
+        if (isInDOM) {
+          // Use requestAnimationFrame to defer until after React finishes
+          requestAnimationFrame(() => {
+            try {
+              if (rootToUnmount && container.isConnected) {
+                rootToUnmount.unmount();
+              }
+            } catch {
+              // Ignore errors if root was already unmounted or container removed
+            }
+          });
+        }
       }
     };
   }, [
@@ -821,12 +847,23 @@ export function BacktestChart({
 
   const hasZoom = zoomDomain !== null;
 
+  // Get gradient colors for the top line
+  const fromColor = getTailwindColorHex(gradientFrom);
+  const toColor = getTailwindColorHex(gradientTo);
+
   return (
     <div
       className="backtest-chart-container bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] animate-[fadeInUp_0.8s_ease-out_0.2s_both] relative overflow-hidden h-full flex flex-col"
       ref={containerRef}
       style={{ height: '100%', maxHeight: '100%' }}
     >
+      {/* Top gradient line - matches algorithm color scheme */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] opacity-60"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${fromColor}, ${toColor}, transparent)`,
+        }}
+      />
       <div className="absolute top-[14px] right-4 flex flex-col items-end flex-shrink-0 gap-2 z-10">
         <div className="text-xs text-white/50 italic">
           Click and drag to select a range, double-click to reset

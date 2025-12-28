@@ -1,16 +1,6 @@
 @import "tailwindcss";
 
-/* Chart container gradient border */
-.backtest-chart-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #3b82f6, #10b981, transparent);
-  opacity: 0.6;
-}
+/* Chart container gradient border - now handled by inline div element */
 
 /* Tooltip - dynamically created by D3, needs CSS class */
 .backtest-tooltip {

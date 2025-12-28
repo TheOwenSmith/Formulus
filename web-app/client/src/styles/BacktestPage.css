@@ -84,3 +84,13 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Freeze hover states during drag */
+body.dragging-active * {
+  pointer-events: none !important;
+}
+
+body.dragging-active [data-drop-zone],
+body.dragging-active [data-drag-preview] {
+  pointer-events: auto !important;
+}
+

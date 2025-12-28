@@ -7,7 +7,7 @@ import {
 } from '@client/components/MetricTogglePanel/metricUtils';
 import { PerformanceMetrics } from '@client/components/PerformanceMetrics';
 import type { Graph } from '@client/types';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Color scheme definitions for different algorithm cards
 const colorSchemes = [
@@ -156,6 +156,9 @@ interface AlgorithmResultCardProps {
   availableTickers: string[];
   defaultTicker: string;
   index: number; // Index for color scheme selection
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 export function AlgorithmResultCard({
@@ -165,11 +168,17 @@ export function AlgorithmResultCard({
   availableTickers,
   defaultTicker,
   index,
+  isDragging = false,
+  onDragStart,
+  onDragEnd,
 }: AlgorithmResultCardProps) {
   // Get color scheme for this card (cycle through available schemes)
   const colorScheme = colorSchemes[index % colorSchemes.length];
   const [selectedTicker, setSelectedTicker] = useState<string>(defaultTicker);
   const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(true);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
 
   // Get the selected ticker plot
   const selectedTickerPlot = useMemo(() => {
@@ -230,9 +239,82 @@ export function AlgorithmResultCard({
     setEnabledMetrics((prev) => ({ ...prev, [metric]: enabled }));
   };
 
+  // Handle mouse down for drag start
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't start drag if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('select') ||
+      target.closest('[role="button"]') ||
+      target.closest('svg') ||
+      target.closest('path')
+    ) {
+      return;
+    }
+
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    setIsDragActive(true);
+  };
+
+  // Handle mouse move to detect drag
+  useEffect(() => {
+    if (!isDragActive || !dragStartPos.current) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragStartPos.current) return;
+
+      const deltaX = Math.abs(e.clientX - dragStartPos.current.x);
+      const deltaY = Math.abs(e.clientY - dragStartPos.current.y);
+      const threshold = 5; // pixels
+
+      if (deltaX > threshold || deltaY > threshold) {
+        // Drag threshold exceeded, start dragging
+        if (onDragStart) {
+          onDragStart();
+        }
+        dragStartPos.current = null;
+        setIsDragActive(false);
+      }
+    };
+
+    const handleMouseUp = () => {
+      dragStartPos.current = null;
+      setIsDragActive(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragActive, onDragStart]);
+
+  // Handle mouse up for drag end
+  const handleMouseUp = () => {
+    if (isDragging && onDragEnd) {
+      onDragEnd();
+    }
+    dragStartPos.current = null;
+    setIsDragActive(false);
+  };
+
   return (
     <div
-      className={`bg-gradient-to-br ${colorScheme.bgGradient} ${colorScheme.bgGradientTo} rounded-2xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] mb-6 border ${colorScheme.borderColor} relative overflow-hidden transition-all duration-300 hover:shadow-[0_25px_70px_rgba(0,0,0,0.4)]`}
+      ref={cardRef}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      className={`bg-gradient-to-br ${colorScheme.bgGradient} ${colorScheme.bgGradientTo} rounded-2xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] my-[18px] border ${colorScheme.borderColor} relative overflow-hidden transition-all duration-300 ${
+        isDragging
+          ? 'opacity-50 scale-[0.98] shadow-[0_30px_80px_rgba(0,0,0,0.5)]'
+          : 'hover:shadow-[0_25px_70px_rgba(0,0,0,0.4)]'
+      } ${isDragActive || isDragging ? 'select-none cursor-grabbing' : ''}`}
+      style={{
+        userSelect: isDragActive || isDragging ? 'none' : 'auto',
+      }}
     >
       {/* Subtle gradient overlay */}
       <div
@@ -334,6 +416,8 @@ export function AlgorithmResultCard({
               selectedTicker={selectedTicker}
               onTickerChange={setSelectedTicker}
               algorithmColor={colorScheme.primaryColor}
+              gradientFrom={colorScheme.gradientFrom}
+              gradientTo={colorScheme.gradientTo}
             />
           </div>
         </div>

@@ -4,12 +4,14 @@ interface TickerSelectorProps {
   availableTickers: string[];
   selectedTicker: string;
   onTickerChange: (ticker: string) => void;
+  algorithmColor?: string; // Primary color for the algorithm (hex format)
 }
 
 export function TickerSelector({
   availableTickers,
   selectedTicker,
   onTickerChange,
+  algorithmColor = '#3b82f6', // Default to blue
 }: TickerSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,9 +72,17 @@ export function TickerSelector({
               }}
               className={`w-full text-left px-3 py-2 text-xs font-medium transition-all duration-150 ${
                 ticker === selectedTicker
-                  ? 'bg-blue-500/30 text-white border-l-2 border-blue-500'
+                  ? 'text-white border-l-2'
                   : 'text-white/80 hover:bg-white/10 hover:text-white'
               }`}
+              style={
+                ticker === selectedTicker
+                  ? {
+                      backgroundColor: `${algorithmColor}30`,
+                      borderLeftColor: algorithmColor,
+                    }
+                  : undefined
+              }
             >
               {ticker}
             </button>
