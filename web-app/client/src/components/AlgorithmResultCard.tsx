@@ -6,8 +6,9 @@ import {
   type MetricKey,
 } from '@client/components/MetricTogglePanel/metricUtils';
 import { PerformanceMetrics } from '@client/components/PerformanceMetrics';
+import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/svgPaths';
 import type { Graph } from '@client/types';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Color scheme definitions for different algorithm cards
 const colorSchemes = [
@@ -159,9 +160,10 @@ interface AlgorithmResultCardProps {
   isDragging?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  isSideBySideMode?: boolean;
 }
 
-export function AlgorithmResultCard({
+function AlgorithmResultCardComponent({
   algorithmName,
   algorithmPlot,
   fullData,
@@ -171,14 +173,32 @@ export function AlgorithmResultCard({
   isDragging = false,
   onDragStart,
   onDragEnd,
+  isSideBySideMode = false,
 }: AlgorithmResultCardProps) {
   // Get color scheme for this card (cycle through available schemes)
   const colorScheme = colorSchemes[index % colorSchemes.length];
   const [selectedTicker, setSelectedTicker] = useState<string>(defaultTicker);
-  const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(true);
+  // In side-by-side mode, show graph by default (false). In normal mode, show metrics panel by default (true).
+  const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(!isSideBySideMode);
   const [isDragActive, setIsDragActive] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  // Track previous side-by-side mode to detect changes
+  const prevSideBySideModeRef = useRef(isSideBySideMode);
+
+  // Sync metrics panel visibility when side-by-side mode changes
+  // Use a ref-based approach to avoid unnecessary re-renders
+  useEffect(() => {
+    // Only update if side-by-side mode actually changed
+    if (prevSideBySideModeRef.current !== isSideBySideMode) {
+      prevSideBySideModeRef.current = isSideBySideMode;
+      // Schedule state update in next tick to avoid cascading renders
+      requestAnimationFrame(() => {
+        setIsMetricsPanelVisible(!isSideBySideMode);
+      });
+    }
+  }, [isSideBySideMode]);
 
   // Get the selected ticker plot
   const selectedTickerPlot = useMemo(() => {
@@ -235,9 +255,9 @@ export function AlgorithmResultCard({
     return initial;
   });
 
-  const handleToggleMetric = (metric: MetricKey, enabled: boolean) => {
+  const handleToggleMetric = useCallback((metric: MetricKey, enabled: boolean) => {
     setEnabledMetrics((prev) => ({ ...prev, [metric]: enabled }));
-  };
+  }, []);
 
   // Handle mouse down for drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -307,13 +327,14 @@ export function AlgorithmResultCard({
       ref={cardRef}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      className={`bg-gradient-to-br ${colorScheme.bgGradient} ${colorScheme.bgGradientTo} rounded-2xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] my-[18px] border ${colorScheme.borderColor} relative overflow-hidden transition-all duration-300 ${
+      className={`bg-gradient-to-br ${colorScheme.bgGradient} ${colorScheme.bgGradientTo} rounded-2xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] border ${colorScheme.borderColor} relative overflow-hidden transition-all duration-300 ${
         isDragging
           ? 'opacity-50 scale-[0.98] shadow-[0_30px_80px_rgba(0,0,0,0.5)]'
           : 'hover:shadow-[0_25px_70px_rgba(0,0,0,0.4)]'
       } ${isDragActive || isDragging ? 'select-none cursor-grabbing' : ''}`}
       style={{
         userSelect: isDragActive || isDragging ? 'none' : 'auto',
+        pointerEvents: isDragging ? 'none' : 'auto',
       }}
     >
       {/* Subtle gradient overlay */}
@@ -342,86 +363,258 @@ export function AlgorithmResultCard({
             primaryColor={colorScheme.primaryColor}
             gradientFrom={colorScheme.gradientFrom}
             gradientTo={colorScheme.gradientTo}
+            isSideBySideMode={isSideBySideMode}
           />
         </div>
 
         {/* Chart and Metrics */}
-        <div className="flex flex-col lg:flex-row gap-4" style={{ height: '700px' }}>
-          {/* Performance metrics panel (left) */}
-          <div
-            className={`transition-all duration-300 ${
-              isMetricsPanelVisible
-                ? 'w-full lg:w-[33%] lg:min-w-[300px] lg:flex-shrink-0 opacity-100'
-                : 'w-0 opacity-0 overflow-hidden lg:min-w-0'
-            }`}
-            style={{ height: '100%' }}
-          >
-            {isMetricsPanelVisible && (
-              <PerformanceMetrics
-                description={fullData.description}
-                onToggle={() => setIsMetricsPanelVisible(false)}
-                enabledMetrics={enabledMetrics}
-                onToggleMetric={handleToggleMetric}
-                availableMetrics={availableMetrics}
-                primaryColor={colorScheme.primaryColor}
-              />
-            )}
-          </div>
-
-          {/* Main graph (right) */}
-          <div className="flex-1 w-full min-w-0 relative" style={{ height: '100%' }}>
-            {!isMetricsPanelVisible && (
-              <button
-                onClick={() => setIsMetricsPanelVisible(true)}
-                className="absolute top-4 left-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
+        {isSideBySideMode ? (
+          /* Side-by-side mode: Show either metrics OR graph, not both - with animation */
+          <div className="relative" style={{ height: '700px' }}>
+            {/* Metrics panel with fade/slide animation */}
+            <div
+              className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out ${
+                isMetricsPanelVisible
+                  ? 'opacity-100 translate-x-0 z-20'
+                  : 'opacity-0 -translate-x-4 z-0'
+              }`}
+              style={{
+                pointerEvents: isMetricsPanelVisible ? 'auto' : 'none',
+              }}
+            >
+              <div
+                className="relative w-full h-full"
                 style={{
-                  backgroundColor: `${colorScheme.primaryColor}20`,
-                  border: `1px solid ${colorScheme.primaryColor}40`,
-                  color: colorScheme.primaryColorLight,
+                  pointerEvents: isMetricsPanelVisible ? 'auto' : 'none',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}30`;
-                  e.currentTarget.style.borderColor = `${colorScheme.primaryColor}60`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}20`;
-                  e.currentTarget.style.borderColor = `${colorScheme.primaryColor}40`;
-                }}
-                aria-label="Show metrics panel"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="transition-transform duration-200 rotate-180"
+                <button
+                  onClick={() => setIsMetricsPanelVisible(false)}
+                  className="absolute top-4 right-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
+                  style={{
+                    backgroundColor: `${colorScheme.primaryColor}20`,
+                    border: `1px solid ${colorScheme.primaryColor}40`,
+                    color: colorScheme.primaryColorLight,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}30`;
+                    e.currentTarget.style.borderColor = `${colorScheme.primaryColor}60`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}20`;
+                    e.currentTarget.style.borderColor = `${colorScheme.primaryColor}40`;
+                  }}
+                  aria-label="Show chart"
                 >
-                  <path
-                    d="M10 12L6 8L10 4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns={SVG_NAMESPACE}
+                    className="transition-transform duration-200"
+                  >
+                    <path d={ARROW_LEFT} {...STROKE_PROPERTIES} />
+                  </svg>
+                  <span>Show Chart</span>
+                </button>
+                <PerformanceMetrics
+                  description={fullData.description}
+                  onToggle={() => setIsMetricsPanelVisible(false)}
+                  enabledMetrics={enabledMetrics}
+                  onToggleMetric={handleToggleMetric}
+                  availableMetrics={availableMetrics}
+                  primaryColor={colorScheme.primaryColor}
+                  primaryColorLight={colorScheme.primaryColorLight}
+                  hideToggleButton={isSideBySideMode}
+                />
+              </div>
+            </div>
+
+            {/* Graph with fade/slide animation */}
+            <div
+              className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out ${
+                !isMetricsPanelVisible
+                  ? 'opacity-100 translate-x-0 z-10'
+                  : 'opacity-0 translate-x-4 z-0'
+              }`}
+              style={{
+                pointerEvents: !isMetricsPanelVisible ? 'auto' : 'none',
+              }}
+            >
+              <div
+                className="relative w-full h-full"
+                style={{
+                  pointerEvents: !isMetricsPanelVisible ? 'auto' : 'none',
+                }}
+              >
+                <button
+                  onClick={() => setIsMetricsPanelVisible(true)}
+                  className="absolute top-4 left-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
+                  style={{
+                    backgroundColor: `${colorScheme.primaryColor}20`,
+                    border: `1px solid ${colorScheme.primaryColor}40`,
+                    color: colorScheme.primaryColorLight,
+                    pointerEvents: !isMetricsPanelVisible ? 'auto' : 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isMetricsPanelVisible) {
+                      e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}30`;
+                      e.currentTarget.style.borderColor = `${colorScheme.primaryColor}60`;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isMetricsPanelVisible) {
+                      e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}20`;
+                      e.currentTarget.style.borderColor = `${colorScheme.primaryColor}40`;
+                    }
+                  }}
+                  aria-label="Show metrics panel"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns={SVG_NAMESPACE}
+                    className="transition-transform duration-200 rotate-180"
+                  >
+                    <path d={ARROW_LEFT} {...STROKE_PROPERTIES} />
+                  </svg>
+                  <span>Show Metrics</span>
+                </button>
+                {/* Render graph but disable interactions when hidden */}
+                <div
+                  style={{
+                    pointerEvents: !isMetricsPanelVisible ? 'auto' : 'none',
+                    width: '100%',
+                    height: '100%',
+                    cursor: !isMetricsPanelVisible ? 'default' : 'default',
+                  }}
+                >
+                  <BacktestChart
+                    data={algorithmData}
+                    growthRate={growthRate}
+                    hasShowMetricsButton={false}
+                    availableTickers={availableTickers}
+                    selectedTicker={selectedTicker}
+                    onTickerChange={setSelectedTicker}
+                    algorithmColor={colorScheme.primaryColor}
+                    gradientFrom={colorScheme.gradientFrom}
+                    gradientTo={colorScheme.gradientTo}
                   />
-                </svg>
-                <span>Show Metrics</span>
-              </button>
-            )}
-            <BacktestChart
-              data={algorithmData}
-              growthRate={growthRate}
-              hasShowMetricsButton={!isMetricsPanelVisible}
-              availableTickers={availableTickers}
-              selectedTicker={selectedTicker}
-              onTickerChange={setSelectedTicker}
-              algorithmColor={colorScheme.primaryColor}
-              gradientFrom={colorScheme.gradientFrom}
-              gradientTo={colorScheme.gradientTo}
-            />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Normal mode: Show metrics and graph side-by-side */
+          <div className="flex flex-col lg:flex-row gap-4" style={{ height: '700px' }}>
+            {/* Performance metrics panel (left) */}
+            <div
+              className={`transition-all duration-300 ${
+                isMetricsPanelVisible
+                  ? 'w-full lg:w-[33%] lg:min-w-[300px] lg:flex-shrink-0 opacity-100'
+                  : 'w-0 opacity-0 overflow-hidden lg:min-w-0'
+              }`}
+              style={{ height: '100%' }}
+            >
+              {isMetricsPanelVisible && (
+                <PerformanceMetrics
+                  description={fullData.description}
+                  onToggle={() => setIsMetricsPanelVisible(false)}
+                  enabledMetrics={enabledMetrics}
+                  onToggleMetric={handleToggleMetric}
+                  availableMetrics={availableMetrics}
+                  primaryColor={colorScheme.primaryColor}
+                  primaryColorLight={colorScheme.primaryColorLight}
+                />
+              )}
+            </div>
+
+            {/* Main graph (right) */}
+            <div className="flex-1 w-full min-w-0 relative" style={{ height: '100%' }}>
+              {!isMetricsPanelVisible && (
+                <button
+                  onClick={() => setIsMetricsPanelVisible(true)}
+                  className="absolute top-4 left-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
+                  style={{
+                    backgroundColor: `${colorScheme.primaryColor}20`,
+                    border: `1px solid ${colorScheme.primaryColor}40`,
+                    color: colorScheme.primaryColorLight,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}30`;
+                    e.currentTarget.style.borderColor = `${colorScheme.primaryColor}60`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = `${colorScheme.primaryColor}20`;
+                    e.currentTarget.style.borderColor = `${colorScheme.primaryColor}40`;
+                  }}
+                  aria-label="Show metrics panel"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns={SVG_NAMESPACE}
+                    className="transition-transform duration-200 rotate-180"
+                  >
+                    <path d={ARROW_LEFT} {...STROKE_PROPERTIES} />
+                  </svg>
+                  <span>Show Metrics</span>
+                </button>
+              )}
+              <BacktestChart
+                data={algorithmData}
+                growthRate={growthRate}
+                hasShowMetricsButton={!isMetricsPanelVisible}
+                availableTickers={availableTickers}
+                selectedTicker={selectedTicker}
+                onTickerChange={setSelectedTicker}
+                algorithmColor={colorScheme.primaryColor}
+                gradientFrom={colorScheme.gradientFrom}
+                gradientTo={colorScheme.gradientTo}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders when props haven't changed
+export const AlgorithmResultCard = memo(AlgorithmResultCardComponent, (prevProps, nextProps) => {
+  // Custom comparison function for better performance
+  // Only re-render if these specific props change
+  // Use shallow comparison for objects/arrays
+  if (
+    prevProps.algorithmName !== nextProps.algorithmName ||
+    prevProps.isDragging !== nextProps.isDragging ||
+    prevProps.isSideBySideMode !== nextProps.isSideBySideMode ||
+    prevProps.index !== nextProps.index ||
+    prevProps.defaultTicker !== nextProps.defaultTicker ||
+    prevProps.availableTickers !== nextProps.availableTickers ||
+    prevProps.algorithmPlot !== nextProps.algorithmPlot
+  ) {
+    return false; // Props changed, re-render
+  }
+
+  // Deep comparison for fullData (only check critical fields)
+  if (prevProps.fullData !== nextProps.fullData) {
+    // Check if critical fields changed
+    const prevData = prevProps.fullData;
+    const nextData = nextProps.fullData;
+    if (
+      prevData.timestamps !== nextData.timestamps ||
+      prevData.description !== nextData.description ||
+      prevData.sharpeRatio !== nextData.sharpeRatio
+    ) {
+      return false; // Critical data changed, re-render
+    }
+  }
+
+  return true; // Props are equal, skip re-render
+});

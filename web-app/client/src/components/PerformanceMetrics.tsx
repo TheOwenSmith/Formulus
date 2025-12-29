@@ -1,3 +1,4 @@
+import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/svgPaths';
 import { useMemo } from 'react';
 import { MetricTogglePanel } from './MetricTogglePanel/MetricTogglePanel';
 import { createMetricMap, type MetricKey } from './MetricTogglePanel/metricUtils';
@@ -9,6 +10,8 @@ interface PerformanceMetricsProps {
   onToggleMetric: (metric: MetricKey, enabled: boolean) => void;
   availableMetrics: Set<MetricKey>;
   primaryColor?: string; // Primary color for the algorithm (hex format)
+  primaryColorLight?: string; // Light version of primary color for text (hex format)
+  hideToggleButton?: boolean; // Hide the internal toggle button (useful for side-by-side mode)
 }
 
 export function PerformanceMetrics({
@@ -18,6 +21,8 @@ export function PerformanceMetrics({
   onToggleMetric,
   availableMetrics,
   primaryColor = '#3b82f6',
+  primaryColorLight,
+  hideToggleButton = false,
 }: PerformanceMetricsProps) {
   // Metric toggle state is now managed by parent
   const metricMap = useMemo(() => createMetricMap(description), [description]);
@@ -42,27 +47,15 @@ export function PerformanceMetrics({
         <h3 className="text-lg font-semibold m-0 text-white/90 tracking-tight">
           Performance Metrics
         </h3>
-        {onToggle && (
+        {onToggle && !hideToggleButton && (
           <button
             onClick={onToggle}
             className="bg-slate-800/60 border border-white/10 text-white/90 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:bg-slate-800/80 hover:border-white/20 hover:-translate-y-px flex items-center gap-2"
             aria-label="Hide metrics panel"
             title="Hide Metrics"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M10 12L6 8L10 4"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns={SVG_NAMESPACE}>
+              <path d={ARROW_LEFT} {...STROKE_PROPERTIES} />
             </svg>
           </button>
         )}
@@ -73,6 +66,7 @@ export function PerformanceMetrics({
           onToggle={onToggleMetric}
           availableMetrics={availableMetrics}
           primaryColor={primaryColor}
+          primaryColorLight={primaryColorLight}
         />
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">

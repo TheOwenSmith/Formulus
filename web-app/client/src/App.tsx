@@ -36,10 +36,17 @@ const generateAlgorithmData = (
 
 const sampleData: Graph = {
   algorithmPlots: {
-    'Momentum Strategy': generateAlgorithmData('Momentum Strategy', 0.12, 4, 0),
-    'Mean Reversion': generateAlgorithmData('Mean Reversion', 0.08, 3, Math.PI / 2),
     'Breakout Strategy': generateAlgorithmData('Breakout Strategy', 0.15, 5, Math.PI),
+    'Mean Reversion': generateAlgorithmData('Mean Reversion', 0.08, 3, Math.PI / 2),
+    'Momentum Strategy': generateAlgorithmData('Momentum Strategy', 0.12, 4, 0),
     'RSI Strategy': generateAlgorithmData('RSI Strategy', 0.1, 3.5, Math.PI * 1.5),
+    Z1: generateAlgorithmData('Z1', 0.1, 3, Math.PI * 2),
+    Z2: generateAlgorithmData('Z2', 0.1, 3, Math.PI * 2),
+    Z3: generateAlgorithmData('Z3', 0.1, 3, Math.PI * 2),
+    Z4: generateAlgorithmData('Z4', 0.1, 3, Math.PI * 2),
+    Z5: generateAlgorithmData('Z5', 0.1, 3, Math.PI * 2),
+    Z6: generateAlgorithmData('Z6', 0.1, 3, Math.PI * 2),
+    Z7: generateAlgorithmData('Z7', 0.1, 3, Math.PI * 2),
   },
   description: [
     'Aggregate: 1min',

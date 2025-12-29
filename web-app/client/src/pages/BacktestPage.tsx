@@ -1,6 +1,8 @@
 import { AlgorithmResultCard } from '@client/components/AlgorithmResultCard';
+import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/svgPaths';
 import '@client/styles/BacktestPage.css';
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type { Graph } from '../types';
 
 // Color schemes for drag preview and drop indicators (matching AlgorithmResultCard)
@@ -147,6 +149,17 @@ export function BacktestPage({ data }: BacktestPageProps) {
     Object.keys(algorithmPlots),
   );
 
+  // Side-by-side comparison mode state
+  const [isSideBySideMode, setIsSideBySideMode] = useState<boolean>(false);
+  const [isPending, startTransition] = useTransition();
+
+  // Memoize the toggle handler to prevent unnecessary re-renders
+  const handleToggleSideBySide = useCallback(() => {
+    startTransition(() => {
+      setIsSideBySideMode((prev) => !prev);
+    });
+  }, []);
+
   // Drag and drop state
   const [draggedAlgorithm, setDraggedAlgorithm] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<number | null>(null);
@@ -176,11 +189,12 @@ export function BacktestPage({ data }: BacktestPageProps) {
           const currentIndex = prevOrder.indexOf(draggedAlgorithm);
           if (currentIndex === -1) return prevOrder;
 
-          // Calculate the target position
-          let targetPosition = dropPosition;
-          if (currentIndex < dropPosition) {
-            targetPosition = dropPosition - 1;
-          }
+          // Calculate the target position using grid layout utility
+          const targetPosition = calculateTargetPosition(
+            currentIndex,
+            dropPosition,
+            prevOrder.length,
+          );
 
           // Only reorder if position actually changed
           if (currentIndex !== targetPosition) {
@@ -293,12 +307,14 @@ export function BacktestPage({ data }: BacktestPageProps) {
 
       for (const dropZone of dropZones) {
         const rect = dropZone.getBoundingClientRect();
-        // Check if mouse is within the drop zone area (with some padding for easier targeting)
+        // Check if mouse is within the drop zone area (with generous padding for easier targeting)
+        // Use larger padding to account for absolute positioning and grid layout
+        const padding = 20;
         if (
-          e.clientX >= rect.left &&
-          e.clientX <= rect.right &&
-          e.clientY >= rect.top - 10 &&
-          e.clientY <= rect.bottom + 10
+          e.clientX >= rect.left - padding &&
+          e.clientX <= rect.right + padding &&
+          e.clientY >= rect.top - padding &&
+          e.clientY <= rect.bottom + padding
         ) {
           const position = parseInt(dropZone.getAttribute('data-drop-zone') ?? '-1', 10);
           if (position >= 0) {
@@ -445,109 +461,110 @@ export function BacktestPage({ data }: BacktestPageProps) {
         </h1>
       </div>
 
-      <div className="max-w-[1400px] mx-auto">
-        {/* Drop zone at the beginning (for first position) */}
-        {algorithmNames.length > 0 && (
-          <div
-            data-drop-zone={0}
-            className="relative h-[36px] -mb-[18px] flex items-center justify-center"
-            onMouseEnter={() => handleDropZoneHover(0)}
-            onMouseUp={handleDragEnd}
-          >
-            {draggedAlgorithmInfo && dropPosition === 0 && wouldChangePosition && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-full px-6">
-                  <div
-                    className="w-full h-1 relative rounded-full"
-                    style={{
-                      background: `linear-gradient(to right, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
-                    }}
-                  >
-                    <svg
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M8 4V12M4 8H12"
-                        stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        {/* Render one card per algorithm */}
-        {algorithmNames.map((algorithmName, index) => {
-          const originalIndex = algorithmIndexMap.get(algorithmName) ?? index;
-          return (
-            <div key={algorithmName}>
-              {/* Drop zone indicator above each card */}
-              {index > 0 && (
-                <div
-                  data-drop-zone={index}
-                  className="relative h-[36px] -mt-[18px] -mb-[18px] flex items-center justify-center"
-                  onMouseEnter={() => handleDropZoneHover(index)}
-                  onMouseUp={handleDragEnd}
-                >
-                  {draggedAlgorithmInfo && dropPosition === index && wouldChangePosition && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-full px-6">
-                        <div
-                          className="w-full h-1 relative rounded-full"
-                          style={{
-                            background: `linear-gradient(to right, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
-                          }}
-                        >
-                          <svg
-                            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M8 4V12M4 8H12"
-                              stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <AlgorithmResultCard
-                algorithmName={algorithmName}
-                algorithmPlot={algorithmPlots[algorithmName]}
-                fullData={data}
-                availableTickers={availableTickers}
-                defaultTicker={defaultTicker}
-                index={originalIndex}
-                isDragging={draggedAlgorithm === algorithmName}
-                onDragStart={() => handleDragStart(algorithmName)}
-                onDragEnd={handleDragEnd}
+      {/* Fixed position toggle button */}
+      <button
+        onClick={handleToggleSideBySide}
+        disabled={isPending}
+        className="fixed bottom-8 right-8 z-50 px-6 py-3 rounded-xl font-medium text-sm cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-1 flex items-center gap-2 shadow-lg border disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          backgroundColor: isSideBySideMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.8)',
+          borderColor: isSideBySideMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+          color: isSideBySideMode ? '#60a5fa' : '#e2e8f0',
+        }}
+        onMouseEnter={(e) => {
+          if (isSideBySideMode) {
+            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+          } else {
+            e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isSideBySideMode) {
+            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+          } else {
+            e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.8)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          }
+        }}
+        aria-label={
+          isSideBySideMode ? 'Disable side-by-side comparison' : 'Enable side-by-side comparison'
+        }
+      >
+        {isSideBySideMode ? (
+          <>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns={SVG_NAMESPACE}>
+              {/* Two columns side by side icon */}
+              {SIDE_BY_SIDE_RECTS.map((rect, idx) => (
+                <rect
+                  key={idx}
+                  x={rect.x}
+                  y={rect.y}
+                  width={rect.width}
+                  height={rect.height}
+                  rx={rect.rx}
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              ))}
+            </svg>
+            <span>Side-by-Side: ON</span>
+          </>
+        ) : (
+          <>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns={SVG_NAMESPACE}>
+              <path
+                d={SINGLE_COLUMN}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
-            </div>
-          );
-        })}
-        {/* Drop zone at the end */}
-        {algorithmNames.length > 0 && (
-          <div
-            data-drop-zone={algorithmNames.length}
-            className="relative h-[36px] -mt-[18px] flex items-center justify-center"
-            onMouseEnter={() => handleDropZoneHover(algorithmNames.length)}
-            onMouseUp={handleDragEnd}
-          >
-            {draggedAlgorithmInfo &&
-              dropPosition === algorithmNames.length &&
-              wouldChangePosition && (
+            </svg>
+            <span>Side-by-Side: OFF</span>
+          </>
+        )}
+      </button>
+
+      <div className="max-w-[1400px] mx-auto">
+        {/* Conditional grid layout: 2 columns when side-by-side mode is enabled, 1 column otherwise */}
+        <div
+          className={`grid gap-6 ${isSideBySideMode ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}
+        >
+          {/* Drop zone at the beginning (for first position) */}
+          {algorithmNames.length > 0 && (
+            <div
+              data-drop-zone={0}
+              className={`relative z-20 h-[36px] flex items-center justify-center ${
+                isSideBySideMode ? 'col-span-2' : 'col-span-1'
+              }`}
+              onMouseEnter={() => handleDropZoneHover(0)}
+              onMouseUp={handleDragEnd}
+              style={{
+                pointerEvents: draggedAlgorithm ? 'auto' : 'none',
+                // Position to match spacing of between-cards drop zones
+                // Between-cards: drop zone center is at -12px relative to card below (12px above card)
+                // For beginning: we want the line 12px above the first card
+                // The drop zone is a grid item. The gap is 24px, so gap center is 12px from each edge
+                // We want the drop zone center to align with the gap center (12px above first card)
+                // Drop zone is 36px tall, center is 18px from top
+                // If gap center is 12px above card, and gap starts 24px above card
+                // Then gap center is 12px below gap start
+                // Drop zone center should be 12px below gap start
+                // So drop zone top should be at: gap start + 12px - 18px = gap start - 6px
+                // Gap start is 24px above card, so drop zone top should be at 18px above card
+                // But naturally, the drop zone would be positioned with its bottom at gap start
+                // So naturally: bottom at 24px above card, top at 24px - 36px = -12px above card
+                // We want: top at 18px above card
+                // Difference: 18px - (-12px) = 30px, so move down by 30px
+                // marginBottom: 30px moves the element down (positive moves down)
+                marginBottom: '-30px', // Positions drop zone so line is 12px above card (matching between-cards)
+              }}
+            >
+              {draggedAlgorithmInfo && dropPosition === 0 && wouldChangePosition && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-full px-6">
                     <div
@@ -560,10 +577,10 @@ export function BacktestPage({ data }: BacktestPageProps) {
                         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
                         viewBox="0 0 16 16"
                         fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
+                        xmlns={SVG_NAMESPACE}
                       >
                         <path
-                          d="M8 4V12M4 8H12"
+                          d={PLUS}
                           stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
                           strokeWidth="2.5"
                           strokeLinecap="round"
@@ -573,8 +590,178 @@ export function BacktestPage({ data }: BacktestPageProps) {
                   </div>
                 </div>
               )}
-          </div>
-        )}
+            </div>
+          )}
+          {/* Render algorithm cards in grid */}
+          {algorithmNames.map((algorithmName, index) => {
+            const originalIndex = algorithmIndexMap.get(algorithmName) ?? index;
+            // In side-by-side mode, determine if this is the first column (left side) of a row
+            // In single column mode, all items are effectively "first column"
+            const isFirstColumn = isSideBySideMode ? index % 2 === 0 : true;
+
+            return (
+              <div
+                key={algorithmName}
+                className="relative"
+                style={{
+                  // Ensure drop zones are not blocked by the card when dragging
+                  zIndex: draggedAlgorithm === algorithmName ? 1 : 'auto',
+                }}
+              >
+                {/* Drop zone before each position - positioned absolutely */}
+                {index > 0 && (
+                  <div
+                    data-drop-zone={index}
+                    className={`absolute z-20 flex items-center justify-center ${
+                      isFirstColumn ? 'h-[36px] left-0 right-0' : 'w-[36px] top-0 bottom-0'
+                    }`}
+                    style={{
+                      // Center the drop zone in the gap (gap-6 = 24px, 50% increase from 16px)
+                      // Gap is 24px between cards, centered at 12px from each edge
+                      // If card top is at 0, gap spans from -24px to 0px, center at -12px
+                      // For 36px drop zone centered at -12px: top = -12px - 18px = -30px
+                      ...(isFirstColumn
+                        ? {
+                            top: '-30px', // Centers 36px drop zone in 24px gap
+                          }
+                        : {
+                            left: '-30px', // Centers 36px drop zone in 24px gap
+                          }),
+                      pointerEvents: draggedAlgorithm ? 'auto' : 'none',
+                      // Ensure drop zones are always visible for hit detection
+                      minWidth: isFirstColumn ? '100%' : '36px',
+                      minHeight: isFirstColumn ? '36px' : '100%',
+                    }}
+                    onMouseEnter={() => handleDropZoneHover(index)}
+                    onMouseUp={handleDragEnd}
+                  >
+                    {draggedAlgorithmInfo && dropPosition === index && wouldChangePosition && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        {isFirstColumn ? (
+                          // Horizontal indicator for between rows (or single column mode)
+                          <div className="w-full px-6">
+                            <div
+                              className="w-full h-1 relative rounded-full"
+                              style={{
+                                background: `linear-gradient(to right, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
+                              }}
+                            >
+                              <svg
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                xmlns={SVG_NAMESPACE}
+                              >
+                                <path
+                                  d={PLUS}
+                                  stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        ) : (
+                          // Vertical indicator for between columns (only in side-by-side mode)
+                          <div className="h-full px-3">
+                            <div
+                              className="h-full w-1 relative rounded-full"
+                              style={{
+                                background: `linear-gradient(to bottom, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
+                              }}
+                            >
+                              <svg
+                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                xmlns={SVG_NAMESPACE}
+                              >
+                                <path
+                                  d={PLUS}
+                                  stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Algorithm card - this is the grid item */}
+                <AlgorithmResultCard
+                  algorithmName={algorithmName}
+                  algorithmPlot={algorithmPlots[algorithmName]}
+                  fullData={data}
+                  availableTickers={availableTickers}
+                  defaultTicker={defaultTicker}
+                  index={originalIndex}
+                  isDragging={draggedAlgorithm === algorithmName}
+                  onDragStart={() => handleDragStart(algorithmName)}
+                  onDragEnd={handleDragEnd}
+                  isSideBySideMode={isSideBySideMode}
+                />
+              </div>
+            );
+          })}
+          {/* Drop zone at the end */}
+          {algorithmNames.length > 0 && (
+            <div
+              data-drop-zone={algorithmNames.length}
+              className={`relative z-20 h-[36px] flex items-center justify-center ${
+                isSideBySideMode ? 'col-span-2' : 'col-span-1'
+              }`}
+              onMouseEnter={() => handleDropZoneHover(algorithmNames.length)}
+              onMouseUp={handleDragEnd}
+              style={{
+                pointerEvents: draggedAlgorithm ? 'auto' : 'none',
+                // Position to match spacing of between-cards drop zones
+                // Between-cards: drop zone center is at -12px relative to card below (12px above card)
+                // For end: we want the line 12px below the last card
+                // Drop zone center should be at 12px below card
+                // Drop zone is 36px tall, center is 18px from top
+                // So top should be at 12px - 18px = -6px relative to card bottom
+                // The drop zone is a grid item with 24px gap above it
+                // Naturally: top at gap start (24px below card), bottom at 24px + 36px = 60px below card
+                // We want: top at -6px relative to card bottom (which is 6px above card bottom, or 18px above gap start)
+                // Difference: -6px - 24px = -30px relative to gap start, so move up by 30px
+                // marginTop: -30px moves the element up
+                marginTop: '-30px', // Positions drop zone so line is 12px below card (matching between-cards)
+              }}
+            >
+              {draggedAlgorithmInfo &&
+                dropPosition === algorithmNames.length &&
+                wouldChangePosition && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-full px-6">
+                      <div
+                        className="w-full h-1 relative rounded-full"
+                        style={{
+                          background: `linear-gradient(to right, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
+                        }}
+                      >
+                        <svg
+                          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          xmlns={SVG_NAMESPACE}
+                        >
+                          <path
+                            d={PLUS}
+                            stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

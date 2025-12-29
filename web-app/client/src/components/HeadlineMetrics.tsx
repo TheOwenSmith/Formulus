@@ -1,12 +1,13 @@
 import type { Graph } from '@client/types';
-import { withCommasRounded } from '@client/utils/numberUtils';
 import { generateGradientFromTailwind } from '@client/utils/colorUtils';
+import { withCommasRounded } from '@client/utils/numberUtils';
 
 interface HeadlineMetricsProps {
   data: Graph;
   primaryColor?: string; // Primary color for the algorithm (hex format)
   gradientFrom?: string; // Tailwind gradient from class (e.g., "from-blue-400")
   gradientTo?: string; // Tailwind gradient to class (e.g., "to-cyan-400")
+  isSideBySideMode?: boolean; // Whether we're in side-by-side comparison mode
 }
 
 export function HeadlineMetrics({
@@ -14,14 +15,22 @@ export function HeadlineMetrics({
   primaryColor = '#3b82f6',
   gradientFrom = 'from-blue-400',
   gradientTo = 'to-cyan-400',
+  isSideBySideMode = false,
 }: HeadlineMetricsProps) {
+  // Early return if tickerPlot is not available
+  if (!data.tickerPlot || data.tickerPlot.y.length === 0) {
+    return null;
+  }
+
   // Calculate performance metrics
   const initialTickerValue = data.tickerPlot.y[0];
   const finalTickerValue = data.tickerPlot.y[data.tickerPlot.y.length - 1];
   const tickerReturn = ((finalTickerValue - initialTickerValue) / initialTickerValue) * 100;
 
-  // Format growth rate with APY
-  const growthRateFormatted = `${withCommasRounded(data.growthRate * 100)}% APY`;
+  // Format growth rate with APY (hide APY in side-by-side mode to prevent wrapping issues)
+  const growthRateFormatted = isSideBySideMode
+    ? `${withCommasRounded(data.growthRate * 100)}%`
+    : `${withCommasRounded(data.growthRate * 100)}% APY`;
 
   // Calculate algorithm growth rate as percentage for color logic
   const algorithmGrowthRate = data.growthRate * 100;
@@ -72,10 +81,10 @@ export function HeadlineMetrics({
             background: generateGradientFromTailwind(gradientFrom, gradientTo),
           }}
         />
-        <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2">
+        <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2 text-center">
           Algorithm Growth Rate
         </div>
-        <div className={`text-2xl font-bold tracking-tight ${getAlgorithmColor()}`}>
+        <div className={`text-2xl font-bold tracking-tight ${getAlgorithmColor()} text-center`}>
           {algorithmGrowthRate >= 0 ? '+' : ''}
           {growthRateFormatted}
         </div>
@@ -89,12 +98,12 @@ export function HeadlineMetrics({
             background: generateGradientFromTailwind(gradientFrom, gradientTo),
           }}
         />
-        <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2">
+        <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2 text-center">
           {data.tickerPlot.name} Growth Rate
         </div>
-        <div className={`text-2xl font-bold tracking-tight ${getTickerColor()}`}>
+        <div className={`text-2xl font-bold tracking-tight ${getTickerColor()} text-center`}>
           {tickerReturn >= 0 ? '+' : ''}
-          {withCommasRounded(tickerReturn)}% APY
+          {withCommasRounded(tickerReturn)}%{isSideBySideMode ? '' : ' APY'}
         </div>
       </div>
 
@@ -109,10 +118,10 @@ export function HeadlineMetrics({
             background: generateGradientFromTailwind(gradientFrom, gradientTo),
           }}
         />
-        <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2">
+        <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2 text-center">
           Sharpe Ratio
         </div>
-        <div className={`text-2xl font-bold tracking-tight ${getSharpeRatioColor()}`}>
+        <div className={`text-2xl font-bold tracking-tight ${getSharpeRatioColor()} text-center`}>
           {sharpeRatioFormatted}
         </div>
       </div>

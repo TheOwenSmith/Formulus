@@ -140,11 +140,21 @@ export function BacktestChart({
     svg.selectAll('*').remove();
 
     const container = containerRef.current;
-    const width = dimensions.width ?? container.clientWidth;
-    const height = dimensions.height ?? 600;
+    const width = Math.max(0, dimensions.width ?? container?.clientWidth ?? 0);
+    const height = Math.max(0, dimensions.height ?? 600);
     const margin = { top: 60, right: 80, bottom: 80, left: 100 };
+
+    // Ensure we have minimum valid dimensions before proceeding
+    // This prevents rendering during layout transitions when dimensions are invalid
+    if (width < margin.left + margin.right || height < margin.top + margin.bottom) {
+      return; // Don't render if container is too small
+    }
+
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
+
+    // Double-check inner dimensions are valid
+    if (innerWidth <= 0 || innerHeight <= 0) return;
 
     svg.attr('width', width).attr('height', height);
 
@@ -466,8 +476,12 @@ export function BacktestChart({
     const legendWidth = legendTextOffset + maxLabelWidth + legendPadding * 2;
     const legendHeight = legendItems.length * legendItemHeight + legendPadding * 2;
 
-    const legendX = innerWidth - legendWidth - legendRightMargin;
-    const finalLegendX = legendX < legendRightMargin ? legendRightMargin : legendX;
+    // Ensure legend fits within available width and prevent negative values
+    const maxLegendWidth = Math.max(0, innerWidth - legendRightMargin * 2);
+    const adjustedLegendWidth = Math.min(legendWidth, maxLegendWidth);
+
+    const legendX = innerWidth - adjustedLegendWidth - legendRightMargin;
+    const finalLegendX = Math.max(legendRightMargin, Math.max(0, legendX));
     const legendY = 10;
 
     // Tooltip
@@ -503,7 +517,7 @@ export function BacktestChart({
           const [mouseX, mouseY] = d3.pointer(event.sourceEvent, g.node() as Element);
           if (
             mouseX >= finalLegendX &&
-            mouseX <= finalLegendX + legendWidth &&
+            mouseX <= finalLegendX + adjustedLegendWidth &&
             mouseY >= legendY &&
             mouseY <= legendY + legendHeight
           ) {
@@ -593,14 +607,14 @@ export function BacktestChart({
     brushOverlay.style('cursor', 'crosshair').style('fill', 'transparent');
 
     // Exclude legend area from brush - create a clip path or adjust pointer events
-    // The legend is positioned at finalLegendX, legendY with width legendWidth and height legendHeight
+    // The legend is positioned at finalLegendX, legendY with width adjustedLegendWidth and height legendHeight
     // We'll add pointer-events handling to prevent brush from interfering with legend clicks
     brushOverlay.on('mousedown', function (event) {
       const [mouseX, mouseY] = d3.pointer(event, g.node() as Element);
       // Check if click is within legend bounds
       if (
         mouseX >= finalLegendX &&
-        mouseX <= finalLegendX + legendWidth &&
+        mouseX <= finalLegendX + adjustedLegendWidth &&
         mouseY >= legendY &&
         mouseY <= legendY + legendHeight
       ) {
@@ -693,7 +707,7 @@ export function BacktestChart({
     g.append('rect')
       .attr('x', finalLegendX)
       .attr('y', legendY)
-      .attr('width', legendWidth)
+      .attr('width', Math.max(0, adjustedLegendWidth))
       .attr('height', legendHeight)
       .attr('fill', 'rgba(15, 23, 42, 0.95)')
       .attr('stroke', 'rgba(255, 255, 255, 0.2)')

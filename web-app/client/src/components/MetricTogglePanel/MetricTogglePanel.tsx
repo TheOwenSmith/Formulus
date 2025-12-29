@@ -1,3 +1,11 @@
+import {
+  CHEVRON_DOWN,
+  MENU_CIRCLES,
+  MENU_LINES,
+  STROKE_PROPERTIES,
+  STROKE_PROPERTIES_SMALL,
+  SVG_NAMESPACE,
+} from '@client/icons/svgPaths';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { MetricKey } from './metricUtils';
@@ -8,6 +16,7 @@ interface MetricTogglePanelProps {
   onToggle: (metric: MetricKey, enabled: boolean) => void;
   availableMetrics: Set<MetricKey>;
   primaryColor?: string; // Primary color for the algorithm (hex format)
+  primaryColorLight?: string; // Light version of primary color for text (hex format)
 }
 
 export function MetricTogglePanel({
@@ -15,12 +24,32 @@ export function MetricTogglePanel({
   onToggle,
   availableMetrics,
   primaryColor = '#3b82f6',
+  primaryColorLight,
 }: MetricTogglePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to convert hex to rgba
+  const hexToRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  // Get the light color for text - use provided primaryColorLight or calculate a lighter version
+  const getTextColor = () => {
+    if (primaryColorLight) return primaryColorLight;
+    // If no light color provided, calculate a lighter version
+    const r = parseInt(primaryColor.slice(1, 3), 16);
+    const g = parseInt(primaryColor.slice(3, 5), 16);
+    const b = parseInt(primaryColor.slice(5, 7), 16);
+    // Lighten by approximately 20% (similar to Tailwind's -400 vs -500)
+    return `rgb(${Math.min(255, Math.round(r * 1.2))}, ${Math.min(255, Math.round(g * 1.2))}, ${Math.min(255, Math.round(b * 1.2))})`;
+  };
 
   const allMetrics = Object.keys(METRIC_LABELS) as MetricKey[];
   const availableMetricsList = allMetrics.filter((metric) => availableMetrics.has(metric));
@@ -168,19 +197,13 @@ export function MetricTogglePanel({
           height="18"
           viewBox="0 0 18 18"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          xmlns={SVG_NAMESPACE}
           style={{ color: primaryColor }}
         >
-          <path
-            d="M2.25 4.5H15.75M2.25 9H15.75M2.25 13.5H15.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle cx="4.5" cy="4.5" r="1.5" fill="currentColor" />
-          <circle cx="4.5" cy="9" r="1.5" fill="currentColor" />
-          <circle cx="4.5" cy="13.5" r="1.5" fill="currentColor" />
+          <path d={MENU_LINES} {...STROKE_PROPERTIES_SMALL} />
+          {MENU_CIRCLES.map((circle, idx) => (
+            <circle key={idx} cx={circle.cx} cy={circle.cy} r={circle.r} fill="currentColor" />
+          ))}
         </svg>
         <span className="flex-1 text-left">
           Metrics ({enabledCount}/{totalCount})
@@ -191,15 +214,9 @@ export function MetricTogglePanel({
           height="16"
           viewBox="0 0 16 16"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          xmlns={SVG_NAMESPACE}
         >
-          <path
-            d="M4 6L8 10L12 6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d={CHEVRON_DOWN} {...STROKE_PROPERTIES} />
         </svg>
       </button>
 
@@ -215,7 +232,20 @@ export function MetricTogglePanel({
               <h4 className="text-base font-semibold text-white/95 m-0">Display Metrics</h4>
               <div className="flex gap-2 flex-wrap w-full sm:w-auto">
                 <button
-                  className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-lg text-blue-400 text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[5px] hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px flex-1 sm:flex-initial"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[5px] hover:-translate-y-px flex-1 sm:flex-initial"
+                  style={{
+                    backgroundColor: hexToRgba(primaryColor, 0.2),
+                    border: `1px solid ${hexToRgba(primaryColor, 0.4)}`,
+                    color: getTextColor(),
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.3);
+                    e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.6);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.2);
+                    e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.4);
+                  }}
                   onClick={() => {
                     availableMetricsList.forEach((metric) => {
                       onToggle(metric, true);
@@ -225,7 +255,20 @@ export function MetricTogglePanel({
                   Enable All
                 </button>
                 <button
-                  className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-lg text-blue-400 text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[5px] hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px flex-1 sm:flex-initial"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[5px] hover:-translate-y-px flex-1 sm:flex-initial"
+                  style={{
+                    backgroundColor: hexToRgba(primaryColor, 0.2),
+                    border: `1px solid ${hexToRgba(primaryColor, 0.4)}`,
+                    color: getTextColor(),
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.3);
+                    e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.6);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.2);
+                    e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.4);
+                  }}
                   onClick={() => {
                     availableMetricsList.forEach((metric) => {
                       onToggle(metric, false);
@@ -235,7 +278,20 @@ export function MetricTogglePanel({
                   Disable All
                 </button>
                 <button
-                  className="px-3 py-1.5 bg-blue-500/20 border border-blue-500/40 rounded-lg text-blue-400 text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[5px] hover:bg-blue-500/30 hover:border-blue-500/60 hover:-translate-y-px flex-1 sm:flex-initial"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200 backdrop-blur-[5px] hover:-translate-y-px flex-1 sm:flex-initial"
+                  style={{
+                    backgroundColor: hexToRgba(primaryColor, 0.2),
+                    border: `1px solid ${hexToRgba(primaryColor, 0.4)}`,
+                    color: getTextColor(),
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.3);
+                    e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.6);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.2);
+                    e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.4);
+                  }}
                   onClick={() => {
                     availableMetricsList.forEach((metric) => {
                       onToggle(metric, DEFAULT_METRIC_OPTIONS[metric]);
@@ -256,7 +312,8 @@ export function MetricTogglePanel({
                     type="checkbox"
                     checked={enabledMetrics[metric]}
                     onChange={(e) => onToggle(metric, e.target.checked)}
-                    className="w-[18px] h-[18px] cursor-pointer accent-blue-500 flex-shrink-0"
+                    className="w-[18px] h-[18px] cursor-pointer flex-shrink-0"
+                    style={{ accentColor: primaryColor }}
                   />
                   <span className="text-white/85 text-sm font-normal cursor-pointer hover:text-white/95">
                     {METRIC_LABELS[metric]}

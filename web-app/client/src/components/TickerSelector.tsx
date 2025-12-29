@@ -1,3 +1,4 @@
+import { ARROW_DOWN_SMALL, STROKE_PROPERTIES_SMALL, SVG_NAMESPACE } from '@client/icons/svgPaths';
 import { useEffect, useRef, useState } from 'react';
 
 interface TickerSelectorProps {
@@ -47,16 +48,10 @@ export function TickerSelector({
           height="10"
           viewBox="0 0 10 10"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          xmlns={SVG_NAMESPACE}
           className={`text-white/60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         >
-          <path
-            d="M2.5 3.75L5 6.25L7.5 3.75"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d={ARROW_DOWN_SMALL} {...STROKE_PROPERTIES_SMALL} />
         </svg>
       </button>
 
