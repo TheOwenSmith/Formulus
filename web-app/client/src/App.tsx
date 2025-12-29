@@ -1,3 +1,6 @@
+import { Header } from '@client/components/Header';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { AboutPage } from './pages/AboutPage';
 import { BacktestPage } from './pages/BacktestPage';
 import type { Graph } from './types';
 
@@ -15,12 +18,18 @@ const generateTickerData = (name: string, baseTrend: number, noiseFactor: number
 });
 
 // Generate algorithm data with different performance characteristics
-const generateAlgorithmData = (name: string, baseTrend: number, volatility: number, phase: number) => ({
+const generateAlgorithmData = (
+  name: string,
+  baseTrend: number,
+  volatility: number,
+  phase: number,
+) => ({
   name,
   y: Array.from({ length: 100 * MULTIPLIER }, (_, i) => {
     const base = 100;
     const trend = (i / MULTIPLIER) * baseTrend;
-    const noise = Math.sin((i / MULTIPLIER / 8) + phase) * volatility + Math.random() * (volatility / 2);
+    const noise =
+      Math.sin(i / MULTIPLIER / 8 + phase) * volatility + Math.random() * (volatility / 2);
     return base + trend + noise;
   }),
 });
@@ -30,7 +39,7 @@ const sampleData: Graph = {
     'Momentum Strategy': generateAlgorithmData('Momentum Strategy', 0.12, 4, 0),
     'Mean Reversion': generateAlgorithmData('Mean Reversion', 0.08, 3, Math.PI / 2),
     'Breakout Strategy': generateAlgorithmData('Breakout Strategy', 0.15, 5, Math.PI),
-    'RSI Strategy': generateAlgorithmData('RSI Strategy', 0.10, 3.5, Math.PI * 1.5),
+    'RSI Strategy': generateAlgorithmData('RSI Strategy', 0.1, 3.5, Math.PI * 1.5),
   },
   description: [
     'Aggregate: 1min',
@@ -72,5 +81,14 @@ const sampleData: Graph = {
 };
 
 export function App() {
-  return <BacktestPage data={sampleData} />;
+  return (
+    <BrowserRouter>
+      <Header />
+      <Routes>
+        <Route path="/backtest" element={<BacktestPage data={sampleData} />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/" element={<BacktestPage data={sampleData} />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
