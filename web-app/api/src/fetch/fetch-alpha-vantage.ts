@@ -1,10 +1,10 @@
-import type { Bar } from '@api/backtesting/read-data';
 import { config } from '@api/lib/config';
 import { tryAsync, trySync } from '@api/utils/errorHandling';
 import { retryWithBackoff } from '@api/utils/retry';
 import { zodSafeFetch } from '@api/utils/zod-safe-fetch';
 import fs from 'fs';
 import z from 'zod';
+import type { Bar } from './types';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
 
 const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
