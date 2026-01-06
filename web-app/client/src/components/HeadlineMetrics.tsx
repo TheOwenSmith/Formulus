@@ -1,62 +1,68 @@
-import type { Graph } from '@client/types';
 import { generateGradientFromTailwind } from '@client/utils/colorUtils';
+import { yearsBetween } from '@client/utils/dateUtils';
 import { withCommasRounded } from '@client/utils/numberUtils';
+import type { DescriptionMetrics, SimplePlot } from '@shared/types';
 
 interface HeadlineMetricsProps {
-  data: Graph;
-  primaryColor?: string; // Primary color for the algorithm (hex format)
+  descriptionMetrics: DescriptionMetrics;
   gradientFrom?: string; // Tailwind gradient from class (e.g., "from-blue-400")
   gradientTo?: string; // Tailwind gradient to class (e.g., "to-cyan-400")
   isSideBySideMode?: boolean; // Whether we're in side-by-side comparison mode
+  primaryColor?: string; // Primary color for the algorithm (hex format)
+  selectedTickerPlot: SimplePlot;
 }
 
 export function HeadlineMetrics({
-  data,
+  descriptionMetrics,
   primaryColor = '#3b82f6',
   gradientFrom = 'from-blue-400',
   gradientTo = 'to-cyan-400',
   isSideBySideMode = false,
+  selectedTickerPlot,
 }: HeadlineMetricsProps) {
-  // Early return if tickerPlot is not available
-  if (!data.tickerPlot || data.tickerPlot.y.length === 0) {
-    return null;
-  }
+  // Calculate and format ticker return rate
+  const balance = selectedTickerPlot.y.at(-1)!;
+  const yearsBetweenStartAndEnd = yearsBetween(
+    descriptionMetrics.timespan[1],
+    descriptionMetrics.timespan[0],
+  );
+  const tickerGrowthRate = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
 
-  // Calculate performance metrics
-  const initialTickerValue = data.tickerPlot.y[0];
-  const finalTickerValue = data.tickerPlot.y[data.tickerPlot.y.length - 1];
-  const tickerReturn = ((finalTickerValue - initialTickerValue) / initialTickerValue) * 100;
+  const tickerReturnFormmated =
+    `${withCommasRounded(tickerGrowthRate)}%` +
+    (!isSideBySideMode ? ` (${withCommasRounded(tickerGrowthRate)}% APY)` : '');
 
-  // Format growth rate with APY (hide APY in side-by-side mode to prevent wrapping issues)
-  const growthRateFormatted = isSideBySideMode
-    ? `${withCommasRounded(data.growthRate * 100)}%`
-    : `${withCommasRounded(data.growthRate * 100)}% APY`;
+  // Format return rate with APY (hide APY in side-by-side mode to prevent wrapping issues)
+  const algorithmReturn = descriptionMetrics.algorithmReturn * 100;
+  const algorithmGrowthRate = descriptionMetrics.growthRate * 100;
 
-  // Calculate algorithm growth rate as percentage for color logic
-  const algorithmGrowthRate = data.growthRate * 100;
+  const algorithmReturnFormmated =
+    `${withCommasRounded(algorithmReturn)}%` +
+    (!isSideBySideMode ? ` (${withCommasRounded(algorithmGrowthRate)}% APY)` : '');
 
   // Format Sharpe ratio
-  const sharpeRatio = data.sharpeRatio;
-  const sharpeRatioFormatted = sharpeRatio != null ? withCommasRounded(sharpeRatio) : 'N/A';
+  const algorithmSharpeRatio = descriptionMetrics.sharpeRatio;
+  const algorithmSharpeRatioFormatted =
+    algorithmSharpeRatio != null ? withCommasRounded(algorithmSharpeRatio) : 'N/A';
 
   // Determine color for Algorithm Growth Rate
   const getAlgorithmColor = () => {
     if (algorithmGrowthRate < 0) return 'text-red-500';
-    if (algorithmGrowthRate >= tickerReturn) return 'text-emerald-500';
+    if (algorithmGrowthRate >= tickerGrowthRate) return 'text-emerald-500';
     return 'text-white/90';
   };
 
-  // Determine color for SPY Growth Rate
+  // Determine color for ticker Growth Rate
   const getTickerColor = () => {
-    if (tickerReturn >= 3) return 'text-emerald-500';
-    if (tickerReturn >= 0) return 'text-white/90';
+    if (tickerGrowthRate >= 3) return 'text-emerald-500';
+    if (tickerGrowthRate >= 0) return 'text-white/90';
     return 'text-red-500';
   };
 
   const getSharpeRatioColor = () => {
-    if (sharpeRatio == null) return 'text-white/90';
-    if (sharpeRatio >= 1) return 'text-emerald-500';
-    if (sharpeRatio >= 0) return 'text-white-90';
+    if (algorithmSharpeRatio == null) return 'text-white/90';
+    if (algorithmSharpeRatio >= 1) return 'text-emerald-500';
+    if (algorithmSharpeRatio >= 0) return 'text-white-90';
     return 'text-red-500';
   };
 
@@ -86,7 +92,7 @@ export function HeadlineMetrics({
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getAlgorithmColor()} text-center`}>
           {algorithmGrowthRate >= 0 ? '+' : ''}
-          {growthRateFormatted}
+          {algorithmReturnFormmated}
         </div>
       </div>
 
@@ -99,11 +105,11 @@ export function HeadlineMetrics({
           }}
         />
         <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2 text-center">
-          {data.tickerPlot.name} Growth Rate
+          {selectedTickerPlot.name} Growth Rate
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getTickerColor()} text-center`}>
-          {tickerReturn >= 0 ? '+' : ''}
-          {withCommasRounded(tickerReturn)}%{isSideBySideMode ? '' : ' APY'}
+          {tickerGrowthRate >= 0 ? '+' : ''}
+          {tickerReturnFormmated}
         </div>
       </div>
 
@@ -122,7 +128,7 @@ export function HeadlineMetrics({
           Sharpe Ratio
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getSharpeRatioColor()} text-center`}>
-          {sharpeRatioFormatted}
+          {algorithmSharpeRatioFormatted}
         </div>
       </div>
     </div>

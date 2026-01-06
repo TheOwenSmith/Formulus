@@ -29,7 +29,8 @@
     "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true,
 
-    "rootDir": ".."
+    "rootDir": "..",
   },
-  "include": ["./src", "../api/src"]
+  "include": ["src/**/*", "../api/src/shared/**/*"],
+  "exclude": ["node_modules", "*.config.ts", "*.config.js", "*.config.mjs", "../api"]
 }

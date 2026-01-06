@@ -14,3 +14,70 @@ body {
   width: 100%;
   min-height: 100vh;
 }
+
+/* Custom Sonner toast styling */
+.toast-custom {
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  color: white !important;
+}
+
+/* Override Sonner toast container styles */
+[data-sonner-toaster] {
+  --normal-bg: rgba(15, 23, 42, 0.8);
+  --normal-border: rgba(255, 255, 255, 0.1);
+  --normal-text: white;
+}
+
+[data-sonner-toast] {
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  color: white !important;
+}
+
+[data-sonner-toast][data-type='error'] {
+  background: rgba(248, 113, 113, 0.15) !important;
+  border-color: rgba(248, 113, 113, 0.7) !important;
+  box-shadow: 0 20px 60px rgba(248, 113, 113, 0.25), 0 0 0 1px rgba(248, 113, 113, 0.7) !important;
+}
+
+[data-sonner-toast][data-type='success'] {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+[data-sonner-toast][data-type='info'] {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+[data-sonner-toast][data-type='warning'] {
+  background: rgba(234, 179, 8, 0.1) !important;
+  border-color: rgba(234, 179, 8, 0.3) !important;
+}
+
+[data-sonner-toast] [data-title] {
+  color: white !important;
+  font-weight: 500 !important;
+}
+
+[data-sonner-toast] [data-description] {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+[data-sonner-toast] [data-close-button] {
+  color: rgba(255, 255, 255, 0.7) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  color: white !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}

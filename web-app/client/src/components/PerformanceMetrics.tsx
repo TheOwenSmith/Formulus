@@ -1,45 +1,37 @@
-import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/svgPaths';
-import { useMemo } from 'react';
+import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/index';
+import type { DescriptionMetrics } from '@shared/types';
+import type { Dispatch, SetStateAction } from 'react';
 import { MetricTogglePanel } from './MetricTogglePanel/MetricTogglePanel';
-import { createMetricMap, type MetricKey } from './MetricTogglePanel/metricUtils';
+import {
+  DESCRIPTION_METRIC_LABELS,
+  DESCRIPTION_METRIC_TO_STRING,
+  DESCRIPTION_METRICS_ORDER,
+  type DescriptionMetricVisbility,
+  type MetricKey,
+} from './MetricTogglePanel/metricUtils';
 
 interface PerformanceMetricsProps {
-  description: string[];
+  descriptionMetrics: DescriptionMetrics;
+  hideToggleButton?: boolean; // Hide the internal toggle button (useful for side-by-side mode)
+  metricVisibility: DescriptionMetricVisbility;
   onToggle?: () => void;
-  enabledMetrics: Record<MetricKey, boolean>;
-  onToggleMetric: (metric: MetricKey, enabled: boolean) => void;
-  availableMetrics: Set<MetricKey>;
   primaryColor?: string; // Primary color for the algorithm (hex format)
   primaryColorLight?: string; // Light version of primary color for text (hex format)
-  hideToggleButton?: boolean; // Hide the internal toggle button (useful for side-by-side mode)
+  setMetricVisibility: Dispatch<SetStateAction<DescriptionMetricVisbility>>;
 }
 
 export function PerformanceMetrics({
-  description,
+  descriptionMetrics,
+  hideToggleButton = false,
+  metricVisibility,
   onToggle,
-  enabledMetrics,
-  onToggleMetric,
-  availableMetrics,
   primaryColor = '#3b82f6',
   primaryColorLight,
-  hideToggleButton = false,
+  setMetricVisibility,
 }: PerformanceMetricsProps) {
-  // Metric toggle state is now managed by parent
-  const metricMap = useMemo(() => createMetricMap(description), [description]);
-
-  // Filter displayed metrics based on toggle state
-  const displayedMetrics = useMemo(() => {
-    return description.filter((desc) => {
-      // Try to identify the metric
-      for (const [metricKey, metricDesc] of metricMap.entries()) {
-        if (desc === metricDesc) {
-          return enabledMetrics[metricKey];
-        }
-      }
-      // If we can't identify it, show it by default (fallback)
-      return true;
-    });
-  }, [description, metricMap, enabledMetrics]);
+  const enabledMetrics: MetricKey[] = DESCRIPTION_METRICS_ORDER.filter(
+    (metric) => metricVisibility[metric],
+  );
 
   return (
     <div className="bg-slate-900/60 rounded-xl p-6 shadow-[0_10px_40px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] h-full flex flex-col relative">
@@ -62,35 +54,31 @@ export function PerformanceMetrics({
       </div>
       <div className="mb-6">
         <MetricTogglePanel
-          enabledMetrics={enabledMetrics}
-          onToggle={onToggleMetric}
-          availableMetrics={availableMetrics}
+          metricVisibility={metricVisibility}
           primaryColor={primaryColor}
           primaryColorLight={primaryColorLight}
+          setMetricVisibility={setMetricVisibility}
         />
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">
-        {displayedMetrics.length > 0 ? (
+        {enabledMetrics.length > 0 ? (
           <div className="flex flex-col gap-3 overflow-y-auto flex-1 pr-2">
-            {displayedMetrics.map((metric, index) => {
-              // Parse metric string to separate label and value
-              const colonIndex = metric.indexOf(':');
-              const label = colonIndex !== -1 ? metric.substring(0, colonIndex + 1) : '';
-              const value = colonIndex !== -1 ? metric.substring(colonIndex + 1).trim() : metric;
+            {enabledMetrics.map((metric: MetricKey, index) => {
+              const label = DESCRIPTION_METRIC_LABELS[metric];
+              const descriptionMetricToStringFn = DESCRIPTION_METRIC_TO_STRING[metric] as (
+                descriptionMetric: DescriptionMetrics[MetricKey],
+              ) => string;
+              const value = descriptionMetricToStringFn(descriptionMetrics[metric]);
 
               return (
                 <div
                   key={index}
                   className="py-2.5 px-4 bg-white/4 rounded-lg border border-white/8 text-sm text-white/85 transition-all duration-200 hover:bg-white/6 hover:border-white/12 flex-shrink-0"
                 >
-                  {colonIndex !== -1 ? (
-                    <div>
-                      <span className="text-white/60">{label} </span>
-                      <span className="text-white/90 font-medium">{value}</span>
-                    </div>
-                  ) : (
-                    <span className="text-white/85">{metric}</span>
-                  )}
+                  <div>
+                    <span className="text-white/60">{label} </span>
+                    <span className="text-white/90 font-medium">{value}</span>
+                  </div>
                 </div>
               );
             })}

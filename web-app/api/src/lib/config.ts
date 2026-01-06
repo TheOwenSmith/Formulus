@@ -7,6 +7,10 @@ const envVars = [
   'NODE_ENV',
   'PORT',
   'CORS_ORIGIN',
+  'DATABASE_URL',
+  'BETTER_AUTH_SECRET',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 

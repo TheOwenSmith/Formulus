@@ -1,14 +1,14 @@
 import { BacktestChart } from '@client/components/BacktestChart';
 import { HeadlineMetrics } from '@client/components/HeadlineMetrics';
 import {
-  createMetricMap,
-  DEFAULT_METRIC_OPTIONS,
-  type MetricKey,
+  DEFAULT_DESCRIPTION_METRIC_VISBILITY,
+  type DescriptionMetricVisbility,
 } from '@client/components/MetricTogglePanel/metricUtils';
 import { PerformanceMetrics } from '@client/components/PerformanceMetrics';
-import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/svgPaths';
-import type { Graph } from '@client/types';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/index';
+import { withCommasRounded } from '@client/utils/numberUtils';
+import type { DescriptionMetrics, SimplePlot, Ticker, Timestamp } from '@shared/types';
+import { memo, useEffect, useRef, useState } from 'react';
 
 // Color scheme definitions for different algorithm cards
 const colorSchemes = [
@@ -151,33 +151,35 @@ const colorSchemes = [
 ];
 
 interface AlgorithmResultCardProps {
-  algorithmName: string;
-  algorithmPlot: { name: string; y: number[] };
-  fullData: Graph;
-  availableTickers: string[];
-  defaultTicker: string;
+  algorithmGraph: {
+    aggregate: Timestamp;
+    descriptionMetrics: DescriptionMetrics;
+    algorithmPlot: SimplePlot;
+  };
+  defaultTicker: Ticker;
   index: number; // Index for color scheme selection
   isDragging?: boolean;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
   isSideBySideMode?: boolean;
+  onDragEnd?: () => void;
+  onDragStart?: () => void;
+  tickerPlotByTicker: Record<Ticker, SimplePlot>;
+  timestamps: string[];
 }
 
 function AlgorithmResultCardComponent({
-  algorithmName,
-  algorithmPlot,
-  fullData,
-  availableTickers,
+  algorithmGraph,
   defaultTicker,
   index,
-  isDragging = false,
-  onDragStart,
+  isDragging,
+  isSideBySideMode,
   onDragEnd,
-  isSideBySideMode = false,
+  onDragStart,
+  tickerPlotByTicker,
+  timestamps,
 }: AlgorithmResultCardProps) {
   // Get color scheme for this card (cycle through available schemes)
   const colorScheme = colorSchemes[index % colorSchemes.length];
-  const [selectedTicker, setSelectedTicker] = useState<string>(defaultTicker);
+  const [selectedTicker, setSelectedTicker] = useState<Ticker>(defaultTicker);
   // In side-by-side mode, show graph by default (false). In normal mode, show metrics panel by default (true).
   const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(!isSideBySideMode);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -200,64 +202,9 @@ function AlgorithmResultCardComponent({
     }
   }, [isSideBySideMode]);
 
-  // Get the selected ticker plot
-  const selectedTickerPlot = useMemo(() => {
-    if (fullData.tickerPlots && selectedTicker) {
-      return fullData.tickerPlots[selectedTicker];
-    }
-    return fullData.tickerPlot;
-  }, [fullData, selectedTicker]);
-
-  // Calculate growth rate for this algorithm
-  const initialValue = algorithmPlot.y[0];
-  const finalValue = algorithmPlot.y[algorithmPlot.y.length - 1];
-  const algorithmReturn = ((finalValue - initialValue) / initialValue) * 100;
-
-  // Calculate years between start and end for APY calculation
-  // Estimate based on timestamps if available
-  let yearsBetween = 1; // Default to 1 year
-  if (fullData.timestamps.length > 1) {
-    const startDate = new Date(fullData.timestamps[0].replace(' ', 'T'));
-    const endDate = new Date(fullData.timestamps[fullData.timestamps.length - 1].replace(' ', 'T'));
-    const daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-    yearsBetween = daysBetween / 365.25;
-  }
-
-  const growthRate =
-    yearsBetween > 0 ? Math.pow(finalValue / initialValue, 1 / yearsBetween) - 1 : 0;
-
-  // Create a single-algorithm Graph for this component
-  const algorithmData: Graph = useMemo(() => {
-    const result: Graph = {
-      ...fullData,
-      algorithmName: algorithmName,
-      algorithmPlot: algorithmPlot,
-      growthRate: growthRate,
-      sharpeRatio: fullData.sharpeRatio, // Use shared sharpe ratio for now, could calculate per-algorithm
-    };
-    if (selectedTickerPlot) {
-      result.tickerPlot = selectedTickerPlot;
-    }
-    return result;
-  }, [fullData, algorithmPlot, algorithmName, growthRate, selectedTickerPlot]);
-
-  // Metrics state
-  const metricMap = useMemo(() => createMetricMap(fullData.description), [fullData.description]);
-  const availableMetrics = useMemo(() => new Set(metricMap.keys()), [metricMap]);
-
-  const [enabledMetrics, setEnabledMetrics] = useState<Record<MetricKey, boolean>>(() => {
-    const initial: Record<MetricKey, boolean> = { ...DEFAULT_METRIC_OPTIONS };
-    const tempMetricMap = createMetricMap(fullData.description);
-    const availableSet = new Set(tempMetricMap.keys());
-    for (const metric of availableSet) {
-      initial[metric] = DEFAULT_METRIC_OPTIONS[metric];
-    }
-    return initial;
-  });
-
-  const handleToggleMetric = useCallback((metric: MetricKey, enabled: boolean) => {
-    setEnabledMetrics((prev) => ({ ...prev, [metric]: enabled }));
-  }, []);
+  const [metricVisibility, setMetricVisibility] = useState<DescriptionMetricVisbility>(() => ({
+    ...DEFAULT_DESCRIPTION_METRIC_VISBILITY,
+  }));
 
   // Handle mouse down for drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -347,23 +294,25 @@ function AlgorithmResultCardComponent({
           <h2
             className={`text-2xl font-bold mb-2 bg-gradient-to-r ${colorScheme.gradientFrom} ${colorScheme.gradientTo} bg-clip-text text-transparent`}
           >
-            {algorithmName}
+            {algorithmGraph.algorithmPlot.name}
           </h2>
           <div className="text-sm text-white/60">
-            Algorithm Return: {algorithmReturn >= 0 ? '+' : ''}
-            {algorithmReturn.toFixed(2)}% | Growth Rate: {growthRate >= 0 ? '+' : ''}
-            {(growthRate * 100).toFixed(2)}% APY
+            Algorithm Return: {algorithmGraph.descriptionMetrics.algorithmReturn >= 0 ? '+' : ''}
+            {withCommasRounded(algorithmGraph.descriptionMetrics.algorithmReturn * 100)}% | Growth
+            Rate: {algorithmGraph.descriptionMetrics.growthRate >= 0 ? '+' : ''}
+            {withCommasRounded(algorithmGraph.descriptionMetrics.growthRate * 100)}% APY
           </div>
         </div>
 
         {/* Headline Metrics */}
         <div className="mb-6">
           <HeadlineMetrics
-            data={algorithmData}
-            primaryColor={colorScheme.primaryColor}
+            descriptionMetrics={algorithmGraph.descriptionMetrics}
             gradientFrom={colorScheme.gradientFrom}
             gradientTo={colorScheme.gradientTo}
             isSideBySideMode={isSideBySideMode}
+            primaryColor={colorScheme.primaryColor}
+            selectedTickerPlot={tickerPlotByTicker[selectedTicker]}
           />
         </div>
 
@@ -419,14 +368,13 @@ function AlgorithmResultCardComponent({
                   <span>Show Chart</span>
                 </button>
                 <PerformanceMetrics
-                  description={fullData.description}
+                  descriptionMetrics={algorithmGraph.descriptionMetrics}
+                  hideToggleButton={isSideBySideMode}
+                  metricVisibility={metricVisibility}
                   onToggle={() => setIsMetricsPanelVisible(false)}
-                  enabledMetrics={enabledMetrics}
-                  onToggleMetric={handleToggleMetric}
-                  availableMetrics={availableMetrics}
                   primaryColor={colorScheme.primaryColor}
                   primaryColorLight={colorScheme.primaryColorLight}
-                  hideToggleButton={isSideBySideMode}
+                  setMetricVisibility={setMetricVisibility}
                 />
               </div>
             </div>
@@ -493,15 +441,15 @@ function AlgorithmResultCardComponent({
                   }}
                 >
                   <BacktestChart
-                    data={algorithmData}
-                    growthRate={growthRate}
-                    hasShowMetricsButton={false}
-                    availableTickers={availableTickers}
-                    selectedTicker={selectedTicker}
-                    onTickerChange={setSelectedTicker}
                     algorithmColor={colorScheme.primaryColor}
+                    algorithmPlot={algorithmGraph.algorithmPlot}
+                    availableTickers={Object.keys(tickerPlotByTicker)}
                     gradientFrom={colorScheme.gradientFrom}
                     gradientTo={colorScheme.gradientTo}
+                    onTickerChange={setSelectedTicker}
+                    selectedTicker={selectedTicker}
+                    tickerPlot={tickerPlotByTicker[selectedTicker]}
+                    timestamps={timestamps}
                   />
                 </div>
               </div>
@@ -521,13 +469,12 @@ function AlgorithmResultCardComponent({
             >
               {isMetricsPanelVisible && (
                 <PerformanceMetrics
-                  description={fullData.description}
+                  descriptionMetrics={algorithmGraph.descriptionMetrics}
+                  metricVisibility={metricVisibility}
                   onToggle={() => setIsMetricsPanelVisible(false)}
-                  enabledMetrics={enabledMetrics}
-                  onToggleMetric={handleToggleMetric}
-                  availableMetrics={availableMetrics}
                   primaryColor={colorScheme.primaryColor}
                   primaryColorLight={colorScheme.primaryColorLight}
+                  setMetricVisibility={setMetricVisibility}
                 />
               )}
             </div>
@@ -567,15 +514,15 @@ function AlgorithmResultCardComponent({
                 </button>
               )}
               <BacktestChart
-                data={algorithmData}
-                growthRate={growthRate}
-                hasShowMetricsButton={!isMetricsPanelVisible}
-                availableTickers={availableTickers}
-                selectedTicker={selectedTicker}
-                onTickerChange={setSelectedTicker}
                 algorithmColor={colorScheme.primaryColor}
+                algorithmPlot={algorithmGraph.algorithmPlot}
+                availableTickers={Object.keys(tickerPlotByTicker)}
                 gradientFrom={colorScheme.gradientFrom}
                 gradientTo={colorScheme.gradientTo}
+                onTickerChange={setSelectedTicker}
+                selectedTicker={selectedTicker}
+                tickerPlot={tickerPlotByTicker[selectedTicker]}
+                timestamps={timestamps}
               />
             </div>
           </div>
@@ -586,35 +533,4 @@ function AlgorithmResultCardComponent({
 }
 
 // Memoize the component to prevent unnecessary re-renders when props haven't changed
-export const AlgorithmResultCard = memo(AlgorithmResultCardComponent, (prevProps, nextProps) => {
-  // Custom comparison function for better performance
-  // Only re-render if these specific props change
-  // Use shallow comparison for objects/arrays
-  if (
-    prevProps.algorithmName !== nextProps.algorithmName ||
-    prevProps.isDragging !== nextProps.isDragging ||
-    prevProps.isSideBySideMode !== nextProps.isSideBySideMode ||
-    prevProps.index !== nextProps.index ||
-    prevProps.defaultTicker !== nextProps.defaultTicker ||
-    prevProps.availableTickers !== nextProps.availableTickers ||
-    prevProps.algorithmPlot !== nextProps.algorithmPlot
-  ) {
-    return false; // Props changed, re-render
-  }
-
-  // Deep comparison for fullData (only check critical fields)
-  if (prevProps.fullData !== nextProps.fullData) {
-    // Check if critical fields changed
-    const prevData = prevProps.fullData;
-    const nextData = nextProps.fullData;
-    if (
-      prevData.timestamps !== nextData.timestamps ||
-      prevData.description !== nextData.description ||
-      prevData.sharpeRatio !== nextData.sharpeRatio
-    ) {
-      return false; // Critical data changed, re-render
-    }
-  }
-
-  return true; // Props are equal, skip re-render
-});
+export const AlgorithmResultCard = memo(AlgorithmResultCardComponent);

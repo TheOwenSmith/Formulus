@@ -1,5 +1,5 @@
 import { getAggregateDataIterator } from '@api/core/backtesting/read-data';
-import { trySync } from '@api/utils/errorHandling';
+import { trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import type { Ticker } from './types';
 

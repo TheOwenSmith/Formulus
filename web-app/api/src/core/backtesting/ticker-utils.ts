@@ -1,6 +1,6 @@
 import { type Algorithm } from '@api/core/algorithms/algorithm';
 import { aggregateTimestamps, type Ticker, type Timestamp } from '@api/fetch/types';
-import { trySync } from '@api/utils/errorHandling';
+import { trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import z from 'zod';
 import type { TickerData } from './backtest-algorithms-concurrently';
@@ -195,12 +195,4 @@ export function getMarketSlippageByTicker(
     }
   }
   return marketSlippageByTicker;
-}
-
-const MAX_TICKERS_TO_SHOW = 3;
-export function tickersToString(tickers: Ticker[]): string {
-  return (
-    tickers.slice(0, MAX_TICKERS_TO_SHOW).join(',') +
-    (tickers.length > MAX_TICKERS_TO_SHOW ? `,...${tickers.length - MAX_TICKERS_TO_SHOW} more` : '')
-  );
 }

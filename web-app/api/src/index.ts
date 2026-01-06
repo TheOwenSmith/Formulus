@@ -1,6 +1,8 @@
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
+import { toNodeHandler } from 'better-auth/node';
 import cors from 'cors';
 import express from 'express';
+import { auth } from './lib/auth';
 import { config } from './lib/config';
 import { appRouter, createContext } from './lib/trpc';
 
@@ -13,6 +15,10 @@ app.use(
   }),
 );
 
+// Better Auth
+app.all('/api/auth/*splat', toNodeHandler(auth));
+
+// TRPC
 app.use(
   createExpressMiddleware({
     router: appRouter,

@@ -1,9 +1,9 @@
 import { AlgorithmResultCard } from '@client/components/AlgorithmResultCard';
-import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/svgPaths';
+import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/index';
 import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
+import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/types';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import type { Graph } from '../types';
 
 // Color schemes for drag preview and drop indicators (matching AlgorithmResultCard)
 const colorSchemes = [
@@ -105,48 +105,21 @@ function DragPreview({ algorithmName, colorIndex }: DragPreviewProps) {
   );
 }
 
-interface BacktestPageProps {
-  data: Graph;
-}
-
-export function BacktestPage({ data }: BacktestPageProps) {
-  // Get available tickers and default ticker
-  const availableTickers = useMemo(() => {
-    if (data.tickerPlots) {
-      return Object.keys(data.tickerPlots);
+export function BacktestPage({ data }: { data: BacktestAlgorithmsResult }) {
+  // Get default ticker by aggregate
+  const defaultTickerByAggregate = useMemo<Record<Timestamp, Ticker>>(() => {
+    const result = {} as Record<Timestamp, Ticker>;
+    for (const aggregate in data.tickerPlotByAggregateByTicker) {
+      result[aggregate as Timestamp] = Object.keys(
+        data.tickerPlotByAggregateByTicker[aggregate as Timestamp],
+      )[0] as Ticker;
     }
-    // Legacy support
-    if (data.tickerPlot) {
-      return [data.tickerPlot.name];
-    }
-    return [];
+    return result;
   }, [data]);
-
-  const defaultTicker = useMemo(() => {
-    if (data.tickerPlots) {
-      return Object.keys(data.tickerPlots)[0] ?? '';
-    }
-    return data.tickerPlot?.name ?? '';
-  }, [data]);
-
-  // Get algorithm plots - support both new (algorithmPlots) and legacy (algorithmPlot) formats
-  const algorithmPlots = useMemo(() => {
-    if (data.algorithmPlots) {
-      return data.algorithmPlots;
-    }
-    // Legacy support
-    if (data.algorithmPlot && data.algorithmName) {
-      return { [data.algorithmName]: data.algorithmPlot };
-    }
-    return {};
-  }, [data]);
-
-  // Track original order for color scheme mapping
-  const originalAlgorithmNames = useMemo(() => Object.keys(algorithmPlots), [algorithmPlots]);
 
   // State for reordered algorithm names
   const [orderedAlgorithmNames, setOrderedAlgorithmNames] = useState<string[]>(() =>
-    Object.keys(algorithmPlots),
+    data.algorithmGraphs.map((algorithmGraph) => algorithmGraph.algorithmPlot.name),
   );
 
   // Side-by-side comparison mode state
@@ -166,13 +139,13 @@ export function BacktestPage({ data }: BacktestPageProps) {
   const [dragPreviewPos, setDragPreviewPos] = useState<{ x: number; y: number } | null>(null);
 
   // Map algorithm names to their original indices for color schemes
-  const algorithmIndexMap = useMemo(() => {
+  const originalIndexByAlgorithmName = useMemo(() => {
     const map = new Map<string, number>();
-    originalAlgorithmNames.forEach((name, index) => {
-      map.set(name, index);
-    });
+    for (let i = 0; i < data.algorithmGraphs.length; i++) {
+      map.set(data.algorithmGraphs[i].algorithmPlot.name, i);
+    }
     return map;
-  }, [originalAlgorithmNames]);
+  }, [data]);
 
   // Handle drag start
   const handleDragStart = useCallback((algorithmName: string) => {
@@ -359,8 +332,6 @@ export function BacktestPage({ data }: BacktestPageProps) {
     };
   }, [draggedAlgorithm]);
 
-  const algorithmNames = orderedAlgorithmNames;
-
   // Interactive gradient based on global cursor position
   const headerRef = useRef<HTMLDivElement>(null);
   const [gradientColors, setGradientColors] = useState({
@@ -405,13 +376,13 @@ export function BacktestPage({ data }: BacktestPageProps) {
   // Get dragged algorithm info for preview and drop indicator
   const draggedAlgorithmInfo = useMemo(() => {
     if (!draggedAlgorithm) return null;
-    const originalIndex = algorithmIndexMap.get(draggedAlgorithm) ?? 0;
+    const originalIndex = originalIndexByAlgorithmName.get(draggedAlgorithm) ?? 0;
     return {
       name: draggedAlgorithm,
       index: originalIndex,
       colorScheme: colorSchemes[originalIndex % colorSchemes.length],
     };
-  }, [draggedAlgorithm, algorithmIndexMap]);
+  }, [draggedAlgorithm, originalIndexByAlgorithmName]);
 
   // Check if drop position would actually change the order
   const wouldChangePosition = useMemo(() => {
@@ -535,7 +506,7 @@ export function BacktestPage({ data }: BacktestPageProps) {
           className={`grid gap-6 ${isSideBySideMode ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}
         >
           {/* Drop zone at the beginning (for first position) */}
-          {algorithmNames.length > 0 && (
+          {orderedAlgorithmNames.length > 0 && (
             <div
               data-drop-zone={0}
               className={`relative z-20 h-[36px] flex items-center justify-center ${
@@ -593,8 +564,10 @@ export function BacktestPage({ data }: BacktestPageProps) {
             </div>
           )}
           {/* Render algorithm cards in grid */}
-          {algorithmNames.map((algorithmName, index) => {
-            const originalIndex = algorithmIndexMap.get(algorithmName) ?? index;
+          {orderedAlgorithmNames.map((algorithmName, index) => {
+            const originalIndex = originalIndexByAlgorithmName.get(algorithmName) ?? index;
+            const algorithmGraph = data.algorithmGraphs[originalIndex];
+            const { aggregate } = algorithmGraph;
             // In side-by-side mode, determine if this is the first column (left side) of a row
             // In single column mode, all items are effectively "first column"
             const isFirstColumn = isSideBySideMode ? index % 2 === 0 : true;
@@ -692,28 +665,27 @@ export function BacktestPage({ data }: BacktestPageProps) {
                 )}
                 {/* Algorithm card - this is the grid item */}
                 <AlgorithmResultCard
-                  algorithmName={algorithmName}
-                  algorithmPlot={algorithmPlots[algorithmName]}
-                  fullData={data}
-                  availableTickers={availableTickers}
-                  defaultTicker={defaultTicker}
+                  algorithmGraph={algorithmGraph}
+                  defaultTicker={defaultTickerByAggregate[aggregate]}
                   index={originalIndex}
                   isDragging={draggedAlgorithm === algorithmName}
-                  onDragStart={() => handleDragStart(algorithmName)}
-                  onDragEnd={handleDragEnd}
                   isSideBySideMode={isSideBySideMode}
+                  onDragEnd={handleDragEnd}
+                  onDragStart={() => handleDragStart(algorithmName)}
+                  tickerPlotByTicker={data.tickerPlotByAggregateByTicker[aggregate]}
+                  timestamps={data.timestampsByAggregate[aggregate]}
                 />
               </div>
             );
           })}
           {/* Drop zone at the end */}
-          {algorithmNames.length > 0 && (
+          {orderedAlgorithmNames.length > 0 && (
             <div
-              data-drop-zone={algorithmNames.length}
+              data-drop-zone={orderedAlgorithmNames.length}
               className={`relative z-20 h-[36px] flex items-center justify-center ${
                 isSideBySideMode ? 'col-span-2' : 'col-span-1'
               }`}
-              onMouseEnter={() => handleDropZoneHover(algorithmNames.length)}
+              onMouseEnter={() => handleDropZoneHover(orderedAlgorithmNames.length)}
               onMouseUp={handleDragEnd}
               style={{
                 pointerEvents: draggedAlgorithm ? 'auto' : 'none',
@@ -732,7 +704,7 @@ export function BacktestPage({ data }: BacktestPageProps) {
               }}
             >
               {draggedAlgorithmInfo &&
-                dropPosition === algorithmNames.length &&
+                dropPosition === orderedAlgorithmNames.length &&
                 wouldChangePosition && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="w-full px-6">

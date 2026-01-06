@@ -3,33 +3,33 @@ import {
   type Algorithm,
 } from '@api/core/algorithms/algorithm';
 import type { Ticker, Timestamp } from '@api/fetch/types';
-import type { SimplePlot } from '@api/lib/nodeplotlib';
 import {
   MAX_POINTS_PER_PLOT,
   type AlgorithmData,
+  type SimplePlot,
   type WithPerformance,
 } from './backtest-algorithms-concurrently';
 
-export function updateGraph<T>({
-  graphByIndex,
+export function updateGraph<T, P>({
   graphIndex,
-  pointY,
+  graphObject,
+  newPoint,
 }: {
-  graphByIndex: T;
-  // keys of T that have number[] values
-  graphIndex: { [K in keyof T]: T[K] extends number[] ? K : never }[keyof T];
-  pointY: number;
+  graphObject: T;
+  // keys of T that have P[] values
+  graphIndex: { [K in keyof T]: T[K] extends P[] ? K : never }[keyof T];
+  newPoint: P;
 }): boolean {
-  const graphYs = graphByIndex[graphIndex] as number[];
-  graphYs.push(pointY);
+  const graph = graphObject[graphIndex] as P[];
+  graph.push(newPoint);
 
-  if (graphYs.length > MAX_POINTS_PER_PLOT) {
+  if (graph.length > MAX_POINTS_PER_PLOT) {
     // Reduce the number of points in the plot by half
-    const reducedAlgorithmPlot: number[] = [];
-    for (let j = 0; j < graphYs.length; j += 2) {
-      reducedAlgorithmPlot.push(graphYs[j]);
+    const reducedGraph: P[] = [];
+    for (let j = 0; j < graph.length; j += 2) {
+      reducedGraph.push(graph[j]);
     }
-    (graphByIndex[graphIndex] as number[]) = reducedAlgorithmPlot;
+    (graphObject[graphIndex] as P[]) = reducedGraph;
     return true;
   }
   return false;
@@ -64,7 +64,6 @@ export async function getAlgorithmGraphWithPerformance({
   algorithmData,
   performanceFn = (descriptionMetrics: DescriptionMetrics) => descriptionMetrics.growthRate,
   timespan,
-  xs,
   yearsBetweenStartAndEnd,
 }: {
   aggregate: Timestamp;
@@ -72,11 +71,9 @@ export async function getAlgorithmGraphWithPerformance({
   algorithmData: AlgorithmData;
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   timespan: [string, string];
-  xs: number[];
   yearsBetweenStartAndEnd: number;
 }): Promise<
   WithPerformance<{
-    name: string;
     aggregate: Timestamp;
     descriptionMetrics: DescriptionMetrics;
     algorithmPlot: SimplePlot;
@@ -100,10 +97,8 @@ export async function getAlgorithmGraphWithPerformance({
   } = algorithmData;
 
   const algorithmPlot: SimplePlot = {
-    name: 'Algorithm',
-    x: xs,
+    name,
     y: algorithmYs,
-    type: 'scatter',
   };
 
   const algorithmReturnPercentage = balance - 100;
@@ -141,10 +136,9 @@ export async function getAlgorithmGraphWithPerformance({
 
   const performance = await performanceFn(descriptionMetrics);
   return {
-    name,
     aggregate,
-    descriptionMetrics,
     algorithmPlot,
+    descriptionMetrics,
     performance,
   };
 }

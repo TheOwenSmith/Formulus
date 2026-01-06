@@ -10,29 +10,38 @@
     "correct-splits": "bun run ./src/scripts/correct-stock-splits.ts",
     "prettier:write": "prettier \"**/*.{ts,js}\" --write",
     "prettier:check": "prettier \"**/*.{ts,js}\" --check",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/bun": "^1.3.5",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pg": "^8.16.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-sort-keys": "^2.3.5",
+    "prisma": "^7.2.0",
     "typescript-eslint": "^8.46.4"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
     "@trpc/server": "^11.8.1",
+    "better-auth": "^1.4.10",
     "cli-progress": "^3.12.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "inquirer": "^12.10.0",
+    "nanoid": "^5.1.6",
+    "pg": "^8.16.3",
     "zod": "^4.1.12"
   }
 }

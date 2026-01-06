@@ -1,7 +1,7 @@
 import { TickerSelector } from '@client/components/TickerSelector';
 import '@client/styles/BacktestChart.css';
-import type { Graph } from '@client/types';
 import { getTailwindColorHex } from '@client/utils/colorUtils';
+import type { SimplePlot, Ticker } from '@shared/types';
 import * as d3 from 'd3';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -42,30 +42,37 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
+type DataPoint = {
+  timestamp: string;
+  tickerValue: number;
+  index: number;
+  algorithmValue: number;
+};
+
 interface BacktestChartProps {
-  data: Graph;
-  growthRate: number; // As a decimal (e.g., 0.385 for 38.5%)
-  onResetZoom?: () => void;
-  hasShowMetricsButton?: boolean;
-  availableTickers?: string[];
-  selectedTicker?: string;
-  onTickerChange?: (ticker: string) => void;
   algorithmColor?: string; // Primary color for the algorithm (hex format)
+  algorithmPlot: SimplePlot;
+  availableTickers: Ticker[];
   gradientFrom?: string; // Tailwind gradient class like "from-blue-500"
   gradientTo?: string; // Tailwind gradient class like "to-cyan-300"
+  onResetZoom?: () => void;
+  onTickerChange?: (ticker: Ticker) => void;
+  selectedTicker: Ticker;
+  tickerPlot: SimplePlot;
+  timestamps: string[];
 }
 
 export function BacktestChart({
-  data,
-  growthRate,
-  onResetZoom,
-  hasShowMetricsButton = false,
-  availableTickers = [],
-  selectedTicker,
-  onTickerChange,
   algorithmColor = '#3b82f6', // Default to blue
+  algorithmPlot,
+  availableTickers,
   gradientFrom = 'from-blue-500',
   gradientTo = 'to-cyan-300',
+  onResetZoom,
+  onTickerChange,
+  selectedTicker,
+  tickerPlot,
+  timestamps,
 }: BacktestChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -116,23 +123,6 @@ export function BacktestChart({
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
-    if (!data.tickerPlot || data.tickerPlot.y.length === 0) return;
-
-    // Prefer single algorithm mode (algorithmPlot) for individual algorithm display
-    // Fall back to multiple algorithms (algorithmPlots) if algorithmPlot is not available
-    const useSingleAlgorithm = data.algorithmPlot && data.algorithmPlot.y.length > 0;
-    const algorithmPlots =
-      useSingleAlgorithm && data.algorithmName
-        ? { [data.algorithmName]: data.algorithmPlot }
-        : (data.algorithmPlots ??
-          (data.algorithmPlot && data.algorithmName
-            ? { [data.algorithmName]: data.algorithmPlot }
-            : {}));
-    if (Object.keys(algorithmPlots).length === 0) return;
-
-    // Check that all algorithm plots have data
-    const hasData = Object.values(algorithmPlots).every((plot) => plot.y.length > 0);
-    if (!hasData) return;
 
     if (dimensions.width === 0) return;
 
@@ -160,43 +150,13 @@ export function BacktestChart({
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Prepare data
-    const { tickerPlot, timestamps } = data;
-    if (!tickerPlot) return;
-
-    // Use provided algorithmColor for single algorithm, or color palette for multiple
-    const algorithmNames = Object.keys(algorithmPlots);
-    const algorithmColorMap = new Map<string, string>();
-    if (algorithmNames.length === 1 && algorithmColor) {
-      // Single algorithm mode - use provided color
-      algorithmColorMap.set(algorithmNames[0], algorithmColor);
-    } else {
-      // Multiple algorithms - use color palette
-      const algorithmColors = [
-        '#3b82f6', // blue
-        '#10b981', // emerald
-        '#f59e0b', // amber
-        '#ef4444', // red
-        '#8b5cf6', // violet
-        '#06b6d4', // cyan
-        '#f97316', // orange
-        '#ec4899', // pink
-      ];
-      algorithmNames.forEach((name, i) => {
-        algorithmColorMap.set(name, algorithmColors[i % algorithmColors.length]);
-      });
-    }
-
-    const dataPoints = tickerPlot.y.map((y, i) => {
-      const point: any = {
+    const dataPoints: DataPoint[] = tickerPlot.y.map((y, i) => {
+      const point: DataPoint = {
         timestamp: timestamps[i],
         tickerValue: y,
         index: i,
+        algorithmValue: algorithmPlot.y[i],
       };
-      // Add each algorithm's value
-      algorithmNames.forEach((name) => {
-        point[`algorithm_${name}`] = algorithmPlots[name].y[i];
-      });
       return point;
     });
 
@@ -207,19 +167,15 @@ export function BacktestChart({
     // Get visible data points for y-scale calculation and drawing
     const startIndex = Math.max(0, Math.floor(currentXDomain[0]));
     const endIndex = Math.min(dataPoints.length - 1, Math.ceil(currentXDomain[1]));
-    const visibleDataPoints = dataPoints.slice(startIndex, endIndex + 1);
+    const visibleDataPoints: DataPoint[] = dataPoints.slice(startIndex, endIndex + 1);
 
     // Scales
     const xScale = d3.scaleLinear().domain(currentXDomain).range([0, innerWidth]);
 
     // Calculate y-scale based on visible data points only
-    const visibleTickerValues = visibleDataPoints.map((d) => d.tickerValue);
-    const allVisibleAlgorithmValues: number[] = [];
-    algorithmNames.forEach((name) => {
-      const key = `algorithm_${name}`;
-      allVisibleAlgorithmValues.push(...visibleDataPoints.map((d: any) => d[key]));
-    });
-    const allVisibleValues = [...visibleTickerValues, ...allVisibleAlgorithmValues];
+    const visibleTickerValues: number[] = visibleDataPoints.map((d) => d.tickerValue);
+    const visibleAlgorithmValues: number[] = visibleDataPoints.map((d) => d.algorithmValue);
+    const allVisibleValues: number[] = [...visibleTickerValues, ...visibleAlgorithmValues];
 
     const yMin = d3.min(allVisibleValues)!;
     const yMax = d3.max(allVisibleValues)!;
@@ -232,24 +188,21 @@ export function BacktestChart({
 
     // Line generators - use only visible data points to prevent overflow
     const tickerLine = d3
-      .line<(typeof dataPoints)[0]>()
+      .line<DataPoint>()
       .x((d) => xScale(d.index))
       .y((d) => yScale(d.tickerValue))
       .curve(d3.curveMonotoneX);
 
     // Create line generators for each algorithm
     const algorithmLines = new Map<string, d3.Line<(typeof dataPoints)[0]>>();
-    algorithmNames.forEach((name) => {
-      const key = `algorithm_${name}`;
-      algorithmLines.set(
-        name,
-        d3
-          .line<(typeof dataPoints)[0]>()
-          .x((d) => xScale(d.index))
-          .y((d: any) => yScale(d[key]))
-          .curve(d3.curveMonotoneX),
-      );
-    });
+    algorithmLines.set(
+      algorithmPlot.name,
+      d3
+        .line<DataPoint>()
+        .x((d) => xScale(d.index))
+        .y((d) => yScale(d.algorithmValue))
+        .curve(d3.curveMonotoneX),
+    );
 
     // Create gradient definitions
     const defs = svg.append('defs');
@@ -274,26 +227,23 @@ export function BacktestChart({
       .attr('stop-opacity', 0);
 
     // Algorithm gradients - one for each algorithm
-    algorithmNames.forEach((name) => {
-      const color = algorithmColorMap.get(name)!;
-      const algorithmGradient = defs
-        .append('linearGradient')
-        .attr('id', `algorithm-gradient-${name.replace(/\s+/g, '-')}`)
-        .attr('x1', '0%')
-        .attr('y1', '0%')
-        .attr('x2', '0%')
-        .attr('y2', '100%');
-      algorithmGradient
-        .append('stop')
-        .attr('offset', '0%')
-        .attr('stop-color', color)
-        .attr('stop-opacity', 0.3);
-      algorithmGradient
-        .append('stop')
-        .attr('offset', '100%')
-        .attr('stop-color', color)
-        .attr('stop-opacity', 0);
-    });
+    const algorithmGradient = defs
+      .append('linearGradient')
+      .attr('id', `algorithm-gradient`)
+      .attr('x1', '0%')
+      .attr('y1', '0%')
+      .attr('x2', '0%')
+      .attr('y2', '100%');
+    algorithmGradient
+      .append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', algorithmColor)
+      .attr('stop-opacity', 0.3);
+    algorithmGradient
+      .append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', algorithmColor)
+      .attr('stop-opacity', 0);
 
     // Grid lines (horizontal only)
     const yAxisGrid = d3
@@ -318,18 +268,15 @@ export function BacktestChart({
 
     // Create area generators for each algorithm
     const algorithmAreas = new Map<string, d3.Area<(typeof dataPoints)[0]>>();
-    algorithmNames.forEach((name) => {
-      const key = `algorithm_${name}`;
-      algorithmAreas.set(
-        name,
-        d3
-          .area<(typeof dataPoints)[0]>()
-          .x((d) => xScale(d.index))
-          .y0(innerHeight)
-          .y1((d) => yScale(d[key]))
-          .curve(d3.curveMonotoneX),
-      );
-    });
+    algorithmAreas.set(
+      algorithmPlot.name,
+      d3
+        .area<(typeof dataPoints)[0]>()
+        .x((d) => xScale(d.index))
+        .y0(innerHeight)
+        .y1((d) => yScale(d.algorithmValue))
+        .curve(d3.curveMonotoneX),
+    );
 
     g.append('path')
       .datum(visibleDataPoints)
@@ -341,18 +288,15 @@ export function BacktestChart({
       .attr('opacity', 1);
 
     // Draw areas for each algorithm
-    algorithmNames.forEach((name, i) => {
-      const gradientId = `algorithm-gradient-${name.replace(/\s+/g, '-')}`;
-      g.append('path')
-        .datum(visibleDataPoints)
-        .attr('fill', `url(#${gradientId})`)
-        .attr('d', algorithmAreas.get(name)!)
-        .attr('opacity', 0)
-        .transition()
-        .duration(300)
-        .delay(i * 50)
-        .attr('opacity', 1);
-    });
+    const gradientId = `algorithm-gradient`;
+    g.append('path')
+      .datum(visibleDataPoints)
+      .attr('fill', `url(#${gradientId})`)
+      .attr('d', algorithmAreas.get(algorithmPlot.name)!)
+      .attr('opacity', 0)
+      .transition()
+      .duration(300)
+      .attr('opacity', 1);
 
     // Draw lines - use only visible data points to prevent overflow
     g.append('path')
@@ -367,20 +311,17 @@ export function BacktestChart({
       .attr('opacity', 1);
 
     // Draw lines for each algorithm
-    algorithmNames.forEach((name, i) => {
-      const color = algorithmColorMap.get(name)!;
-      g.append('path')
-        .datum(visibleDataPoints)
-        .attr('fill', 'none')
-        .attr('stroke', color)
-        .attr('stroke-width', 2.5)
-        .attr('d', algorithmLines.get(name)!)
-        .attr('opacity', 0)
-        .transition()
-        .duration(100)
-        .delay(15 + i * 15)
-        .attr('opacity', 1);
-    });
+    g.append('path')
+      .datum(visibleDataPoints)
+      .attr('fill', 'none')
+      .attr('stroke', algorithmColor)
+      .attr('stroke-width', 2.5)
+      .attr('d', algorithmLines.get(algorithmPlot.name)!)
+      .attr('opacity', 0)
+      .transition()
+      .duration(100)
+      .delay(15)
+      .attr('opacity', 1);
 
     // Axes
     const xAxis = d3
@@ -457,11 +398,7 @@ export function BacktestChart({
     // Calculate legend dimensions first (before brush, so we can exclude it from brush)
     const legendItems = [
       // Add all algorithms first
-      ...algorithmNames.map((name) => ({
-        color: algorithmColorMap.get(name)!,
-        label: name,
-        isAlgorithm: true,
-      })),
+      { color: algorithmColor, label: algorithmPlot.name, isAlgorithm: true },
       // Then add ticker
       { color: '#ffffff', label: tickerPlot.name, isAlgorithm: false },
     ];
@@ -569,10 +506,6 @@ export function BacktestChart({
 
     const brushGroup = g.append('g').attr('class', 'brush').call(brush);
 
-    // Get the primary algorithm color for brush styling
-    const primaryAlgorithmColor =
-      algorithmNames.length > 0 ? algorithmColorMap.get(algorithmNames[0])! : '#3b82f6';
-
     // Convert hex to rgba for brush fill
     const hexToRgba = (hex: string, alpha: number) => {
       const r = parseInt(hex.slice(1, 3), 16);
@@ -584,14 +517,14 @@ export function BacktestChart({
     // Style the brush
     brushGroup
       .selectAll('.selection')
-      .attr('fill', hexToRgba(primaryAlgorithmColor, 0.2))
-      .attr('stroke', primaryAlgorithmColor)
+      .attr('fill', hexToRgba(algorithmColor, 0.2))
+      .attr('stroke', algorithmColor)
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '5,5');
 
     brushGroup
       .selectAll('.handle')
-      .attr('fill', primaryAlgorithmColor)
+      .attr('fill', algorithmColor)
       .attr('stroke', '#ffffff')
       .attr('stroke-width', 2)
       .attr('width', 8)
@@ -641,13 +574,10 @@ export function BacktestChart({
 
         // Calculate returns for all algorithms
         const algorithmReturns = new Map<string, number>();
-        algorithmNames.forEach((name) => {
-          const key = `algorithm_${name}`;
-          const firstValue = (dataPoints[0] as any)[key];
-          const currentValue = (point as any)[key];
-          const returnPct = ((currentValue - firstValue) / firstValue) * 100;
-          algorithmReturns.set(name, returnPct);
-        });
+        const firstValue = dataPoints[0].algorithmValue;
+        const currentValue = point.algorithmValue;
+        const returnPct = ((currentValue - firstValue) / firstValue) * 100;
+        algorithmReturns.set(algorithmPlot.name, returnPct);
 
         // Build tooltip HTML
         let tooltipHtml = `
@@ -662,21 +592,17 @@ export function BacktestChart({
         `;
 
         // Add each algorithm to tooltip
-        algorithmNames.forEach((name) => {
-          const key = `algorithm_${name}`;
-          const value = (point as any)[key];
-          const returnPct = algorithmReturns.get(name)!;
-          const color = algorithmColorMap.get(name)!;
-          tooltipHtml += `
+        const value = point.algorithmValue;
+        const algorithmReturnPct = algorithmReturns.get(algorithmPlot.name)!;
+        tooltipHtml += `
             <div style="margin-bottom: 4px;">
-              <span style="color: ${color}; font-weight: 500;">${name}:</span>
+              <span style="color: ${algorithmColor}; font-weight: 500;">${algorithmPlot.name}:</span>
               <span style="margin-left: 8px; color: rgba(255, 255, 255, 0.9);">$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span style="margin-left: 8px; color: ${returnPct > 0 ? '#10b981' : returnPct === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
-                (${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(2)}%)
+              <span style="margin-left: 8px; color: ${algorithmReturnPct > 0 ? '#10b981' : algorithmReturnPct === 0 ? 'rgba(255, 255, 255, 0.9)' : '#ef4444'}; font-weight: 500;">
+                (${algorithmReturnPct >= 0 ? '+' : ''}${algorithmReturnPct.toFixed(2)}%)
               </span>
             </div>
           `;
-        });
 
         const [tooltipX, tooltipY] = d3.pointer(event, containerRef.current);
         tooltip
@@ -752,12 +678,7 @@ export function BacktestChart({
           .style('font-size', '13px')
           .style('font-weight', '500')
           .text(item.label);
-      } else if (
-        !item.isAlgorithm &&
-        availableTickers.length > 1 &&
-        selectedTicker &&
-        onTickerChange
-      ) {
+      } else if (!item.isAlgorithm && tickerPlot.y.length > 1 && selectedTicker && onTickerChange) {
         // Render ticker selector in foreignObject for the second item
         const foreignObject = legendItem
           .append('foreignObject')
@@ -842,14 +763,15 @@ export function BacktestChart({
       }
     };
   }, [
-    data,
+    algorithmPlot,
     dimensions,
     zoomDomain,
-    growthRate,
     onResetZoom,
-    availableTickers,
     selectedTicker,
     onTickerChange,
+    algorithmColor,
+    tickerPlot,
+    timestamps,
   ]);
 
   const handleResetZoom = () => {

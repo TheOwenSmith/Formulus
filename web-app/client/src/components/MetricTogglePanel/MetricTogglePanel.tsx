@@ -5,26 +5,36 @@ import {
   STROKE_PROPERTIES,
   STROKE_PROPERTIES_SMALL,
   SVG_NAMESPACE,
-} from '@client/icons/svgPaths';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+} from '@client/icons/index';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { createPortal } from 'react-dom';
-import type { MetricKey } from './metricUtils';
-import { DEFAULT_METRIC_OPTIONS, METRIC_LABELS } from './metricUtils';
+import {
+  DEFAULT_DESCRIPTION_METRIC_VISBILITY,
+  DESCRIPTION_METRIC_LABELS,
+  DESCRIPTION_METRICS_ORDER,
+  type DescriptionMetricVisbility,
+  type MetricKey,
+} from './metricUtils';
 
 interface MetricTogglePanelProps {
-  enabledMetrics: Record<MetricKey, boolean>;
-  onToggle: (metric: MetricKey, enabled: boolean) => void;
-  availableMetrics: Set<MetricKey>;
+  metricVisibility: DescriptionMetricVisbility;
   primaryColor?: string; // Primary color for the algorithm (hex format)
   primaryColorLight?: string; // Light version of primary color for text (hex format)
+  setMetricVisibility: Dispatch<SetStateAction<DescriptionMetricVisbility>>;
 }
 
 export function MetricTogglePanel({
-  enabledMetrics,
-  onToggle,
-  availableMetrics,
+  metricVisibility,
   primaryColor = '#3b82f6',
   primaryColorLight,
+  setMetricVisibility,
 }: MetricTogglePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
@@ -51,11 +61,40 @@ export function MetricTogglePanel({
     return `rgb(${Math.min(255, Math.round(r * 1.2))}, ${Math.min(255, Math.round(g * 1.2))}, ${Math.min(255, Math.round(b * 1.2))})`;
   };
 
-  const allMetrics = Object.keys(METRIC_LABELS) as MetricKey[];
-  const availableMetricsList = allMetrics.filter((metric) => availableMetrics.has(metric));
+  let enabledCount = 0;
+  let totalCount = 0;
+  for (const metric in metricVisibility) {
+    totalCount++;
+    if (metricVisibility[metric as MetricKey]) {
+      enabledCount++;
+    }
+  }
 
-  const enabledCount = availableMetricsList.filter((metric) => enabledMetrics[metric]).length;
-  const totalCount = availableMetricsList.length;
+  const enableAllMetrics = () => {
+    return setMetricVisibility(
+      DESCRIPTION_METRICS_ORDER.reduce((acc, metric) => {
+        acc[metric] = true;
+        return acc;
+      }, {} as DescriptionMetricVisbility),
+    );
+  };
+
+  const disableAllMetrics = () => {
+    return setMetricVisibility(
+      DESCRIPTION_METRICS_ORDER.reduce((acc, metric) => {
+        acc[metric] = false;
+        return acc;
+      }, {} as DescriptionMetricVisbility),
+    );
+  };
+
+  const resetMetricsToDefaults = () => {
+    setMetricVisibility({ ...DEFAULT_DESCRIPTION_METRIC_VISBILITY });
+  };
+
+  const toggleMetric = (metric: MetricKey, enabled: boolean) => {
+    setMetricVisibility((prev) => ({ ...prev, [metric]: enabled }));
+  };
 
   // Calculate position to keep panel within viewport
   useEffect(() => {
@@ -246,11 +285,7 @@ export function MetricTogglePanel({
                     e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.2);
                     e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.4);
                   }}
-                  onClick={() => {
-                    availableMetricsList.forEach((metric) => {
-                      onToggle(metric, true);
-                    });
-                  }}
+                  onClick={enableAllMetrics}
                 >
                   Enable All
                 </button>
@@ -269,11 +304,7 @@ export function MetricTogglePanel({
                     e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.2);
                     e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.4);
                   }}
-                  onClick={() => {
-                    availableMetricsList.forEach((metric) => {
-                      onToggle(metric, false);
-                    });
-                  }}
+                  onClick={disableAllMetrics}
                 >
                   Disable All
                 </button>
@@ -292,31 +323,27 @@ export function MetricTogglePanel({
                     e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.2);
                     e.currentTarget.style.borderColor = hexToRgba(primaryColor, 0.4);
                   }}
-                  onClick={() => {
-                    availableMetricsList.forEach((metric) => {
-                      onToggle(metric, DEFAULT_METRIC_OPTIONS[metric]);
-                    });
-                  }}
+                  onClick={resetMetricsToDefaults}
                 >
                   Reset to Defaults
                 </button>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-              {availableMetricsList.map((metric) => (
+              {DESCRIPTION_METRICS_ORDER.map((metric) => (
                 <label
                   key={metric}
                   className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5 select-none"
                 >
                   <input
                     type="checkbox"
-                    checked={enabledMetrics[metric]}
-                    onChange={(e) => onToggle(metric, e.target.checked)}
+                    checked={metricVisibility[metric]}
+                    onChange={(e) => toggleMetric(metric, e.target.checked)}
                     className="w-[18px] h-[18px] cursor-pointer flex-shrink-0"
                     style={{ accentColor: primaryColor }}
                   />
                   <span className="text-white/85 text-sm font-normal cursor-pointer hover:text-white/95">
-                    {METRIC_LABELS[metric]}
+                    {DESCRIPTION_METRIC_LABELS[metric]}
                   </span>
                 </label>
               ))}

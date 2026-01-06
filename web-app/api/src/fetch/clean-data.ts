@@ -1,4 +1,4 @@
-import { trySync } from '@api/utils/errorHandling';
+import { trySync } from '@api/utils/error-handling';
 import { spawnSync } from 'child_process';
 import path from 'path';
 import type { Ticker, Timestamp } from './types';

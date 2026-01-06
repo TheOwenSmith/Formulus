@@ -39,7 +39,7 @@ export const userAlgorithmSchema = z
       .min(0)
       .max(ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT)
       .optional(),
-    contextLength: z.int(),
+    contextLength: z.int().positive(),
     indicators: indicatorSchema.array().optional(),
     name: z.string().min(1).max(64),
     tickers: tickerSchema.array(),

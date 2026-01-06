@@ -49,6 +49,23 @@ export default defineConfig([
 
       // Import/Export rules
       'import/no-default-export': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            // Block TS path alias to api
+            {
+              group: ['@api/*'],
+              message: 'Client code cannot import from @api. Use @api/shared.',
+            },
+            // Block ../* imports
+            {
+              group: ['../*'],
+              message: 'Use @client/path/to/file instead of ../path/to/file',
+            },
+          ],
+        },
+      ],
 
       // Sorting
       'sort-keys-fix/sort-keys-fix': [

@@ -8,7 +8,16 @@ import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  { ignores: ['dist', 'node_modules', 'vendor'] },
+  {
+    ignores: [
+      'dist',
+      'node_modules',
+      'generated',
+      'src/generated',
+      '*.config.{ts,mjs,js}',
+      'build.ts',
+    ],
+  },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [eslint.configs.recommended, ...tseslint.configs.recommended, eslintConfigPrettier],
@@ -47,6 +56,18 @@ export default defineConfig([
 
       // Import/Export rules
       'import/no-default-export': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            // Block ../* imports
+            {
+              group: ['../*'],
+              message: 'Use @api/path/to/file instead of ../path/to/file',
+            },
+          ],
+        },
+      ],
 
       // Sorting
       'sort-keys-fix/sort-keys-fix': [

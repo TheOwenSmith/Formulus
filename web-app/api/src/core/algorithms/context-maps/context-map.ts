@@ -8,7 +8,7 @@ import type { TopKAlgorithm } from '@api/core/algorithms/top-k-algorithm';
 import { getAggregateDataIterator } from '@api/core/backtesting/read-data';
 import type { Bar, Ticker, Timestamp } from '@api/fetch/types';
 import { toValidTimespan } from '@api/utils/date-utils';
-import { trySync } from '@api/utils/errorHandling';
+import { trySync } from '@api/utils/error-handling';
 import { isRecord } from '@api/utils/types';
 import z, { ZodType } from 'zod';
 

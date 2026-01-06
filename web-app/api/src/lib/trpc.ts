@@ -1,10 +1,13 @@
+import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
+import { usersRouter } from '@api/routes/users';
 import { initTRPC } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import { config } from './config';
 
 export const createContext = (x: CreateExpressContextOptions) => x;
-type Context = Awaited<ReturnType<typeof createContext>>;
+export type Context = Awaited<ReturnType<typeof createContext>>;
 
 export const t = initTRPC.context<Context>().create({
   errorFormatter({ shape }) {
@@ -20,9 +23,14 @@ export const t = initTRPC.context<Context>().create({
 });
 export type TRPCContext = typeof t;
 
+const router = t.router;
+const authProcedure = createUserAuthenticationProcedure(t);
+
 export const appRouter = t.router({
-  heartbeat: t.procedure.query(() => true),
+  algorithms: algorithmsRouter(router, authProcedure),
+  backtesting: backtestingRouter(router, authProcedure),
   env: t.procedure.query(() => config.env),
-  backtesting: backtestingRouter,
+  heartbeat: t.procedure.query(() => true),
+  users: usersRouter(router, authProcedure),
 });
 export type AppRouter = typeof appRouter;

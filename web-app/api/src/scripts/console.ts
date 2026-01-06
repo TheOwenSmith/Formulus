@@ -20,8 +20,8 @@ import { regressionLineAlgorithm } from '@api/core/algorithms/examples/regressio
 import { superTrendDirectionAlgorithm } from '@api/core/algorithms/examples/super-trend-direction';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from '@api/core/algorithms/simple-algorithm';
 import { backtestAlgorithmsConcurrently } from '@api/core/backtesting/backtest-algorithms-concurrently';
-import { aggregateTimestamps, type Ticker } from '@api/fetch/types';
-import { tryAsync, trySync } from '@api/utils/errorHandling';
+import { type Ticker } from '@api/fetch/types';
+import { tryAsync, trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import path from 'path';
 import z from 'zod';
@@ -85,7 +85,7 @@ if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
       contextMapByTickerByContextLength.get(ticker) ?? new Map<number, Map<number, number>>();
 
     for (const contextLength of contextLengths) {
-      const contextMapFilename = `./context-maps/${ticker}-${contextLength}.txt`;
+      const contextMapFilename = `./generated/context-maps/${ticker}-${contextLength}.txt`;
       if (fs.existsSync(contextMapFilename)) {
         const readFileResponse = trySync(() =>
           fs.readFileSync(contextMapFilename, { encoding: 'utf8' }),
@@ -147,7 +147,7 @@ if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
 }
 
 if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
-  for (const aggregate of aggregateTimestamps) {
+  for (const aggregate of ['60min'] as const) {
     // Populate algorithms with if green algorithm
     algorithms.push(
       createAlgorithmFromSimpleMarketInvariantAlgorithm(ifGreenAlgorithm, aggregate, 'SPY'),
@@ -194,5 +194,8 @@ if (!backtestResponse.ok) {
   throw backtestResponse.error;
 }
 
-const [algorithmGraphs, tickerGraphs] = backtestResponse.data;
-console.log({ algorithmGraphs, tickerGraphs });
+const backtestingResults = backtestResponse.data;
+const writeResultsFileResponse = trySync(() =>
+  fs.writeFileSync('./data/mock-data.json', JSON.stringify(backtestingResults, null, 2)),
+);
+if (!writeResultsFileResponse.ok) throw writeResultsFileResponse.error;

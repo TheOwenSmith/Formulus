@@ -1,5 +1,5 @@
 import { config } from '@api/lib/config';
-import { tryAsync, trySync } from '@api/utils/errorHandling';
+import { tryAsync, trySync } from '@api/utils/error-handling';
 import { retryWithBackoff } from '@api/utils/retry';
 import { zodSafeFetch } from '@api/utils/zod-safe-fetch';
 import fs from 'fs';

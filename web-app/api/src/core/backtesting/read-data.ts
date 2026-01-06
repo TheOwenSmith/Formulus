@@ -1,5 +1,5 @@
 import { stringifiedBarSchema, type Bar } from '@api/fetch/types';
-import { trySync } from '@api/utils/errorHandling';
+import { trySync } from '@api/utils/error-handling';
 import { withCommas } from '@api/utils/number-utils';
 import fs from 'fs';
 import readline from 'readline';

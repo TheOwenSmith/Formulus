@@ -1,7 +1,26 @@
 import z from 'zod';
 
 // Ticker
-export const tickers = ['SPY', 'SPUU', 'SPXL', 'SPX', 'SH', 'SDS', 'SPXU'] as const;
+export const tickers = [
+  'SPY',
+  'SSO',
+  'SPXL',
+  'SH',
+  'SDS',
+  'SPXU',
+  'QQQ',
+  'NVDA',
+  'TSLA',
+  'AMD',
+  'META',
+  'AAPL',
+  'MSFT',
+  'AMZN',
+  'GOOG',
+  'PLTR',
+  'SNAP',
+  'PFE',
+] as const;
 export type Ticker = (typeof tickers)[number] | (string & {});
 export const tickerSchema = z.enum(tickers);
 

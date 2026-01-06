@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  name          String
+  email         String @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  sessions      Session[]
+  accounts      Account[]
+
+  algorithms Algorithm[] @relation("UserAlgorithms")
+
+  backtestingResults BacktestingResults[] @relation("UserBacktestingResults")
+  backtestingShares BacktestingShare[] @relation("UserBacktestingShare")
+
+  @@index([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expiresAt DateTime
+  token     String
+  ipAddress String?
+  userAgent String?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                String
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  identifier String
+  value      String
+  expiresAt  DateTime
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+enum Timestamp {
+  min1 @map("1min")
+  min5 @map("5min")
+  min15 @map("15min")
+  min30 @map("30min")
+  min60 @map("60min")
+}
+
+model Algorithm {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aggregate Timestamp
+  algorithmMaxHoldingProportion Float?
+  contextLength Int
+  indicators String[]
+  name String @db.VarChar(64)
+  tickers String[]
+  userAlgorithmImplementationCode String @db.Text
+
+  creator User @relation("UserAlgorithms", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId String
+
+  backtestingResults BacktestingResults[] @relation("AlgorithmBacktestingResults")
+
+  @@unique([creatorId, name])
+  @@index([creatorId])
+  @@map("algorithm")
+}
+
+model BacktestingResults {
+  id String @id @default(cuid())
+  publicId String @unique @db.VarChar(12)
+  createdAt DateTime @default(now())
+
+  algorithms Algorithm[] @relation("AlgorithmBacktestingResults")
+
+  creator User @relation("UserBacktestingResults", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId String
+
+  shares BacktestingShare[] @relation("BacktestingResultsShare")
+
+  @@index([creatorId])
+  @@index([publicId])
+  @@map("backtesting_results")
+}
+
+model BacktestingShare {
+  createdAt DateTime @default(now())
+
+  user User @relation("UserBacktestingShare", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  backtestingResults BacktestingResults @relation("BacktestingResultsShare", fields: [backtestingResultsId], references: [id], onDelete: Cascade)
+  backtestingResultsId String
+
+  @@id([userId, backtestingResultsId])
+  @@index([userId])
+  @@index([backtestingResultsId])
+  @@map("backtesting_share")
+}

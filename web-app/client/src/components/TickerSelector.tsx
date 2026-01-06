@@ -1,10 +1,11 @@
-import { ARROW_DOWN_SMALL, STROKE_PROPERTIES_SMALL, SVG_NAMESPACE } from '@client/icons/svgPaths';
+import { ARROW_DOWN_SMALL, STROKE_PROPERTIES_SMALL, SVG_NAMESPACE } from '@client/icons/index';
+import type { Ticker } from '@shared/types';
 import { useEffect, useRef, useState } from 'react';
 
 interface TickerSelectorProps {
-  availableTickers: string[];
+  availableTickers: Ticker[];
   selectedTicker: string;
-  onTickerChange: (ticker: string) => void;
+  onTickerChange: (ticker: Ticker) => void;
   algorithmColor?: string; // Primary color for the algorithm (hex format)
 }
 

@@ -1,4 +1,4 @@
-import { trySync } from '@api/utils/errorHandling';
+import { trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import { finished } from 'node:stream/promises';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';

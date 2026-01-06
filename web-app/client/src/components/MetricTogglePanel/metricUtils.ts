@@ -1,31 +1,29 @@
-// Utility to identify and manage metrics from description strings
-// Based on the API's DESCRIPTION_METRIC_TO_STRING mapping
+import { withCommas, withCommasRounded } from '@client/utils/numberUtils';
+import { exhaustiveArray } from '@client/utils/types';
+import type { DescriptionMetrics, ProfitLossRatio, Ticker, Timestamp } from '@shared/types';
 
-export type MetricKey =
-  | 'aggregate'
-  | 'algorithmReturn'
-  | 'averageHoldingDuration'
-  | 'contextLength'
-  | 'expectancyPerTrade'
-  | 'growthRate'
-  | 'maxHoldingPorportion'
-  | 'positionsClosed'
-  | 'profitLossRatio'
-  | 'sharpeRatio'
-  | 'tickers'
-  | 'timespan'
-  | 'tradesMade'
-  | 'volatility'
-  | 'winRate';
+export type MetricKey = keyof DescriptionMetrics;
 
-export type MetricInfo = {
-  key: MetricKey;
-  label: string;
-  description: string;
-};
+export const DESCRIPTION_METRICS_ORDER = exhaustiveArray<DescriptionMetrics>()([
+  'aggregate',
+  'timespan',
+  'algorithmReturn',
+  'growthRate',
+  'sharpeRatio',
+  'winRate',
+  'profitLossRatio',
+  'expectancyPerTrade',
+  'averageHoldingDuration',
+  'tickers',
+  'maxHoldingPorportion',
+  'volatility',
+  'contextLength',
+  'positionsClosed',
+  'tradesMade',
+]);
 
-// Default enabled metrics (matching API defaults)
-export const DEFAULT_METRIC_OPTIONS: Record<MetricKey, boolean> = {
+export type DescriptionMetricVisbility = Record<MetricKey, boolean>;
+export const DEFAULT_DESCRIPTION_METRIC_VISBILITY: DescriptionMetricVisbility = {
   aggregate: true,
   algorithmReturn: true,
   averageHoldingDuration: false,
@@ -43,8 +41,14 @@ export const DEFAULT_METRIC_OPTIONS: Record<MetricKey, boolean> = {
   winRate: true,
 };
 
-// Human-readable labels for each metric
-export const METRIC_LABELS: Record<MetricKey, string> = {
+export const ALL_DESCRIPTION_METRIC_VISIBILITY: DescriptionMetricVisbility = Object.keys(
+  DEFAULT_DESCRIPTION_METRIC_VISBILITY,
+).reduce((acc, metric) => {
+  acc[metric as MetricKey] = DEFAULT_DESCRIPTION_METRIC_VISBILITY[metric as MetricKey];
+  return acc;
+}, {} as DescriptionMetricVisbility);
+
+export const DESCRIPTION_METRIC_LABELS: Record<MetricKey, string> = {
   aggregate: 'Aggregate',
   algorithmReturn: 'Algorithm Return',
   averageHoldingDuration: 'Average Holding Duration',
@@ -62,42 +66,49 @@ export const METRIC_LABELS: Record<MetricKey, string> = {
   winRate: 'Win Rate',
 };
 
-/**
- * Identifies which metric a description string represents
- * by matching against known patterns from the API
- */
-export function identifyMetric(description: string): MetricKey | null {
-  // Match patterns based on DESCRIPTION_METRIC_TO_STRING from API
-  if (description.startsWith('Aggregate:')) return 'aggregate';
-  if (description.startsWith('Algorithm return:')) return 'algorithmReturn';
-  if (description.startsWith('Average holding duration:')) return 'averageHoldingDuration';
-  if (description.startsWith('Context length:')) return 'contextLength';
-  if (description.startsWith('Expectancy per trade:')) return 'expectancyPerTrade';
-  if (description.startsWith('Growth rate:')) return 'growthRate';
-  if (description.startsWith('Max holding percentage:')) return 'maxHoldingPorportion';
-  if (description.startsWith('Positions closed:')) return 'positionsClosed';
-  if (description.startsWith('Profit/loss ratio:')) return 'profitLossRatio';
-  if (description.startsWith('Sharpe ratio:')) return 'sharpeRatio';
-  if (description.startsWith('Tickers:')) return 'tickers';
-  if (description.startsWith('Timespan:')) return 'timespan';
-  if (description.startsWith('Trades made:')) return 'tradesMade';
-  if (description.startsWith('Volatility:')) return 'volatility';
-  if (description.startsWith('Win rate:')) return 'winRate';
-
-  return null;
-}
-
-/**
- * Creates a map of metrics from description strings
- */
-export function createMetricMap(descriptions: string[]): Map<MetricKey, string> {
-  const metricMap = new Map<MetricKey, string>();
-  for (const desc of descriptions) {
-    const metric = identifyMetric(desc);
-    if (metric) {
-      metricMap.set(metric, desc);
+export const DESCRIPTION_METRIC_TO_STRING: {
+  [K in MetricKey]: (descriptionMetric: DescriptionMetrics[K]) => string;
+} = {
+  aggregate: (aggregate: Timestamp) => aggregate,
+  algorithmReturn: (algorithmReturn: number) => withCommasRounded(algorithmReturn * 100) + '%',
+  averageHoldingDuration: (averageHoldingDuration: number | null) =>
+    `${averageHoldingDuration != null ? withCommasRounded(averageHoldingDuration) + ' ticks' : 'unknown'}`,
+  contextLength: (contextLength: number) => withCommas(contextLength),
+  expectancyPerTrade: (expectancyPerTrade: number | null) =>
+    `${expectancyPerTrade != null ? withCommasRounded(expectancyPerTrade * 100) + '%' : 'unknown'}`,
+  growthRate: (growthRate: number) => withCommasRounded(growthRate * 100) + '%',
+  maxHoldingPorportion: (maxHoldingPorportion: number) =>
+    withCommasRounded(maxHoldingPorportion * 100) + '%',
+  positionsClosed: (positionsClosed: number) => withCommas(positionsClosed),
+  profitLossRatio: (profitLossRatio: ProfitLossRatio) => {
+    switch (profitLossRatio.type) {
+      case 'VALUE':
+        return withCommasRounded(profitLossRatio.value) + ':1';
+      case 'NO_LOSSES':
+        return '1:0';
+      case 'UNKNOWN':
+        return 'unknown';
+      default: {
+        const _exhaustiveCheck: never = profitLossRatio;
+        return _exhaustiveCheck;
+      }
     }
-  }
-  return metricMap;
-}
+  },
+  sharpeRatio: (sharpeRatio: number | null) =>
+    sharpeRatio != null ? withCommasRounded(sharpeRatio) : 'unknown',
+  tickers: (tickers: Ticker[]) => tickersToString(tickers),
+  timespan: (timespan: [string, string]) => timespan[0] + ' to ' + timespan[1],
+  tradesMade: (tradesMade: number) => withCommas(tradesMade),
+  volatility: (volatility: number | null) =>
+    volatility != null ? withCommasRounded(volatility * 100) + '%' : 'unknown',
+  winRate: (winRate: number | null) =>
+    winRate != null ? withCommasRounded(winRate * 100) + '%' : 'unknown',
+};
 
+const MAX_TICKERS_TO_SHOW = 3;
+export function tickersToString(tickers: Ticker[]): string {
+  return (
+    tickers.slice(0, MAX_TICKERS_TO_SHOW).join(',') +
+    (tickers.length > MAX_TICKERS_TO_SHOW ? `,...${tickers.length - MAX_TICKERS_TO_SHOW} more` : '')
+  );
+}

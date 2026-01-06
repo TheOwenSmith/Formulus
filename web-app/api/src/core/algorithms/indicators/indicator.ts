@@ -14,11 +14,11 @@ export interface IndicatorResultByIndicator {}
 export type Indicator = keyof IndicatorResultByIndicator;
 
 const regexByIndicator = {
-  ema: /^EMA\((\d*)\)$/,
-  sma: /^SMA\((\d*)\)$/,
-  rsi: /^RSI\((\d*)\)$/,
   atr: /^ATR\((\d*)\)$/,
+  ema: /^EMA\((\d*)\)$/,
   linearRegression: /^LinearRegression\((\d*)\)$/,
+  rsi: /^RSI\((\d*)\)$/,
+  sma: /^SMA\((\d*)\)$/,
   superTrend: /^SuperTrend\((\d*),(\d*)\)$/,
 } satisfies Record<string, RegExp>;
 
