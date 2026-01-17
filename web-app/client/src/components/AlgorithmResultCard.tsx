@@ -9,7 +9,7 @@ import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/inde
 import { colorSchemes } from '@client/utils/colorSchemes';
 import { withCommasRounded } from '@client/utils/numberUtils';
 import type { DescriptionMetrics, SimplePlot, Ticker, Timestamp } from '@shared/types';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useEffect, useRef, useState } from 'react';
 
 interface AlgorithmResultCardProps {
   algorithmGraph: {
@@ -38,8 +38,11 @@ function AlgorithmResultCardComponent({
   tickerPlotByTicker,
   timestamps,
 }: AlgorithmResultCardProps) {
-  // Get color scheme for this card (cycle through available schemes)
-  const colorScheme = colorSchemes[index % colorSchemes.length];
+  // Memoize color scheme to avoid recalculation
+  const colorScheme = useMemo(
+    () => colorSchemes[index % colorSchemes.length],
+    [index],
+  );
   const [selectedTicker, setSelectedTicker] = useState<Ticker>(defaultTicker);
   // In side-by-side mode, show graph by default (false). In normal mode, show metrics panel by default (true).
   const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(!isSideBySideMode);
@@ -67,8 +70,8 @@ function AlgorithmResultCardComponent({
     ...DEFAULT_DESCRIPTION_METRIC_VISBILITY,
   }));
 
-  // Handle mouse down for drag start
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't start drag if clicking on interactive elements
     const target = e.target as HTMLElement;
     if (
@@ -84,7 +87,7 @@ function AlgorithmResultCardComponent({
 
     dragStartPos.current = { x: e.clientX, y: e.clientY };
     setIsDragActive(true);
-  };
+  }, []);
 
   // Handle mouse move to detect drag
   useEffect(() => {
@@ -122,13 +125,17 @@ function AlgorithmResultCardComponent({
   }, [isDragActive, onDragStart]);
 
   // Handle mouse up for drag end
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (isDragging && onDragEnd) {
       onDragEnd();
     }
     dragStartPos.current = null;
     setIsDragActive(false);
-  };
+  }, [isDragging, onDragEnd]);
+
+  // Memoize toggle callbacks
+  const handleShowChart = useCallback(() => setIsMetricsPanelVisible(false), []);
+  const handleShowMetrics = useCallback(() => setIsMetricsPanelVisible(true), []);
 
   return (
     <div
@@ -199,7 +206,7 @@ function AlgorithmResultCardComponent({
                 }}
               >
                 <button
-                  onClick={() => setIsMetricsPanelVisible(false)}
+                  onClick={handleShowChart}
                   className="absolute top-4 right-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
                   style={{
                     backgroundColor: `${colorScheme.primaryColor}20`,
@@ -232,7 +239,7 @@ function AlgorithmResultCardComponent({
                   descriptionMetrics={algorithmGraph.descriptionMetrics}
                   hideToggleButton={isSideBySideMode}
                   metricVisibility={metricVisibility}
-                  onToggle={() => setIsMetricsPanelVisible(false)}
+                  onToggle={handleShowChart}
                   primaryColor={colorScheme.primaryColor}
                   primaryColorLight={colorScheme.primaryColorLight}
                   setMetricVisibility={setMetricVisibility}
@@ -258,7 +265,7 @@ function AlgorithmResultCardComponent({
                 }}
               >
                 <button
-                  onClick={() => setIsMetricsPanelVisible(true)}
+                  onClick={handleShowMetrics}
                   className="absolute top-4 left-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
                   style={{
                     backgroundColor: `${colorScheme.primaryColor}20`,
@@ -333,7 +340,7 @@ function AlgorithmResultCardComponent({
                 <PerformanceMetrics
                   descriptionMetrics={algorithmGraph.descriptionMetrics}
                   metricVisibility={metricVisibility}
-                  onToggle={() => setIsMetricsPanelVisible(false)}
+                  onToggle={handleShowChart}
                   primaryColor={colorScheme.primaryColor}
                   primaryColorLight={colorScheme.primaryColorLight}
                   setMetricVisibility={setMetricVisibility}
@@ -345,7 +352,7 @@ function AlgorithmResultCardComponent({
             <div className="flex-1 w-full min-w-0 relative" style={{ height: '100%' }}>
               {!isMetricsPanelVisible && (
                 <button
-                  onClick={() => setIsMetricsPanelVisible(true)}
+                  onClick={handleShowMetrics}
                   className="absolute top-4 left-4 z-10 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-px flex items-center gap-2 shadow-lg"
                   style={{
                     backgroundColor: `${colorScheme.primaryColor}20`,

@@ -1,6 +1,6 @@
 import { ARROW_DOWN_SMALL, STROKE_PROPERTIES_SMALL, SVG_NAMESPACE } from '@client/icons/index';
 import type { Ticker } from '@shared/types';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface TickerSelectorProps {
   availableTickers: Ticker[];
@@ -18,14 +18,15 @@ export function TickerSelector({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Memoize click outside handler
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      setIsOpen(false);
+    }
+  }, []);
+
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
@@ -33,13 +34,27 @@ export function TickerSelector({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, handleClickOutside]);
+
+  // Memoize ticker change handler
+  const handleTickerChange = useCallback(
+    (ticker: Ticker) => {
+      onTickerChange(ticker);
+      setIsOpen(false);
+    },
+    [onTickerChange],
+  );
+
+  // Memoize toggle handler
+  const handleToggle = useCallback(() => {
+    setIsOpen((prev) => !prev);
+  }, []);
 
   return (
     <div className="relative inline-block" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className="flex items-center gap-1 text-white/95 text-[13px] font-medium cursor-pointer transition-all duration-200 hover:text-white focus:outline-none"
         style={{ fontFamily: 'inherit' }}
       >
@@ -62,10 +77,7 @@ export function TickerSelector({
             <button
               key={ticker}
               type="button"
-              onClick={() => {
-                onTickerChange(ticker);
-                setIsOpen(false);
-              }}
+              onClick={() => handleTickerChange(ticker)}
               className={`w-full text-left px-3 py-2 text-xs font-medium transition-all duration-150 ${
                 ticker === selectedTicker
                   ? 'text-white border-l-2'

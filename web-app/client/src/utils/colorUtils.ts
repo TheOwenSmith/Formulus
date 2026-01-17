@@ -83,13 +83,24 @@ function extractColorName(tailwindClass: string): string {
   return tailwindClass.replace(/^(from-|to-|via-)/, '');
 }
 
+// Cache for color lookups to avoid repeated string operations
+const colorCache = new Map<string, string>();
+
 /**
  * Gets the hex color value for a Tailwind color name
  */
 export function getTailwindColorHex(tailwindColor: string): string {
+  if (colorCache.has(tailwindColor)) {
+    return colorCache.get(tailwindColor)!;
+  }
   const colorName = extractColorName(tailwindColor);
-  return tailwindColors[colorName] || '#3b82f6'; // Default to blue-500
+  const hex = tailwindColors[colorName] || '#3b82f6'; // Default to blue-500
+  colorCache.set(tailwindColor, hex);
+  return hex;
 }
+
+// Cache for gradient strings
+const gradientCache = new Map<string, string>();
 
 /**
  * Generates a gradient string from two Tailwind color classes
@@ -98,7 +109,13 @@ export function getTailwindColorHex(tailwindColor: string): string {
  * @returns CSS linear-gradient string
  */
 export function generateGradientFromTailwind(fromColor: string, toColor: string): string {
+  const cacheKey = `${fromColor}-${toColor}`;
+  if (gradientCache.has(cacheKey)) {
+    return gradientCache.get(cacheKey)!;
+  }
   const fromHex = getTailwindColorHex(fromColor);
   const toHex = getTailwindColorHex(toColor);
-  return `linear-gradient(90deg, ${fromHex}, ${toHex})`;
+  const gradient = `linear-gradient(90deg, ${fromHex}, ${toHex})`;
+  gradientCache.set(cacheKey, gradient);
+  return gradient;
 }

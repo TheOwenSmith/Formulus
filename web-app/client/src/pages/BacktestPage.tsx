@@ -2,6 +2,7 @@ import { AlgorithmResultCard } from '@client/components/AlgorithmResultCard';
 import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/index';
 import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
+import { throttle } from '@client/utils/throttle';
 import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/types';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLoaderData } from 'react-router-dom';
@@ -390,7 +391,11 @@ export function BacktestPage() {
 
     animationFrameId = requestAnimationFrame(animate);
 
-    const handleMouseMove = (e: MouseEvent) => {
+    // Cache DOM queries to avoid repeated lookups
+    let cachedCards: NodeListOf<Element> | null = null;
+    let cachedDropZones: NodeListOf<Element> | null = null;
+
+    const handleMouseMove = throttle((e: MouseEvent) => {
       mouseY = e.clientY;
       setDragPreviewPos({ x: e.clientX + 20, y: e.clientY + 20 });
 
@@ -422,8 +427,10 @@ export function BacktestPage() {
 
         // Fallback: check all algorithm cards and see which one the mouse is over
         if (!foundTarget) {
-          const allCards = document.querySelectorAll('[data-algorithm-card]');
-          for (const card of allCards) {
+          if (!cachedCards) {
+            cachedCards = document.querySelectorAll('[data-algorithm-card]');
+          }
+          for (const card of cachedCards) {
             const rect = card.getBoundingClientRect();
             if (
               e.clientX >= rect.left &&
@@ -448,10 +455,12 @@ export function BacktestPage() {
         }
       } else {
         // Normal mode: find drop zone by checking all drop zones and their bounding boxes
-        const dropZones = document.querySelectorAll('[data-drop-zone]');
+        if (!cachedDropZones) {
+          cachedDropZones = document.querySelectorAll('[data-drop-zone]');
+        }
         let foundPosition: number | null = null;
 
-        for (const dropZone of dropZones) {
+        for (const dropZone of cachedDropZones) {
           const rect = dropZone.getBoundingClientRect();
           // Check if mouse is within the drop zone area (with generous padding for easier targeting)
           // Use larger padding to account for absolute positioning and grid layout
@@ -492,9 +501,9 @@ export function BacktestPage() {
           setTargetAlgorithmCard(null);
         }
       }
-    };
+    }, 16); // ~60fps throttling
 
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     return () => {
       isActive = false;
       window.removeEventListener('mousemove', handleMouseMove);
@@ -518,7 +527,7 @@ export function BacktestPage() {
   });
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = throttle((e: MouseEvent) => {
       // Use viewport height for global tracking (Y position only)
       const viewportHeight = window.innerHeight;
 
@@ -541,7 +550,7 @@ export function BacktestPage() {
         via: `hsl(${hue2}, ${saturation}%, ${lightness}%)`,
         to: `hsl(${hue3}, ${saturation}%, ${lightness}%)`,
       });
-    };
+    }, 16); // ~60fps throttling
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
 

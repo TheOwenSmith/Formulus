@@ -1,6 +1,6 @@
 import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/index';
 import type { DescriptionMetrics } from '@shared/types';
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { MetricTogglePanel } from './MetricTogglePanel/MetricTogglePanel';
 import {
   DESCRIPTION_METRIC_LABELS,
@@ -29,8 +29,10 @@ export function PerformanceMetrics({
   primaryColorLight,
   setMetricVisibility,
 }: PerformanceMetricsProps) {
-  const enabledMetrics: MetricKey[] = DESCRIPTION_METRICS_ORDER.filter(
-    (metric) => metricVisibility[metric],
+  // Memoize enabled metrics to avoid recalculating on every render
+  const enabledMetrics: MetricKey[] = useMemo(
+    () => DESCRIPTION_METRICS_ORDER.filter((metric) => metricVisibility[metric]),
+    [metricVisibility],
   );
 
   return (

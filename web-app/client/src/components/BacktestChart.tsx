@@ -3,11 +3,16 @@ import '@client/styles/BacktestChart.css';
 import { getTailwindColorHex } from '@client/utils/colorUtils';
 import type { SimplePlot, Ticker } from '@shared/types';
 import * as d3 from 'd3';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 // Format timestamp string to YYYY-MM-DD HH:mm:ss with 12-hour format
+// Memoize formatted timestamps to avoid repeated parsing
+const timestampCache = new Map<string, string>();
 function formatTimestamp(timestamp: string): string {
+  if (timestampCache.has(timestamp)) {
+    return timestampCache.get(timestamp)!;
+  }
   try {
     // Parse timestamp - handle both ISO and YYYY-MM-DD HH:mm:ss formats
     let date: Date;
@@ -36,8 +41,11 @@ function formatTimestamp(timestamp: string): string {
     hours = hours ? hours : 12; // 0 should be 12
     const hours12 = String(hours);
 
-    return `${year}-${month}-${day} ${hours12}:${minutes}:${seconds} ${ampm}`;
+    const formatted = `${year}-${month}-${day} ${hours12}:${minutes}:${seconds} ${ampm}`;
+    timestampCache.set(timestamp, formatted);
+    return formatted;
   } catch {
+    timestampCache.set(timestamp, timestamp);
     return timestamp; // Return as-is if parsing fails
   }
 }
@@ -84,6 +92,16 @@ export function BacktestChart({
   const isBrushingRef = useRef(false);
   const tickerSelectorRootRef = useRef<Root | null>(null);
   const tickerSelectorContainerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Memoize data points to avoid recalculating on every render
+  const dataPoints = useMemo<DataPoint[]>(() => {
+    return tickerPlot.y.map((y, i) => ({
+      timestamp: timestamps[i],
+      tickerValue: y,
+      index: i,
+      algorithmValue: algorithmPlot.y[i],
+    }));
+  }, [tickerPlot.y, algorithmPlot.y, timestamps]);
 
   // Reset zoom when ticker changes
   useEffect(() => {
@@ -91,6 +109,14 @@ export function BacktestChart({
       setZoomDomain(null);
     }
   }, [selectedTicker]);
+
+  // Memoize gradient colors to avoid recalculating
+  const gradientColors = useMemo(() => {
+    return {
+      from: getTailwindColorHex(gradientFrom),
+      to: getTailwindColorHex(gradientTo),
+    };
+  }, [gradientFrom, gradientTo]);
 
   // Handle resize - use ResizeObserver to detect container size changes
   useEffect(() => {
@@ -151,16 +177,6 @@ export function BacktestChart({
     svg.attr('width', width).attr('height', height);
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-
-    const dataPoints: DataPoint[] = tickerPlot.y.map((y, i) => {
-      const point: DataPoint = {
-        timestamp: timestamps[i],
-        tickerValue: y,
-        index: i,
-        algorithmValue: algorithmPlot.y[i],
-      };
-      return point;
-    });
 
     // Original domain for reset
     const originalXDomain: [number, number] = [0, dataPoints.length - 1];
@@ -772,22 +788,18 @@ export function BacktestChart({
     selectedTicker,
     onTickerChange,
     algorithmColor,
-    tickerPlot,
-    timestamps,
+    dataPoints,
+    gradientColors,
   ]);
 
-  const handleResetZoom = () => {
+  const handleResetZoom = useCallback(() => {
     setZoomDomain(null);
     if (onResetZoom) {
       onResetZoom();
     }
-  };
+  }, [onResetZoom]);
 
   const hasZoom = zoomDomain !== null;
-
-  // Get gradient colors for the top line
-  const fromColor = getTailwindColorHex(gradientFrom);
-  const toColor = getTailwindColorHex(gradientTo);
 
   return (
     <div
@@ -799,7 +811,7 @@ export function BacktestChart({
       <div
         className="absolute top-0 left-0 right-0 h-[2px] opacity-60"
         style={{
-          background: `linear-gradient(90deg, transparent, ${fromColor}, ${toColor}, transparent)`,
+          background: `linear-gradient(90deg, transparent, ${gradientColors.from}, ${gradientColors.to}, transparent)`,
         }}
       />
       <div className="absolute top-[14px] right-4 flex flex-col items-end flex-shrink-0 gap-2 z-10">

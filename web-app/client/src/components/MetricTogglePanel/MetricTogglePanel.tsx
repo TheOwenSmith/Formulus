@@ -6,7 +6,10 @@ import {
   STROKE_PROPERTIES_SMALL,
   SVG_NAMESPACE,
 } from '@client/icons/index';
+import { throttle } from '@client/utils/throttle';
 import {
+  useCallback,
+  useMemo,
   useEffect,
   useRef,
   useState,
@@ -42,16 +45,16 @@ export function MetricTogglePanel({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Helper function to convert hex to rgba
-  const hexToRgba = (hex: string, alpha: number) => {
+  // Memoize helper functions
+  const hexToRgba = useCallback((hex: string, alpha: number) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
+  }, []);
 
-  // Get the light color for text - use provided primaryColorLight or calculate a lighter version
-  const getTextColor = () => {
+  // Memoize text color calculation
+  const textColor = useMemo(() => {
     if (primaryColorLight) return primaryColorLight;
     // If no light color provided, calculate a lighter version
     const r = parseInt(primaryColor.slice(1, 3), 16);
@@ -59,42 +62,49 @@ export function MetricTogglePanel({
     const b = parseInt(primaryColor.slice(5, 7), 16);
     // Lighten by approximately 20% (similar to Tailwind's -400 vs -500)
     return `rgb(${Math.min(255, Math.round(r * 1.2))}, ${Math.min(255, Math.round(g * 1.2))}, ${Math.min(255, Math.round(b * 1.2))})`;
-  };
+  }, [primaryColor, primaryColorLight]);
 
-  let enabledCount = 0;
-  let totalCount = 0;
-  for (const metric in metricVisibility) {
-    totalCount++;
-    if (metricVisibility[metric as MetricKey]) {
-      enabledCount++;
+  // Memoize enabled count calculation
+  const { enabledCount, totalCount } = useMemo(() => {
+    let enabled = 0;
+    let total = 0;
+    for (const metric in metricVisibility) {
+      total++;
+      if (metricVisibility[metric as MetricKey]) {
+        enabled++;
+      }
     }
-  }
+    return { enabledCount: enabled, totalCount: total };
+  }, [metricVisibility]);
 
-  const enableAllMetrics = () => {
+  const enableAllMetrics = useCallback(() => {
     return setMetricVisibility(
       DESCRIPTION_METRICS_ORDER.reduce((acc, metric) => {
         acc[metric] = true;
         return acc;
       }, {} as DescriptionMetricVisbility),
     );
-  };
+  }, [setMetricVisibility]);
 
-  const disableAllMetrics = () => {
+  const disableAllMetrics = useCallback(() => {
     return setMetricVisibility(
       DESCRIPTION_METRICS_ORDER.reduce((acc, metric) => {
         acc[metric] = false;
         return acc;
       }, {} as DescriptionMetricVisbility),
     );
-  };
+  }, [setMetricVisibility]);
 
-  const resetMetricsToDefaults = () => {
+  const resetMetricsToDefaults = useCallback(() => {
     setMetricVisibility({ ...DEFAULT_DESCRIPTION_METRIC_VISBILITY });
-  };
+  }, [setMetricVisibility]);
 
-  const toggleMetric = (metric: MetricKey, enabled: boolean) => {
-    setMetricVisibility((prev) => ({ ...prev, [metric]: enabled }));
-  };
+  const toggleMetric = useCallback(
+    (metric: MetricKey, enabled: boolean) => {
+      setMetricVisibility((prev) => ({ ...prev, [metric]: enabled }));
+    },
+    [setMetricVisibility],
+  );
 
   // Calculate position to keep panel within viewport
   useEffect(() => {
@@ -176,7 +186,7 @@ export function MetricTogglePanel({
       document.addEventListener('mousedown', handleClickOutside);
     }, 150);
 
-    const updatePosition = () => {
+    const updatePosition = throttle(() => {
       // Update position on resize or scroll
       requestAnimationFrame(() => {
         if (!buttonRef.current || !dropdownRef.current) return;
@@ -206,10 +216,10 @@ export function MetricTogglePanel({
 
         setPanelStyle(newStyle);
       });
-    };
+    }, 16); // ~60fps throttling
 
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition, { passive: true });
+    window.addEventListener('scroll', updatePosition, { passive: true, capture: true });
 
     return () => {
       clearTimeout(timeoutId);
@@ -275,7 +285,7 @@ export function MetricTogglePanel({
                   style={{
                     backgroundColor: hexToRgba(primaryColor, 0.2),
                     border: `1px solid ${hexToRgba(primaryColor, 0.4)}`,
-                    color: getTextColor(),
+                    color: textColor,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.3);
@@ -294,7 +304,7 @@ export function MetricTogglePanel({
                   style={{
                     backgroundColor: hexToRgba(primaryColor, 0.2),
                     border: `1px solid ${hexToRgba(primaryColor, 0.4)}`,
-                    color: getTextColor(),
+                    color: textColor,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.3);
@@ -313,7 +323,7 @@ export function MetricTogglePanel({
                   style={{
                     backgroundColor: hexToRgba(primaryColor, 0.2),
                     border: `1px solid ${hexToRgba(primaryColor, 0.4)}`,
-                    color: getTextColor(),
+                    color: textColor,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = hexToRgba(primaryColor, 0.3);
