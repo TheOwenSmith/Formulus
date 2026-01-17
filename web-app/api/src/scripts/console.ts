@@ -7,6 +7,7 @@ import {
   deserializeContextMap,
   serializeContextMap,
 } from '@api/core/algorithms/context-maps/context-map';
+import { uploadAlgorithm } from '@api/core/algorithms/db-algorithm';
 import { aboveBelowSmaAlgorithm } from '@api/core/algorithms/examples/above-below-sma';
 import {
   greenRedBarsChooseKAlgorithm,
@@ -19,9 +20,8 @@ import { overboughtOversoldAlgorithm } from '@api/core/algorithms/examples/overb
 import { regressionLineAlgorithm } from '@api/core/algorithms/examples/regression-line';
 import { superTrendDirectionAlgorithm } from '@api/core/algorithms/examples/super-trend-direction';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from '@api/core/algorithms/simple-algorithm';
-import { uploadAlgorithm } from '@api/core/algorithms/upload-algorithm';
 import { backtestAlgorithmsConcurrently } from '@api/core/backtesting/backtest-algorithms-concurrently';
-import { uploadBacktestingResults } from '@api/core/backtesting/upload-backtesting-results';
+import { uploadBacktestingResults } from '@api/core/backtesting/db-backtesting-results';
 import { type Ticker } from '@api/fetch/types';
 import { config } from '@api/lib/config';
 import { tryAsync, trySync } from '@api/utils/error-handling';
