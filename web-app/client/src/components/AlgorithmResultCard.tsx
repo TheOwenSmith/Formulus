@@ -446,6 +446,7 @@ function AlgorithmResultCardComponent({
                     availableTickers={Object.keys(tickerPlotByTicker)}
                     gradientFrom={colorScheme.gradientFrom}
                     gradientTo={colorScheme.gradientTo}
+                    isSideBySideMode={isSideBySideMode}
                     onTickerChange={setSelectedTicker}
                     selectedTicker={selectedTicker}
                     tickerPlot={tickerPlotByTicker[selectedTicker]}
@@ -519,6 +520,7 @@ function AlgorithmResultCardComponent({
                 availableTickers={Object.keys(tickerPlotByTicker)}
                 gradientFrom={colorScheme.gradientFrom}
                 gradientTo={colorScheme.gradientTo}
+                isSideBySideMode={isSideBySideMode}
                 onTickerChange={setSelectedTicker}
                 selectedTicker={selectedTicker}
                 tickerPlot={tickerPlotByTicker[selectedTicker]}

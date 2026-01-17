@@ -55,6 +55,7 @@ interface BacktestChartProps {
   availableTickers: Ticker[];
   gradientFrom?: string; // Tailwind gradient class like "from-blue-500"
   gradientTo?: string; // Tailwind gradient class like "to-cyan-300"
+  isSideBySideMode?: boolean; // Whether we're in side-by-side comparison mode
   onResetZoom?: () => void;
   onTickerChange?: (ticker: Ticker) => void;
   selectedTicker: Ticker;
@@ -68,6 +69,7 @@ export function BacktestChart({
   availableTickers,
   gradientFrom = 'from-blue-500',
   gradientTo = 'to-cyan-300',
+  isSideBySideMode = false,
   onResetZoom,
   onTickerChange,
   selectedTicker,
@@ -326,7 +328,7 @@ export function BacktestChart({
     // Axes
     const xAxis = d3
       .axisBottom(xScale)
-      .ticks(5)
+      .ticks(isSideBySideMode ? 3 : 5)
       .tickFormat((d) => {
         const index = Math.round(Number(d));
         if (index >= 0 && index < timestamps.length) {
