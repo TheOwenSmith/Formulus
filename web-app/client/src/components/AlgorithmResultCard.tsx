@@ -274,7 +274,7 @@ function AlgorithmResultCardComponent({
       ref={cardRef}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      className={`bg-gradient-to-br ${colorScheme.bgGradient} ${colorScheme.bgGradientTo} rounded-2xl p-6 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] border ${colorScheme.borderColor} relative overflow-hidden transition-all duration-300 ${
+      className={`bg-gradient-to-br ${colorScheme.bgGradient} ${colorScheme.bgGradientTo} rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] border ${colorScheme.borderColor} relative overflow-hidden transition-all duration-300 ${
         isDragging
           ? 'opacity-50 scale-[0.98] shadow-[0_30px_80px_rgba(0,0,0,0.5)]'
           : 'hover:shadow-[0_25px_70px_rgba(0,0,0,0.4)]'
@@ -290,13 +290,13 @@ function AlgorithmResultCardComponent({
       />
       <div className="relative z-10">
         {/* Algorithm Header */}
-        <div className="mb-6">
+        <div className="mb-4">
           <h2
-            className={`text-2xl font-bold mb-2 bg-gradient-to-r ${colorScheme.gradientFrom} ${colorScheme.gradientTo} bg-clip-text text-transparent`}
+            className={`text-xl font-bold mb-1 bg-gradient-to-r ${colorScheme.gradientFrom} ${colorScheme.gradientTo} bg-clip-text text-transparent`}
           >
             {algorithmGraph.algorithmPlot.name}
           </h2>
-          <div className="text-sm text-white/60">
+          <div className="text-xs text-white/60">
             Algorithm Return: {algorithmGraph.descriptionMetrics.algorithmReturn >= 0 ? '+' : ''}
             {withCommasRounded(algorithmGraph.descriptionMetrics.algorithmReturn * 100)}% | Growth
             Rate: {algorithmGraph.descriptionMetrics.growthRate >= 0 ? '+' : ''}
@@ -305,7 +305,7 @@ function AlgorithmResultCardComponent({
         </div>
 
         {/* Headline Metrics */}
-        <div className="mb-6">
+        <div className="mb-4">
           <HeadlineMetrics
             descriptionMetrics={algorithmGraph.descriptionMetrics}
             gradientFrom={colorScheme.gradientFrom}
@@ -319,7 +319,7 @@ function AlgorithmResultCardComponent({
         {/* Chart and Metrics */}
         {isSideBySideMode ? (
           /* Side-by-side mode: Show either metrics OR graph, not both - with animation */
-          <div className="relative" style={{ height: '700px' }}>
+          <div className="relative" style={{ height: '480px' }}>
             {/* Metrics panel with fade/slide animation */}
             <div
               className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out ${
@@ -458,7 +458,7 @@ function AlgorithmResultCardComponent({
           </div>
         ) : (
           /* Normal mode: Show metrics and graph side-by-side */
-          <div className="flex flex-col lg:flex-row gap-4" style={{ height: '700px' }}>
+          <div className="flex flex-col lg:flex-row gap-4" style={{ height: '480px' }}>
             {/* Performance metrics panel (left) */}
             <div
               className={`transition-all duration-300 ${

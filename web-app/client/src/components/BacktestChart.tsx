@@ -134,7 +134,7 @@ export function BacktestChart({
     const container = containerRef.current;
     const width = Math.max(0, dimensions.width ?? container?.clientWidth ?? 0);
     const height = Math.max(0, dimensions.height ?? 600);
-    const margin = { top: 60, right: 80, bottom: 80, left: 100 };
+    const margin = { top: 40, right: 60, bottom: 75, left: 80 };
 
     // Ensure we have minimum valid dimensions before proceeding
     // This prevents rendering during layout transitions when dimensions are invalid

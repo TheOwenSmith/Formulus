@@ -140,6 +140,12 @@ export function BacktestPage() {
   const [draggedAlgorithm, setDraggedAlgorithm] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<number | null>(null);
   const [dragPreviewPos, setDragPreviewPos] = useState<{ x: number; y: number } | null>(null);
+  // For side-by-side mode: track which algorithm card is being hovered as drop target
+  const [targetAlgorithmCard, setTargetAlgorithmCard] = useState<string | null>(null);
+  // Track which algorithms were shifted for animation, with their shift direction
+  const [shiftedAlgorithms, setShiftedAlgorithms] = useState<Map<string, 'left' | 'right'>>(
+    new Map(),
+  );
 
   // Map algorithm names to their original indices for color schemes
   const originalIndexByAlgorithmName = useMemo(() => {
@@ -157,29 +163,139 @@ export function BacktestPage() {
 
   // Handle drag end
   const handleDragEnd = useCallback(() => {
-    if (draggedAlgorithm !== null && dropPosition !== null) {
+    const currentDragged = draggedAlgorithm;
+    const currentTarget = targetAlgorithmCard;
+    const currentDropPosition = dropPosition;
+    const currentSideBySide = isSideBySideMode;
+
+    if (currentDragged !== null) {
+      // Preserve scroll position to prevent unwanted scrolling when reordering
+      // This is especially important when moving algorithms up in side-by-side mode
+      const scrollPosition = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const originalScrollBehavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = 'auto';
+      if (document.body) {
+        document.body.style.scrollBehavior = 'auto';
+      }
+
       // Use startTransition to mark reordering as non-urgent, preventing unmount errors
       startTransition(() => {
         // Use functional update to avoid stale closure issues
         setOrderedAlgorithmNames((prevOrder) => {
-          const currentIndex = prevOrder.indexOf(draggedAlgorithm);
+          const currentIndex = prevOrder.indexOf(currentDragged);
           if (currentIndex === -1) return prevOrder;
 
-          // Calculate the target position using grid layout utility
-          const targetPosition = calculateTargetPosition(
-            currentIndex,
-            dropPosition,
-            prevOrder.length,
-          );
+          if (currentSideBySide && currentTarget) {
+            // Side-by-side mode: replace target algorithm's position
+            const targetIndex = prevOrder.indexOf(currentTarget);
+            if (targetIndex === -1 || targetIndex === currentIndex) return prevOrder;
 
-          // Only reorder if position actually changed
-          if (currentIndex !== targetPosition) {
             const newOrder = [...prevOrder];
-            newOrder.splice(currentIndex, 1);
-            newOrder.splice(targetPosition, 0, draggedAlgorithm);
+            const shiftedMap = new Map<string, 'left' | 'right'>();
+
+            // Example: A(0), B(1), C(2), D(3) -> drag A onto C -> B(0), C(1), A(2), D(3)
+            // The dragged algorithm takes the target's position
+            // The target algorithm and everything between them shifts toward the dragged algorithm's original position
+
+            if (currentIndex < targetIndex) {
+              // Moving right: A(0) -> B(1) should result in B(0), A(1), C(2), D(3)
+              // The dragged algorithm takes the target's position
+              // The target and everything between shifts left
+
+              // Track which algorithms will shift left (including the target)
+              for (let i = currentIndex + 1; i <= targetIndex; i++) {
+                shiftedMap.set(prevOrder[i], 'left');
+              }
+
+              // Remove dragged algorithm first
+              newOrder.splice(currentIndex, 1);
+              // After removal: [B, C, D] (B is at 0, C is at 1, D is at 2)
+              // targetIndex was 1 (B's original position)
+              // After removal, B is at 0, C is at 1
+              // We want to insert the dragged algorithm at B's ORIGINAL position (1)
+              // But after removal, position 1 is where C is
+              // So we insert at targetIndex (the original position, which still exists after removal)
+              newOrder.splice(targetIndex, 0, currentDragged);
+              // Result: [B(0), A(1), C(2), D(3)] ✓
+              // Target (B) is already at the correct position (currentIndex = 0) after removal
+              // No need to insert it again - it's already where it should be
+            } else {
+              // Moving left: C(2) -> A(0) should result in C(0), A(1), B(2), D(3)
+              // Track which algorithms will shift right (including the target)
+              for (let i = targetIndex; i < currentIndex; i++) {
+                shiftedMap.set(prevOrder[i], 'right');
+              }
+
+              // Remove dragged algorithm first: [A, B, D] (indices 0, 1, 2)
+              newOrder.splice(currentIndex, 1);
+              // After removal: [A, B, D], A is at 0, B is at 1
+              // targetIndex is 0, we want to insert C at 0
+              newOrder.splice(targetIndex, 0, currentDragged);
+              // After insertion: [C(0), A(1), B(2), D(3)] ✓
+              // Target (A) is now at 1, which is correct
+              // No need to insert A again - it's already where it should be
+            }
+
+            // Trigger animation for shifted algorithms
+            setShiftedAlgorithms(shiftedMap);
+            // Clear animation after it completes
+            setTimeout(() => {
+              setShiftedAlgorithms(new Map());
+            }, 500); // Match animation duration
+
             return newOrder;
+          } else if (currentDropPosition !== null) {
+            // Normal mode: insert at drop position
+            const targetPosition = calculateTargetPosition(
+              currentIndex,
+              currentDropPosition,
+              prevOrder.length,
+            );
+
+            // Only reorder if position actually changed
+            if (currentIndex !== targetPosition) {
+              const newOrder = [...prevOrder];
+              const shiftedMap = new Map<string, 'left' | 'right'>();
+
+              // Track which algorithms will shift
+              if (currentIndex < targetPosition) {
+                // Moving right: algorithms between current and target shift left
+                for (let i = currentIndex + 1; i <= targetPosition; i++) {
+                  shiftedMap.set(prevOrder[i], 'left');
+                }
+              } else {
+                // Moving left: algorithms between target and current shift right
+                for (let i = targetPosition; i < currentIndex; i++) {
+                  shiftedMap.set(prevOrder[i], 'right');
+                }
+              }
+
+              newOrder.splice(currentIndex, 1);
+              newOrder.splice(targetPosition, 0, currentDragged);
+
+              // Trigger animation for shifted algorithms
+              setShiftedAlgorithms(shiftedMap);
+              // Clear animation after it completes
+              setTimeout(() => {
+                setShiftedAlgorithms(new Map());
+              }, 500); // Match animation duration
+
+              return newOrder;
+            }
           }
           return prevOrder;
+        });
+      });
+
+      // Restore scroll position after a brief delay to allow React to render
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+          document.documentElement.style.scrollBehavior = originalScrollBehavior;
+          if (document.body) {
+            document.body.style.scrollBehavior = '';
+          }
         });
       });
     }
@@ -187,7 +303,8 @@ export function BacktestPage() {
     setDraggedAlgorithm(null);
     setDropPosition(null);
     setDragPreviewPos(null);
-  }, [draggedAlgorithm, dropPosition]);
+    setTargetAlgorithmCard(null);
+  }, [draggedAlgorithm, dropPosition, targetAlgorithmCard, isSideBySideMode]);
 
   // Global mouse up handler to end drag and cursor management
   useEffect(() => {
@@ -277,46 +394,103 @@ export function BacktestPage() {
       mouseY = e.clientY;
       setDragPreviewPos({ x: e.clientX + 20, y: e.clientY + 20 });
 
-      // Find drop zone by checking all drop zones and their bounding boxes
-      const dropZones = document.querySelectorAll('[data-drop-zone]');
-      let foundPosition: number | null = null;
-
-      for (const dropZone of dropZones) {
-        const rect = dropZone.getBoundingClientRect();
-        // Check if mouse is within the drop zone area (with generous padding for easier targeting)
-        // Use larger padding to account for absolute positioning and grid layout
-        const padding = 20;
-        if (
-          e.clientX >= rect.left - padding &&
-          e.clientX <= rect.right + padding &&
-          e.clientY >= rect.top - padding &&
-          e.clientY <= rect.bottom + padding
-        ) {
-          const position = parseInt(dropZone.getAttribute('data-drop-zone') ?? '-1', 10);
-          if (position >= 0) {
-            foundPosition = position;
-            break;
-          }
-        }
-      }
-
-      if (foundPosition !== null) {
-        setDropPosition(foundPosition);
-      } else {
-        // Also try elementsFromPoint as fallback
+      if (isSideBySideMode) {
+        // Side-by-side mode: detect algorithm cards as drop targets
+        // First try elementsFromPoint
         const elements = document.elementsFromPoint(e.clientX, e.clientY);
+        let foundTarget: string | null = null;
+
         for (const el of elements) {
-          const dropZone = el.closest('[data-drop-zone]');
-          if (dropZone) {
-            const position = parseInt(dropZone.getAttribute('data-drop-zone') ?? '-1', 10);
-            if (position >= 0) {
-              setDropPosition(position);
-              return;
+          // Check if the element itself has the attribute
+          if (el.hasAttribute?.('data-algorithm-card')) {
+            const algorithmName = el.getAttribute('data-algorithm-card');
+            if (algorithmName && algorithmName !== draggedAlgorithm) {
+              foundTarget = algorithmName;
+              break;
+            }
+          }
+          // Also check parent elements
+          const algorithmCard = el.closest('[data-algorithm-card]');
+          if (algorithmCard) {
+            const algorithmName = algorithmCard.getAttribute('data-algorithm-card');
+            if (algorithmName && algorithmName !== draggedAlgorithm) {
+              foundTarget = algorithmName;
+              break;
             }
           }
         }
-        // Clear drop position if not over any drop zone
-        setDropPosition(null);
+
+        // Fallback: check all algorithm cards and see which one the mouse is over
+        if (!foundTarget) {
+          const allCards = document.querySelectorAll('[data-algorithm-card]');
+          for (const card of allCards) {
+            const rect = card.getBoundingClientRect();
+            if (
+              e.clientX >= rect.left &&
+              e.clientX <= rect.right &&
+              e.clientY >= rect.top &&
+              e.clientY <= rect.bottom
+            ) {
+              const algorithmName = card.getAttribute('data-algorithm-card');
+              if (algorithmName && algorithmName !== draggedAlgorithm) {
+                foundTarget = algorithmName;
+                break;
+              }
+            }
+          }
+        }
+
+        if (foundTarget) {
+          setTargetAlgorithmCard(foundTarget);
+          setDropPosition(null); // Clear drop position in side-by-side mode
+        } else {
+          setTargetAlgorithmCard(null);
+        }
+      } else {
+        // Normal mode: find drop zone by checking all drop zones and their bounding boxes
+        const dropZones = document.querySelectorAll('[data-drop-zone]');
+        let foundPosition: number | null = null;
+
+        for (const dropZone of dropZones) {
+          const rect = dropZone.getBoundingClientRect();
+          // Check if mouse is within the drop zone area (with generous padding for easier targeting)
+          // Use larger padding to account for absolute positioning and grid layout
+          const padding = 20;
+          if (
+            e.clientX >= rect.left - padding &&
+            e.clientX <= rect.right + padding &&
+            e.clientY >= rect.top - padding &&
+            e.clientY <= rect.bottom + padding
+          ) {
+            const position = parseInt(dropZone.getAttribute('data-drop-zone') ?? '-1', 10);
+            if (position >= 0) {
+              foundPosition = position;
+              break;
+            }
+          }
+        }
+
+        if (foundPosition !== null) {
+          setDropPosition(foundPosition);
+          setTargetAlgorithmCard(null); // Clear target card in normal mode
+        } else {
+          // Also try elementsFromPoint as fallback
+          const elements = document.elementsFromPoint(e.clientX, e.clientY);
+          for (const el of elements) {
+            const dropZone = el.closest('[data-drop-zone]');
+            if (dropZone) {
+              const position = parseInt(dropZone.getAttribute('data-drop-zone') ?? '-1', 10);
+              if (position >= 0) {
+                setDropPosition(position);
+                setTargetAlgorithmCard(null);
+                return;
+              }
+            }
+          }
+          // Clear drop position if not over any drop zone
+          setDropPosition(null);
+          setTargetAlgorithmCard(null);
+        }
       }
     };
 
@@ -333,7 +507,7 @@ export function BacktestPage() {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [draggedAlgorithm]);
+  }, [draggedAlgorithm, isSideBySideMode]);
 
   // Interactive gradient based on global cursor position
   const headerRef = useRef<HTMLDivElement>(null);
@@ -389,17 +563,29 @@ export function BacktestPage() {
 
   // Check if drop position would actually change the order
   const wouldChangePosition = useMemo(() => {
-    if (!draggedAlgorithm || dropPosition === null) return false;
+    if (!draggedAlgorithm) return false;
     const currentIndex = orderedAlgorithmNames.indexOf(draggedAlgorithm);
     if (currentIndex === -1) return false;
 
-    let targetPosition = dropPosition;
-    if (currentIndex < dropPosition) {
-      targetPosition = dropPosition - 1;
+    if (isSideBySideMode && targetAlgorithmCard) {
+      // In side-by-side mode, check if target is different from dragged
+      return targetAlgorithmCard !== draggedAlgorithm;
+    } else if (dropPosition !== null) {
+      // Normal mode: check if position would change
+      let targetPosition = dropPosition;
+      if (currentIndex < dropPosition) {
+        targetPosition = dropPosition - 1;
+      }
+      return currentIndex !== targetPosition;
     }
-
-    return currentIndex !== targetPosition;
-  }, [draggedAlgorithm, dropPosition, orderedAlgorithmNames]);
+    return false;
+  }, [
+    draggedAlgorithm,
+    dropPosition,
+    targetAlgorithmCard,
+    orderedAlgorithmNames,
+    isSideBySideMode,
+  ]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 pt-4 pb-8 font-sans text-white">
@@ -435,86 +621,86 @@ export function BacktestPage() {
         </h1>
       </div>
 
-      {/* Fixed position toggle button */}
-      <button
-        onClick={handleToggleSideBySide}
-        disabled={isPending}
-        className="fixed bottom-8 right-8 z-50 px-6 py-3 rounded-xl font-medium text-sm cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-1 flex items-center gap-2 shadow-lg border disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{
-          backgroundColor: isSideBySideMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.8)',
-          borderColor: isSideBySideMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)',
-          color: isSideBySideMode ? '#60a5fa' : '#e2e8f0',
-        }}
-        onMouseEnter={(e) => {
-          if (isSideBySideMode) {
-            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
-            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
-          } else {
-            e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.9)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+      {/* Fixed position toggle button - only show when there are 2+ algorithms */}
+      {orderedAlgorithmNames.length > 1 && (
+        <button
+          onClick={handleToggleSideBySide}
+          disabled={isPending}
+          className="fixed bottom-8 right-8 z-50 px-6 py-3 rounded-xl font-medium text-sm cursor-pointer transition-all duration-200 backdrop-blur-[10px] hover:-translate-y-1 flex items-center gap-2 shadow-lg border disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            backgroundColor: isSideBySideMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.8)',
+            borderColor: isSideBySideMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+            color: isSideBySideMode ? '#60a5fa' : '#e2e8f0',
+          }}
+          onMouseEnter={(e) => {
+            if (isSideBySideMode) {
+              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.6)';
+            } else {
+              e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (isSideBySideMode) {
+              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+            } else {
+              e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.8)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            }
+          }}
+          aria-label={
+            isSideBySideMode ? 'Disable side-by-side comparison' : 'Enable side-by-side comparison'
           }
-        }}
-        onMouseLeave={(e) => {
-          if (isSideBySideMode) {
-            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
-          } else {
-            e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.8)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-          }
-        }}
-        aria-label={
-          isSideBySideMode ? 'Disable side-by-side comparison' : 'Enable side-by-side comparison'
-        }
-      >
-        {isSideBySideMode ? (
-          <>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns={SVG_NAMESPACE}>
-              {/* Two columns side by side icon */}
-              {SIDE_BY_SIDE_RECTS.map((rect, idx) => (
-                <rect
-                  key={idx}
-                  x={rect.x}
-                  y={rect.y}
-                  width={rect.width}
-                  height={rect.height}
-                  rx={rect.rx}
+        >
+          {isSideBySideMode ? (
+            <>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns={SVG_NAMESPACE}>
+                {/* Two columns side by side icon */}
+                {SIDE_BY_SIDE_RECTS.map((rect, idx) => (
+                  <rect
+                    key={idx}
+                    x={rect.x}
+                    y={rect.y}
+                    width={rect.width}
+                    height={rect.height}
+                    rx={rect.rx}
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
+                ))}
+              </svg>
+              <span>Side-by-Side: ON</span>
+            </>
+          ) : (
+            <>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns={SVG_NAMESPACE}>
+                <path
+                  d={SINGLE_COLUMN}
                   stroke="currentColor"
-                  strokeWidth="1.5"
-                  fill="none"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
-              ))}
-            </svg>
-            <span>Side-by-Side: ON</span>
-          </>
-        ) : (
-          <>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns={SVG_NAMESPACE}>
-              <path
-                d={SINGLE_COLUMN}
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span>Side-by-Side: OFF</span>
-          </>
-        )}
-      </button>
+              </svg>
+              <span>Side-by-Side: OFF</span>
+            </>
+          )}
+        </button>
+      )}
 
       <div className="max-w-[1400px] mx-auto">
         {/* Conditional grid layout: 2 columns when side-by-side mode is enabled, 1 column otherwise */}
         <div
           className={`grid gap-6 ${isSideBySideMode ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}
         >
-          {/* Drop zone at the beginning (for first position) */}
-          {orderedAlgorithmNames.length > 0 && (
+          {/* Drop zone at the beginning (for first position) - only in normal mode */}
+          {orderedAlgorithmNames.length > 0 && !isSideBySideMode && (
             <div
               data-drop-zone={0}
-              className={`relative z-20 h-[36px] flex items-center justify-center ${
-                isSideBySideMode ? 'col-span-2' : 'col-span-1'
-              }`}
+              className="relative z-20 h-[36px] flex items-center justify-center col-span-1"
               onMouseEnter={() => handleDropZoneHover(0)}
               onMouseUp={handleDragEnd}
               style={{
@@ -584,66 +770,34 @@ export function BacktestPage() {
                   zIndex: draggedAlgorithm === algorithmName ? 1 : 'auto',
                 }}
               >
-                {/* Drop zone before each position - positioned absolutely */}
-                {index > 0 && (
+                {/* Drop zone before each position - positioned absolutely - only in normal mode */}
+                {index > 0 && !isSideBySideMode && (
                   <div
                     data-drop-zone={index}
-                    className={`absolute z-20 flex items-center justify-center ${
-                      isFirstColumn ? 'h-[36px] left-0 right-0' : 'w-[36px] top-0 bottom-0'
-                    }`}
+                    className="absolute z-20 h-[36px] left-0 right-0 flex items-center justify-center"
                     style={{
                       // Center the drop zone in the gap (gap-6 = 24px, 50% increase from 16px)
                       // Gap is 24px between cards, centered at 12px from each edge
                       // If card top is at 0, gap spans from -24px to 0px, center at -12px
                       // For 36px drop zone centered at -12px: top = -12px - 18px = -30px
-                      ...(isFirstColumn
-                        ? {
-                            top: '-30px', // Centers 36px drop zone in 24px gap
-                          }
-                        : {
-                            left: '-30px', // Centers 36px drop zone in 24px gap
-                          }),
+                      top: '-30px', // Centers 36px drop zone in 24px gap
                       pointerEvents: draggedAlgorithm ? 'auto' : 'none',
                       // Ensure drop zones are always visible for hit detection
-                      minWidth: isFirstColumn ? '100%' : '36px',
-                      minHeight: isFirstColumn ? '36px' : '100%',
+                      minWidth: '100%',
+                      minHeight: '36px',
                     }}
                     onMouseEnter={() => handleDropZoneHover(index)}
                     onMouseUp={handleDragEnd}
                   >
                     {draggedAlgorithmInfo && dropPosition === index && wouldChangePosition && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        {isFirstColumn ? (
-                          // Horizontal indicator for between rows (or single column mode)
+                        {isFirstColumn && (
+                          // Horizontal indicator for between rows
                           <div className="w-full px-6">
                             <div
                               className="w-full h-1 relative rounded-full"
                               style={{
                                 background: `linear-gradient(to right, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
-                              }}
-                            >
-                              <svg
-                                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-slate-900 rounded-full p-1.5 shadow-lg"
-                                viewBox="0 0 16 16"
-                                fill="none"
-                                xmlns={SVG_NAMESPACE}
-                              >
-                                <path
-                                  d={PLUS}
-                                  stroke={draggedAlgorithmInfo.colorScheme.primaryColor}
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            </div>
-                          </div>
-                        ) : (
-                          // Vertical indicator for between columns (only in side-by-side mode)
-                          <div className="h-full px-3">
-                            <div
-                              className="h-full w-1 relative rounded-full"
-                              style={{
-                                background: `linear-gradient(to bottom, ${draggedAlgorithmInfo.colorScheme.primaryColor}, ${draggedAlgorithmInfo.colorScheme.primaryColorLight})`,
                               }}
                             >
                               <svg
@@ -667,27 +821,97 @@ export function BacktestPage() {
                   </div>
                 )}
                 {/* Algorithm card - this is the grid item */}
-                <AlgorithmResultCard
-                  algorithmGraph={algorithmGraph}
-                  defaultTicker={defaultTickerByAggregate[aggregate]}
-                  index={originalIndex}
-                  isDragging={draggedAlgorithm === algorithmName}
-                  isSideBySideMode={isSideBySideMode}
-                  onDragEnd={handleDragEnd}
-                  onDragStart={() => handleDragStart(algorithmName)}
-                  tickerPlotByTicker={data.tickerPlotByAggregateByTicker[aggregate]}
-                  timestamps={data.timestampsByAggregate[aggregate]}
-                />
+                <div
+                  data-algorithm-card={algorithmName}
+                  className="relative"
+                  style={{
+                    // Add visual indicators for side-by-side mode
+                    ...(isSideBySideMode &&
+                      targetAlgorithmCard === algorithmName &&
+                      draggedAlgorithm &&
+                      draggedAlgorithm !== algorithmName &&
+                      draggedAlgorithmInfo && {
+                        // Highlight target card
+                        outline: `3px solid ${draggedAlgorithmInfo.colorScheme.primaryColor}40`,
+                        outlineOffset: '4px',
+                        borderRadius: '12px',
+                      }),
+                    // Animation for shifted algorithms - subtle slide effect
+                    ...(shiftedAlgorithms.has(algorithmName) && {
+                      animation: `${
+                        shiftedAlgorithms.get(algorithmName) === 'left' ? 'slideLeft' : 'slideRight'
+                      } 0.5s ease-out`,
+                    }),
+                  }}
+                  onMouseUp={(e) => {
+                    // Only handle drop in side-by-side mode when hovering over target card
+                    if (
+                      isSideBySideMode &&
+                      draggedAlgorithm &&
+                      targetAlgorithmCard === algorithmName &&
+                      draggedAlgorithm !== algorithmName
+                    ) {
+                      e.stopPropagation();
+                      handleDragEnd();
+                    }
+                  }}
+                >
+                  {/* Target card highlight for side-by-side mode */}
+                  {isSideBySideMode &&
+                    targetAlgorithmCard === algorithmName &&
+                    draggedAlgorithm &&
+                    draggedAlgorithm !== algorithmName &&
+                    draggedAlgorithmInfo && (
+                      <div
+                        className="absolute inset-0 z-20 pointer-events-none rounded-xl"
+                        style={{
+                          background: `${draggedAlgorithmInfo.colorScheme.primaryColor}15`,
+                          border: `2px dashed ${draggedAlgorithmInfo.colorScheme.primaryColor}60`,
+                        }}
+                      >
+                        <div
+                          className="absolute top-4 left-4 px-3 py-1.5 rounded-lg backdrop-blur-[10px] text-sm font-medium"
+                          style={{
+                            backgroundColor: `${draggedAlgorithmInfo.colorScheme.primaryColor}30`,
+                            border: `1px solid ${draggedAlgorithmInfo.colorScheme.primaryColor}50`,
+                            color: draggedAlgorithmInfo.colorScheme.primaryColorLight,
+                          }}
+                        >
+                          Will take this position
+                        </div>
+                      </div>
+                    )}
+                  <div
+                    style={{
+                      // In side-by-side mode, allow pointer events on the card wrapper for drop detection
+                      // The card itself will handle its own pointer events
+                      pointerEvents:
+                        isSideBySideMode && draggedAlgorithm && draggedAlgorithm !== algorithmName
+                          ? 'auto'
+                          : 'auto',
+                    }}
+                  >
+                    <AlgorithmResultCard
+                      algorithmGraph={algorithmGraph}
+                      defaultTicker={defaultTickerByAggregate[aggregate]}
+                      index={originalIndex}
+                      isDragging={draggedAlgorithm === algorithmName}
+                      isSideBySideMode={isSideBySideMode}
+                      onDragEnd={handleDragEnd}
+                      onDragStart={() => handleDragStart(algorithmName)}
+                      tickerPlotByTicker={data.tickerPlotByAggregateByTicker[aggregate]}
+                      timestamps={data.timestampsByAggregate[aggregate]}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
-          {/* Drop zone at the end */}
-          {orderedAlgorithmNames.length > 0 && (
+          {/* Drop zone at the end - only in normal mode */}
+          {orderedAlgorithmNames.length > 0 && !isSideBySideMode && (
             <div
               data-drop-zone={orderedAlgorithmNames.length}
-              className={`relative z-20 h-[36px] flex items-center justify-center ${
-                isSideBySideMode ? 'col-span-2' : 'col-span-1'
-              }`}
+              className="relative z-20 h-[36px] flex items-center justify-center col-span-1"
               onMouseEnter={() => handleDropZoneHover(orderedAlgorithmNames.length)}
               onMouseUp={handleDragEnd}
               style={{

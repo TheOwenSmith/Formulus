@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet, redirect } from 'react-router-dom';
 import { AuthenticatedLayout, RootLayout } from './layout';
 import { getSession } from './lib/auth-client';
-import { trpcCredentialsClient } from './lib/trpc';
+import { backtestLoader } from './loaders/backtestLoader';
 import { AboutPage } from './pages/AboutPage';
 import { BacktestPage } from './pages/BacktestPage';
 import { ErrorPage } from './pages/ErrorPage';
@@ -19,15 +19,7 @@ export const router = createBrowserRouter([
           {
             path: '/backtest/:publicId',
             element: <BacktestPage />,
-            loader: async ({ params }) => {
-              const data = await trpcCredentialsClient.backtesting.getBacktestingResults.query({
-                publicId: params['publicId'] ?? '',
-              });
-              if (data == null) {
-                throw new Error('Backtesting results not found');
-              }
-              return { data };
-            },
+            loader: backtestLoader,
             errorElement: (
               <ErrorPage
                 title="Backtesting Results Not Found"

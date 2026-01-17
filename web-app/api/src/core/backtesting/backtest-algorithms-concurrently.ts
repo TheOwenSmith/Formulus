@@ -13,7 +13,6 @@ import { yearsBetween } from '@api/utils/date-utils';
 import { trySync } from '@api/utils/error-handling';
 import { groupBy } from '@api/utils/group-by';
 import { roundToDecimal, withCommas } from '@api/utils/number-utils';
-import { omitObject } from '@api/utils/omit-object';
 import { SharpeRatioCalculator } from '@api/utils/sharpe-ratio-calculator';
 import type { AtLeastOne } from '@api/utils/types';
 import cliProgress, { Presets } from 'cli-progress';
@@ -24,11 +23,7 @@ import {
 } from './iterator-utils';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator } from './read-data';
-import {
-  getAlgorithmGraphWithPerformance,
-  updateGraph,
-  type DescriptionMetrics,
-} from './statistics';
+import { getAlgorithmGraph, updateGraph, type DescriptionMetrics } from './statistics';
 import {
   createIndexByTicker,
   emptyIndexByAggregateByTicker,
@@ -45,8 +40,6 @@ export type TickerData = {
   filename: string;
   index: string;
 }>;
-
-export type WithPerformance<T> = T & { performance: number };
 
 export type AlgorithmData = {
   algorithmYs: number[];
@@ -71,7 +64,6 @@ const BYTES_PROGRESS_UPDATE_INTERVAL = 10_000;
 
 export type BacktestingAlgorithmsConcurrentlyOptions = {
   iteratorStrictParsing?: boolean;
-  performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   slippageByTicker?: Partial<Record<Ticker, number>>;
   tickerData?: TickerData[];
   timespan?: [string | null, string | null];
@@ -107,7 +99,6 @@ export async function backtestAlgorithmsConcurrently({
 }): Promise<BacktestAlgorithmsResult> {
   const {
     iteratorStrictParsing = false,
-    performanceFn,
     slippageByTicker: userInuttedSlippageByTicker,
     tickerData = [],
     verboseLogging = false,
@@ -166,11 +157,11 @@ export async function backtestAlgorithmsConcurrently({
   console.log(`Bytes to process: ${withCommas(bytesToProcess)}`);
 
   // Output variables
-  const algorithmGraphsWithPerformance: WithPerformance<{
+  const algorithmGraphs: {
     aggregate: Timestamp;
     descriptionMetrics: DescriptionMetrics;
     algorithmPlot: SimplePlot;
-  }>[] = [];
+  }[] = [];
   const tickerPlotByAggregateByTicker: Record<
     Timestamp,
     Record<Ticker, SimplePlot>
@@ -490,23 +481,16 @@ export async function backtestAlgorithmsConcurrently({
     // Compile algorithm plots
     const yearsBetweenStartAndEnd = yearsBetween(timespan[1], timespan[0]);
     for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
-      const algorithmGraphWithPerformance = await getAlgorithmGraphWithPerformance({
+      const algorithmGraph = await getAlgorithmGraph({
         aggregate,
         algorithm: currentAlgorithms[algorithmIndex],
         algorithmData: algorithmDataByAlgorithm[algorithmIndex],
-        performanceFn,
         timespan,
         yearsBetweenStartAndEnd,
       });
-      algorithmGraphsWithPerformance.push(algorithmGraphWithPerformance);
+      algorithmGraphs.push(algorithmGraph);
     }
   }
-
-  // Sort algorithms by performance
-  algorithmGraphsWithPerformance.sort((a, b) => b.performance - a.performance);
-  const algorithmGraphs = algorithmGraphsWithPerformance.map((algorithmGraph) =>
-    omitObject(algorithmGraph, ['performance']),
-  );
 
   if (trackProgress) {
     progressBar.update(bytesToProcess);

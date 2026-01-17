@@ -7,7 +7,6 @@ import {
   MAX_POINTS_PER_PLOT,
   type AlgorithmData,
   type SimplePlot,
-  type WithPerformance,
 } from './backtest-algorithms-concurrently';
 
 export function updateGraph<T, P>({
@@ -58,11 +57,10 @@ export type DescriptionMetrics = {
   winRate: number | null;
 };
 
-export async function getAlgorithmGraphWithPerformance({
+export async function getAlgorithmGraph({
   aggregate,
   algorithm,
   algorithmData,
-  performanceFn = (descriptionMetrics: DescriptionMetrics) => descriptionMetrics.growthRate,
   timespan,
   yearsBetweenStartAndEnd,
 }: {
@@ -72,13 +70,11 @@ export async function getAlgorithmGraphWithPerformance({
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   timespan: [string, string];
   yearsBetweenStartAndEnd: number;
-}): Promise<
-  WithPerformance<{
-    aggregate: Timestamp;
-    descriptionMetrics: DescriptionMetrics;
-    algorithmPlot: SimplePlot;
-  }>
-> {
+}): Promise<{
+  aggregate: Timestamp;
+  descriptionMetrics: DescriptionMetrics;
+  algorithmPlot: SimplePlot;
+}> {
   const {
     contextLength,
     name,
@@ -134,11 +130,9 @@ export async function getAlgorithmGraphWithPerformance({
       winsLosses[0] + winsLosses[1] > 0 ? winsLosses[0] / (winsLosses[0] + winsLosses[1]) : null,
   };
 
-  const performance = await performanceFn(descriptionMetrics);
   return {
     aggregate,
     algorithmPlot,
     descriptionMetrics,
-    performance,
   };
 }

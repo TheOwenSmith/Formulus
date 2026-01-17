@@ -24,7 +24,7 @@ export default defineConfig([
       'sort-keys-fix': sortKeysFix,
     },
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2023,
       globals: globals.browser,
       parser: tseslint.parser,
       parserOptions: {
