@@ -28,17 +28,18 @@ export function HeadlineMetrics({
   );
   const tickerGrowthRate = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
 
-  const tickerReturnFormmated =
-    `${withCommasRounded(tickerGrowthRate)}%` +
-    (!isSideBySideMode ? ` (${withCommasRounded(tickerGrowthRate)}% APY)` : '');
+  // Format ticker: in side-by-side mode show only growth rate (APY), otherwise show growth rate with APY label
+  const tickerReturnFormmated = isSideBySideMode
+    ? `${withCommasRounded(tickerGrowthRate)}% APY`
+    : `${withCommasRounded(tickerGrowthRate)}% (${withCommasRounded(tickerGrowthRate)}% APY)`;
 
-  // Format return rate with APY (hide APY in side-by-side mode to prevent wrapping issues)
+  // Format algorithm: in side-by-side mode show only growth rate (APY), otherwise show return with growth rate (APY)
   const algorithmReturn = descriptionMetrics.algorithmReturn * 100;
   const algorithmGrowthRate = descriptionMetrics.growthRate * 100;
 
-  const algorithmReturnFormmated =
-    `${withCommasRounded(algorithmReturn)}%` +
-    (!isSideBySideMode ? ` (${withCommasRounded(algorithmGrowthRate)}% APY)` : '');
+  const algorithmReturnFormmated = isSideBySideMode
+    ? `${withCommasRounded(algorithmGrowthRate)}% APY`
+    : `${withCommasRounded(algorithmReturn)}% (${withCommasRounded(algorithmGrowthRate)}% APY)`;
 
   // Format Sharpe ratio
   const algorithmSharpeRatio = descriptionMetrics.sharpeRatio;
@@ -88,10 +89,10 @@ export function HeadlineMetrics({
           }}
         />
         <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2 text-center">
-          Algorithm Growth Rate
+          {isSideBySideMode ? 'Algorithm Growth Rate' : 'Algorithm Return'}
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getAlgorithmColor()} text-center`}>
-          {algorithmGrowthRate >= 0 ? '+' : ''}
+          {(isSideBySideMode ? algorithmGrowthRate : algorithmReturn) >= 0 ? '+' : ''}
           {algorithmReturnFormmated}
         </div>
       </div>
@@ -105,7 +106,7 @@ export function HeadlineMetrics({
           }}
         />
         <div className="text-xs text-white/60 uppercase tracking-wider font-medium mb-2 text-center">
-          {selectedTickerPlot.name} Growth Rate
+          {selectedTickerPlot.name} {isSideBySideMode ? 'Growth Rate' : 'Return'}
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getTickerColor()} text-center`}>
           {tickerGrowthRate >= 0 ? '+' : ''}
