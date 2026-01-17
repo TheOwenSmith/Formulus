@@ -76,9 +76,10 @@ import z from 'zod';
 
 const algorithms: Algorithm[] = [];
 const tickers: [Ticker, ...Ticker[]] = ['SPY', 'SH', 'AAPL', 'GOOG', 'PFE', 'TSLA'];
-const ONLY_TEST_MARKET_INVARIANT_ALGORITHMS = true;
+const TEST_MARKET_INVARIANT_ALGORITHMS = true;
+const TEST_NON_MARKET_INVARIANT_ALGORITHMS = true;
 
-if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
+if (TEST_MARKET_INVARIANT_ALGORITHMS) {
   // Load context maps
   console.log('Loading context maps...');
   const contextLengths: number[] = [3, 5, 7, 9];
@@ -149,7 +150,7 @@ if (!ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
   }
 }
 
-if (ONLY_TEST_MARKET_INVARIANT_ALGORITHMS) {
+if (TEST_NON_MARKET_INVARIANT_ALGORITHMS) {
   for (const aggregate of ['60min'] as const) {
     // Populate algorithms with if green algorithm
     algorithms.push(
@@ -190,11 +191,15 @@ console.log('Backtesting algorithms...');
 const backtestResponse = await tryAsync(() =>
   backtestAlgorithmsConcurrently({
     algorithms,
-    timespan: ONLY_TEST_MARKET_INVARIANT_ALGORITHMS ? undefined : ['2019-01-01', null],
+    timespan: TEST_MARKET_INVARIANT_ALGORITHMS ? undefined : ['2019-01-01', null],
   }),
 );
 if (!backtestResponse.ok) {
   throw backtestResponse.error;
+}
+
+for (const algorithm of algorithms) {
+  algorithm.name += Date.now().toString();
 }
 
 console.log('Uploading algorithms...');

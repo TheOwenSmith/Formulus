@@ -8,12 +8,12 @@ export function Header() {
         className="max-w-[1400px] mx-auto px-8 flex items-center justify-between"
         style={{ paddingTop: '0.9rem', paddingBottom: '0.9rem' }}
       >
-        <Link to="/backtest" className="no-underline transition-all duration-300 flex items-center">
+        <Link to="/about" className="no-underline transition-all duration-300 flex items-center">
           <img src={logoWide} alt="PhoenixTrader" className="h-12 w-auto" />
         </Link>
         <div className="flex items-center gap-2">
           <NavLink
-            to="/backtest/UpuU1vUZnC5W"
+            to="/backtest/v705KCtzlDbM"
             className={({ isActive }) =>
               `text-base font-medium px-6 py-3 rounded-lg transition-all duration-300 relative no-underline tracking-[0.01em] border ${
                 isActive
