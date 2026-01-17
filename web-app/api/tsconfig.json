@@ -7,13 +7,14 @@
     "module": "Preserve",
     "moduleDetection": "force",
     "allowJs": true,
-    "types": ["bun"],
 
     // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
 
     // Best practices
     "strict": true,
@@ -30,5 +31,5 @@
     "rootDir": "./src",
     "outDir": "./dist",
   },
-  "exclude": ["node_modules", "*.config.ts", "*.config.mjs", "build.ts"]
+  "exclude": ["node_modules", "*.config.ts", "*.config.mjs"]
 }
