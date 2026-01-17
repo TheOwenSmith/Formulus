@@ -4,6 +4,7 @@ import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
 import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/types';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useLoaderData } from 'react-router-dom';
 
 // Color schemes for drag preview and drop indicators (matching AlgorithmResultCard)
 const colorSchemes = [
@@ -105,7 +106,9 @@ function DragPreview({ algorithmName, colorIndex }: DragPreviewProps) {
   );
 }
 
-export function BacktestPage({ data }: { data: BacktestAlgorithmsResult }) {
+export function BacktestPage() {
+  const { data } = useLoaderData<{ data: BacktestAlgorithmsResult }>();
+
   // Get default ticker by aggregate
   const defaultTickerByAggregate = useMemo<Record<Timestamp, Ticker>>(() => {
     const result = {} as Record<Timestamp, Ticker>;

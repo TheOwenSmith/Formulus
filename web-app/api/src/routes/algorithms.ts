@@ -7,7 +7,7 @@ export function algorithmsRouter(
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
 ) {
   return router({
-    'create-algorithm': authProcedure.input(userAlgorithmSchema).mutation(async ({ ctx }) => {
+    createAlgorithm: authProcedure.input(userAlgorithmSchema).mutation(async ({ ctx }) => {
       const { user } = ctx;
       return { user };
     }),

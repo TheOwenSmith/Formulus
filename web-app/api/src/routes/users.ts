@@ -10,6 +10,75 @@ export function usersRouter(
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
 ) {
   return router({
+    deleteAccount: authProcedure.mutation(async ({ ctx }) => {
+      // Delete user (cascade will delete sessions, accounts, etc.)
+      const deleteUserResponse = await tryAsync(() =>
+        prisma.user.delete({
+          where: { id: ctx.user.id },
+        }),
+      );
+      if (!deleteUserResponse.ok) {
+        console.error(`[${ctx.req.path}]`, deleteUserResponse.error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'An unexpected error occurred while deleting the user',
+        });
+      }
+      return { success: true };
+    }),
+    getCurrentUser: authProcedure.query(async ({ ctx }) => {
+      const getUserResponse = await tryAsync(() =>
+        prisma.user.findUnique({
+          where: { id: ctx.user.id },
+        }),
+      );
+      if (!getUserResponse.ok) {
+        console.error(`[${ctx.req.path}]`, getUserResponse.error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'An unexpected error occurred while retrieving the current user',
+        });
+      }
+      const user = getUserResponse.data;
+
+      if (user == null) {
+        throw new TRPCError({
+          code: 'BAD_GATEWAY',
+          message: 'The current user could does not exist',
+        });
+      }
+      return { user };
+    }),
+    getProfileStats: authProcedure.query(async ({ ctx }) => {
+      const getProfileStatsResponse = await tryAsync(() =>
+        prisma.$transaction([
+          prisma.algorithm.count({
+            where: { creatorId: ctx.user.id },
+          }),
+          prisma.backtestingResults.count({
+            where: { creatorId: ctx.user.id },
+          }),
+          prisma.backtestingShare.count({
+            where: { userId: ctx.user.id },
+          }),
+        ]),
+      );
+      if (!getProfileStatsResponse.ok) {
+        console.error(`[${ctx.req.path}]`, getProfileStatsResponse.error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'An unexpected error occurred while retrieving profile statistics',
+        });
+      }
+      const [numberOfAlgorithms, numberOfBacktestingResults, numberOfBacktestingShares] =
+        getProfileStatsResponse.data;
+
+      return {
+        numberOfAlgorithms,
+        numberOfBacktestingResults,
+        numberOfBacktestingShares,
+      };
+    }),
     updateProfile: authProcedure
       .input(
         z.object({
@@ -44,44 +113,5 @@ export function usersRouter(
         const updatedUser = updateUserResponse.data;
         return { updatedUser };
       }),
-    getCurrentUser: authProcedure.query(async ({ ctx }) => {
-      const getUserResponse = await tryAsync(() =>
-        prisma.user.findUnique({
-          where: { id: ctx.user.id },
-        }),
-      );
-      if (!getUserResponse.ok) {
-        console.error(`[${ctx.req.path}]`, getUserResponse.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'An unexpected error occurred while retrieving the current user',
-        });
-      }
-      const user = getUserResponse.data;
-
-      if (user == null) {
-        throw new TRPCError({
-          code: 'BAD_GATEWAY',
-          message: 'The current user could does not exist',
-        });
-      }
-      return { user };
-    }),
-    deleteAccount: authProcedure.mutation(async ({ ctx }) => {
-      // Delete user (cascade will delete sessions, accounts, etc.)
-      const deleteUserResponse = await tryAsync(() =>
-        prisma.user.delete({
-          where: { id: ctx.user.id },
-        }),
-      );
-      if (!deleteUserResponse.ok) {
-        console.error(`[${ctx.req.path}]`, deleteUserResponse.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'An unexpected error occurred while deleting the user',
-        });
-      }
-      return { success: true };
-    }),
   });
 }

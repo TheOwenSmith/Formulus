@@ -13,7 +13,7 @@ export function Header() {
         </Link>
         <div className="flex items-center gap-2">
           <NavLink
-            to="/backtest"
+            to="/backtest/UpuU1vUZnC5W"
             className={({ isActive }) =>
               `text-base font-medium px-6 py-3 rounded-lg transition-all duration-300 relative no-underline tracking-[0.01em] border ${
                 isActive

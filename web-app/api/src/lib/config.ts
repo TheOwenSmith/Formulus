@@ -11,6 +11,7 @@ const envVars = [
   'BETTER_AUTH_SECRET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
+  'CREATOR_ID',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 

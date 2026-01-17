@@ -19,8 +19,11 @@ import { overboughtOversoldAlgorithm } from '@api/core/algorithms/examples/overb
 import { regressionLineAlgorithm } from '@api/core/algorithms/examples/regression-line';
 import { superTrendDirectionAlgorithm } from '@api/core/algorithms/examples/super-trend-direction';
 import { createAlgorithmFromSimpleMarketInvariantAlgorithm } from '@api/core/algorithms/simple-algorithm';
+import { uploadAlgorithm } from '@api/core/algorithms/upload-algorithm';
 import { backtestAlgorithmsConcurrently } from '@api/core/backtesting/backtest-algorithms-concurrently';
+import { uploadBacktestingResults } from '@api/core/backtesting/upload-backtesting-results';
 import { type Ticker } from '@api/fetch/types';
+import { config } from '@api/lib/config';
 import { tryAsync, trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import path from 'path';
@@ -194,8 +197,28 @@ if (!backtestResponse.ok) {
   throw backtestResponse.error;
 }
 
+console.log('Uploading algorithms...');
+const dbAlgorithmIds: string[] = [];
+for (const algorithm of algorithms) {
+  const uploadAlgorithmResponse = await tryAsync(() =>
+    uploadAlgorithm({
+      algorithm,
+      creatorId: config.getKey('CREATOR_ID'),
+      userAlgorithmImplementationCode: 'console.log("Hello, world!");',
+    }),
+  );
+  if (!uploadAlgorithmResponse.ok) throw uploadAlgorithmResponse.error;
+  const dbAlgorithm = uploadAlgorithmResponse.data;
+  dbAlgorithmIds.push(dbAlgorithm.id);
+}
+
+console.log('Uploading backtesting results...');
 const backtestingResults = backtestResponse.data;
-const writeResultsFileResponse = trySync(() =>
-  fs.writeFileSync('./data/mock-data.json', JSON.stringify(backtestingResults, null, 2)),
+const uploadBacktestingResultsResponse = await tryAsync(() =>
+  uploadBacktestingResults({
+    creatorId: config.getKey('CREATOR_ID'),
+    algorithmsIds: dbAlgorithmIds,
+    result: backtestingResults,
+  }),
 );
-if (!writeResultsFileResponse.ok) throw writeResultsFileResponse.error;
+if (!uploadBacktestingResultsResponse.ok) throw uploadBacktestingResultsResponse.error;

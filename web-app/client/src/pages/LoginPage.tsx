@@ -120,7 +120,7 @@ export function LoginPage() {
       setIsGoogleLoading(true);
       await signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/about`,
+        callbackURL: `${window.location.origin}/profile`,
       });
       // Mark that user has an account and is authenticated after successful Google sign-in
       setHasAccount(true);

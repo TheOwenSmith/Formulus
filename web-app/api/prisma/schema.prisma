@@ -88,11 +88,11 @@ model Verification {
 }
 
 enum Timestamp {
-  min1 @map("1min")
-  min5 @map("5min")
-  min15 @map("15min")
-  min30 @map("30min")
-  min60 @map("60min")
+  min1
+  min5
+  min15
+  min30
+  min60
 }
 
 model Algorithm {
@@ -123,6 +123,10 @@ model BacktestingResults {
   publicId String @unique @db.VarChar(12)
   createdAt DateTime @default(now())
 
+  algorithmGraphs AlgorithmGraph[] @relation("BacktestingResultsAlgorithmGraph")
+  tickerPlots TickerPlot[] @relation("BacktestingResultsTickerPlot")
+  timestampsByAggregate Json @db.Json
+
   algorithms Algorithm[] @relation("AlgorithmBacktestingResults")
 
   creator User @relation("UserBacktestingResults", fields: [creatorId], references: [id], onDelete: Cascade)
@@ -133,6 +137,64 @@ model BacktestingResults {
   @@index([creatorId])
   @@index([publicId])
   @@map("backtesting_results")
+}
+
+model AlgorithmGraph {
+  id String @id @default(cuid())
+
+  aggregate Timestamp
+  descriptionMetrics DescriptionMetrics @relation("AlgorithmGraphDescriptionMetrics", fields: [descriptionMetricsId], references: [id], onDelete: Cascade)
+  descriptionMetricsId String @unique
+
+  name String @db.VarChar(64)
+  plotYs Float[]
+
+  backtestingResults BacktestingResults @relation("BacktestingResultsAlgorithmGraph", fields: [backtestingResultsId], references: [id], onDelete: Cascade)
+  backtestingResultsId String
+
+  @@index([backtestingResultsId])
+  @@map("algorithm_graph")
+}
+
+model TickerPlot {
+  id String @id @default(cuid())
+
+  aggregate Timestamp
+  ticker String @db.VarChar(5)
+  
+  name String @db.VarChar(64)
+  plotYs Float[]
+
+  backtestingResults BacktestingResults @relation("BacktestingResultsTickerPlot", fields: [backtestingResultsId], references: [id], onDelete: Cascade)
+  backtestingResultsId String
+
+  @@index([backtestingResultsId])
+  @@map("ticker_plot")
+}
+
+model DescriptionMetrics {
+  id String @id @default(cuid())
+
+  aggregate Timestamp
+  algorithmReturn Float
+  averageHoldingDuration Float?
+  contextLength Int
+  expectancyPerTrade Float?
+  growthRate Float
+  maxHoldingPorportion Float
+  positionsClosed Int
+  profitLossRatio Json
+  sharpeRatio Float?
+  tickers String[]
+  timespanStart String
+  timespanEnd String
+  tradesMade Int
+  volatility Float?
+  winRate Float?
+
+  algorithmGraph AlgorithmGraph? @relation("AlgorithmGraphDescriptionMetrics")
+
+  @@map("description_metrics")
 }
 
 model BacktestingShare {

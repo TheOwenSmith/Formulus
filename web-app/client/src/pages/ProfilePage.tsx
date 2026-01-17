@@ -1,5 +1,5 @@
 import { LoadingScreen } from '@client/components/LoadingScreen';
-import { CAMERA_PATHS } from '@client/icons/index';
+import { CAMERA_PATHS, CHART_BAR, SHARE } from '@client/icons/index';
 import { signOut } from '@client/lib/auth-client';
 import { trpcCredentials } from '@client/lib/trpc';
 import { useUserStore } from '@client/stores/user-store';
@@ -15,6 +15,10 @@ export function ProfilePage() {
 
   const { data: getUserApiResponse, isPending: userIsPending } = useQuery(
     trpcCredentials.users.getCurrentUser.queryOptions(),
+  );
+
+  const { data: profileStats, isPending: statsIsPending } = useQuery(
+    trpcCredentials.users.getProfileStats.queryOptions(),
   );
 
   const [isEditingName, setIsEditingName] = useState(false);
@@ -168,21 +172,9 @@ export function ProfilePage() {
   const { user } = getUserApiResponse;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 pt-4 pb-8 font-sans text-white">
+    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 pt-4 pb-8 font-sans text-white">
       <div className="max-w-[1000px] mx-auto">
-        <div className="text-center mb-8 animate-[fadeInDown_0.8s_ease-out]">
-          <h1
-            className="text-4xl font-bold m-0 bg-clip-text text-transparent tracking-tight leading-normal pb-1"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, rgb(34, 211, 238), rgb(59, 130, 246), rgb(168, 85, 247))',
-            }}
-          >
-            Profile
-          </h1>
-        </div>
-
-        <div className="space-y-6 animate-[fadeInUp_0.8s_ease-out_0.2s_both]">
+        <div className="space-y-6 animate-[fadeInUp_0.8s_ease-out]">
           {/* Profile Header Card */}
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-6">
@@ -422,6 +414,111 @@ export function ProfilePage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Usage Statistics Card */}
+          <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
+            <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+              Usage Statistics
+            </h2>
+            {statsIsPending ? (
+              <div className="flex items-center justify-center py-8">
+                <svg
+                  className="animate-spin h-8 w-8 text-blue-500"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
+                      <svg
+                        className="w-5 h-5 text-blue-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d={CHART_BAR}
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-white/60 text-sm font-medium">Algorithms</h3>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                    {profileStats?.numberOfAlgorithms ?? 0}
+                  </p>
+                </div>
+
+                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
+                      <svg
+                        className="w-5 h-5 text-purple-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d={CHART_BAR}
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-white/60 text-sm font-medium">Backtests</h3>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    {profileStats?.numberOfBacktestingResults ?? 0}
+                  </p>
+                </div>
+
+                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center">
+                      <svg
+                        className="w-5 h-5 text-emerald-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d={SHARE}
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-white/60 text-sm font-medium">Shared with Me</h3>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                    {profileStats?.numberOfBacktestingShares ?? 0}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Account Actions Card */}
