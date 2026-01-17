@@ -26,18 +26,19 @@ export function HeadlineMetrics({
     descriptionMetrics.timespan[1],
     descriptionMetrics.timespan[0],
   );
+  const tickerReturn = balance - 100;
   const tickerGrowthRate = (Math.pow(balance / 100, 1 / yearsBetweenStartAndEnd) - 1) * 100;
 
   // Format ticker: in side-by-side mode show only growth rate (APY), otherwise show growth rate with APY label
-  const tickerReturnFormmated = isSideBySideMode
+  const tickerPerformanceFormatted = isSideBySideMode
     ? `${withCommasRounded(tickerGrowthRate)}% APY`
-    : `${withCommasRounded(tickerGrowthRate)}% (${withCommasRounded(tickerGrowthRate)}% APY)`;
+    : `${withCommasRounded(tickerReturn)}% (${withCommasRounded(tickerGrowthRate)}% APY)`;
 
   // Format algorithm: in side-by-side mode show only growth rate (APY), otherwise show return with growth rate (APY)
   const algorithmReturn = descriptionMetrics.algorithmReturn * 100;
   const algorithmGrowthRate = descriptionMetrics.growthRate * 100;
 
-  const algorithmReturnFormmated = isSideBySideMode
+  const algorithmPerformanceFormatted = isSideBySideMode
     ? `${withCommasRounded(algorithmGrowthRate)}% APY`
     : `${withCommasRounded(algorithmReturn)}% (${withCommasRounded(algorithmGrowthRate)}% APY)`;
 
@@ -93,7 +94,7 @@ export function HeadlineMetrics({
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getAlgorithmColor()} text-center`}>
           {(isSideBySideMode ? algorithmGrowthRate : algorithmReturn) >= 0 ? '+' : ''}
-          {algorithmReturnFormmated}
+          {algorithmPerformanceFormatted}
         </div>
       </div>
 
@@ -110,7 +111,7 @@ export function HeadlineMetrics({
         </div>
         <div className={`text-2xl font-bold tracking-tight ${getTickerColor()} text-center`}>
           {tickerGrowthRate >= 0 ? '+' : ''}
-          {tickerReturnFormmated}
+          {tickerPerformanceFormatted}
         </div>
       </div>
 
