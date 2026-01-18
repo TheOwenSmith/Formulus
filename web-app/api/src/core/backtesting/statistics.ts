@@ -2,12 +2,11 @@ import {
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   type Algorithm,
 } from '@api/core/algorithms/algorithm';
+import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import type { Ticker, Timestamp } from '@api/fetch/types';
-import {
-  MAX_POINTS_PER_PLOT,
-  type AlgorithmData,
-  type SimplePlot,
-} from './backtest-algorithms-concurrently';
+import { type AlgorithmData, type SimplePlot } from './backtest-algorithms-concurrently';
+import { MAX_POINTS_PER_PLOT } from './constants';
+import { getTickers } from './ticker-utils';
 
 export function updateGraph<T, P>({
   graphIndex,
@@ -65,7 +64,7 @@ export async function getAlgorithmGraph({
   yearsBetweenStartAndEnd,
 }: {
   aggregate: Timestamp;
-  algorithm: Algorithm;
+  algorithm: Algorithm | AnyUserAlgorithmType;
   algorithmData: AlgorithmData;
   performanceFn?: (descriptionMetrics: DescriptionMetrics) => number | Promise<number>;
   timespan: [string, string];
@@ -78,9 +77,10 @@ export async function getAlgorithmGraph({
   const {
     contextLength,
     name,
-    tickers,
     algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
   } = algorithm;
+  const tickers = getTickers(algorithm);
+
   const {
     balance,
     trades,

@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -19,6 +20,7 @@ declare module './indicator' {
     [x: `SMA(${number})`]: (number | null)[];
   }
 }
+export const smaIndicatorResultStringified = '[x: `SMA(${number})`]: (number | null)[];';
 
 export function computeSMA({
   bars,
@@ -30,10 +32,13 @@ export function computeSMA({
   metadata: IndicatorMetadata;
 }): (number | null)[] {
   if (period < 1) {
-    throw new Error('Period must be at least 1 to compute SMA');
+    throw new ErrorWithCode('Period must be at least 1 to compute SMA', 'BAD_REQUEST');
   }
   if (bars.length < period) {
-    throw new Error(`Must have context length of at least ${period} to compute SMA(${period})`);
+    throw new ErrorWithCode(
+      `Must have context length of at least ${period} to compute SMA(${period})`,
+      'BAD_REQUEST',
+    );
   }
 
   const timestamp = bars.at(-1)![0];

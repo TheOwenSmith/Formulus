@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -20,9 +21,11 @@ declare module './indicator-metadata' {
 
 declare module './indicator' {
   export interface IndicatorResultByIndicator {
-    [x: `LinearRegression(${number})`]: (i: number) => number;
+    [x: `LinearRegression(${number})`]: { slope: number; intercept: number };
   }
 }
+export const linearRegressionIndicatorResultStringified =
+  '[x: `LinearRegression(${number})`]: { slope: number; intercept: number };';
 
 export function computeLinearRegression({
   bars,
@@ -32,13 +35,16 @@ export function computeLinearRegression({
   bars: Bar[];
   period: number;
   metadata: IndicatorMetadata;
-}): (i: number) => number {
+}): { slope: number; intercept: number } {
   if (period < 2) {
-    throw new Error('Period must be at least 2 to compute LinearRegression');
+    throw new ErrorWithCode('Period must be at least 2 to compute LinearRegression', 'BAD_REQUEST');
   }
   const b = bars.length;
   if (b < period) {
-    throw new Error(`Must have at least ${period} bars to compute LinearRegression(${period})`);
+    throw new ErrorWithCode(
+      `Must have at least ${period} bars to compute LinearRegression(${period})`,
+      'BAD_REQUEST',
+    );
   }
 
   // Use the correct object for metadata
@@ -79,18 +85,17 @@ export function computeLinearRegression({
     };
 
     // Shift the regression line by (b - period) to the left
-    return (i: number) => slope * i + intercept;
+    return { slope, intercept };
   } else {
-    const { sumX, denominator, sumYWithoutLast, prevSumXY } = linearRegressionMetadata;
-    const lastUpdateTimestamp = linearRegressionMetadata.timestamp;
-
     // If the timestamp is the same as the last update, return cached result
+    const lastUpdateTimestamp = linearRegressionMetadata.timestamp;
     if (timestamp === lastUpdateTimestamp) {
       const { slope, intercept } = linearRegressionMetadata;
-      return (x: number) => slope * x + intercept;
+      return { slope, intercept };
     }
 
     // Compute constants
+    const { sumX, denominator, sumYWithoutLast, prevSumXY } = linearRegressionMetadata;
     const y_p1 = bars.at(-1)![4];
     const sumY = sumYWithoutLast + y_p1;
     // prevSumXY = \sum_{x=0}^{p-1} x*y_{x-1}
@@ -115,6 +120,6 @@ export function computeLinearRegression({
     linearRegressionMetadata.sumYWithoutLast = sumY - bars[b - period][4];
     linearRegressionMetadata.timestamp = timestamp;
 
-    return (x: number) => slope * x + intercept;
+    return { slope, intercept };
   }
 }

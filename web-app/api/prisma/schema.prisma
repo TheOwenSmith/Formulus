@@ -95,18 +95,32 @@ enum Timestamp {
   min60
 }
 
+enum AlgorithmType {
+  NORMAL
+  SIMPLE
+  TOP_K
+}
+
+enum SupportedLanguage {
+  javascript
+  python
+}
+
 model Algorithm {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  type AlgorithmType
   aggregate Timestamp
   algorithmMaxHoldingProportion Float?
   contextLength Int
   indicators String[]
   name String @db.VarChar(64)
   tickers String[]
-  userAlgorithmImplementationCode String @db.Text
+  userAlgorithmImplementationCode String
+  k Int?
+  language SupportedLanguage
 
   creator User @relation("UserAlgorithms", fields: [creatorId], references: [id], onDelete: Cascade)
   creatorId String

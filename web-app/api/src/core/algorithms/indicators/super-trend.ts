@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import { computeATR } from './atr';
 import type { IndicatorMetadata } from './indicator-metadata';
 
@@ -22,10 +23,16 @@ declare module './indicator' {
     } | null)[];
   }
 }
+export const superTrendIndicatorResultStringified = `
+[x: \`SuperTrend(\${number},\${number})\`]: ({
+  superTrendValue: number;
+  direction: Direction;
+} | null)[];
+`;
 
 export const enum Direction {
-  UP,
-  DOWN,
+  UP = 0,
+  DOWN = 1,
 }
 
 export function computeSuperTrend({
@@ -40,11 +47,12 @@ export function computeSuperTrend({
   metadata: IndicatorMetadata;
 }): ({ superTrendValue: number; direction: Direction } | null)[] {
   if (period < 1) {
-    throw new Error('Period must be at least 1 to compute SuperTrend');
+    throw new ErrorWithCode('Period must be at least 1 to compute SuperTrend', 'BAD_REQUEST');
   }
   if (bars.length < period + 1) {
-    throw new Error(
+    throw new ErrorWithCode(
       `Must have context length of at least ${period + 1} to compute SuperTrend(${period},${multiplier})`,
+      'BAD_REQUEST',
     );
   }
 

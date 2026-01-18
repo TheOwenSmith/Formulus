@@ -1,5 +1,5 @@
 import { getAggregateDataIterator } from '@api/core/backtesting/read-data';
-import { trySync } from '@api/utils/error-handling';
+import { ErrorWithCode, trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import type { Ticker } from './types';
 
@@ -80,8 +80,9 @@ function estimateOneWaySlippageBpsFrom1mCloses(closes1m: number[]): number | nul
 export async function estimateSlippageBps(ticker: Ticker): Promise<number | null> {
   const filename = `./data/cleaned/${ticker}_1min.csv`;
   if (!fs.existsSync(filename)) {
-    throw new Error(
+    throw new ErrorWithCode(
       `Could not estimate slippage for '${ticker}' because minute data file '${filename}' does not exist`,
+      'INTERNAL_SERVER_ERROR',
     );
   }
 

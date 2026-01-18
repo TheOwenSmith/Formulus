@@ -1,7 +1,7 @@
 import { DATE_LENGTH, LINE_LENGTH } from '@api/fetch/create-search-index';
 import { aggregateTimestamps, type Ticker } from '@api/fetch/types';
 import { toValidTimespan } from '@api/utils/date-utils';
-import { trySync } from '@api/utils/error-handling';
+import { ErrorWithCode, trySync } from '@api/utils/error-handling';
 import fsp from 'fs/promises';
 import { getAggregateDataIterator, type AggregateDataIterator } from './read-data';
 import { emptyIndexByAggregateByTicker, type IndexedByAggregateByTicker } from './ticker-utils';
@@ -155,12 +155,14 @@ export async function getIteratorBounds(
       if (timespan == null) {
         timespan = [startDay, endDay];
       } else if (startDay !== timespan[0]) {
-        throw new Error(
+        throw new ErrorWithCode(
           `Failed to match iterator '${ticker}' (${aggregate}) to the start day; expected '${startDay}' but got '${timespan[0]}'`,
+          'INTERNAL_SERVER_ERROR',
         );
       } else if (endDay !== timespan[1]) {
-        throw new Error(
+        throw new ErrorWithCode(
           `Failed to match iterator '${ticker}' (${aggregate}) to the end day; expected '${endDay}' but got '${timespan[1]}'`,
+          'INTERNAL_SERVER_ERROR',
         );
       }
 

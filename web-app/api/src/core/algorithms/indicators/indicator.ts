@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import z from 'zod';
 import { computeATR } from './atr';
 import { computeEMA } from './ema';
@@ -22,16 +23,12 @@ const regexByIndicator = {
   superTrend: /^SuperTrend\((\d*),(\d*)\)$/,
 } satisfies Record<string, RegExp>;
 
-export const indicatorSchema = z.string().superRefine((indicator, ctx) => {
-  if (Object.values(regexByIndicator).every((regex) => !regex.test(indicator))) {
-    // if is not a valid indicator
-    ctx.addIssue({
-      code: 'custom',
-      input: indicator,
-      message: `Invalid indicator name '${indicator}'`,
-    });
-  }
-});
+function isIndicator(inp: string): inp is Indicator {
+  return Object.values(regexByIndicator).some((regex) => regex.test(inp));
+}
+export const indicatorSchema = z
+  .string()
+  .refine(isIndicator, { message: 'Invalid indicator name' });
 
 export function indicatorsToIndicatorResultsFunction(
   indicators: Indicator[],
@@ -117,7 +114,7 @@ export function indicatorsToIndicatorResultsFunction(
         });
       continue;
     }
-    throw new Error(`Unknown indicator: '${indicator}'`);
+    throw new ErrorWithCode(`Unknown indicator: '${indicator}'`, 'BAD_REQUEST');
   }
 
   return (bars: Bar[], metadata: IndicatorMetadata) => {

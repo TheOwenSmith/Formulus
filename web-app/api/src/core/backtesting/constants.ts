@@ -1,0 +1,2 @@
+export const MAX_POINTS_PER_PLOT = 1_000;
+export const BYTES_PROGRESS_UPDATE_INTERVAL = 10_000;

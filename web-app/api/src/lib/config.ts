@@ -1,3 +1,4 @@
+import { ErrorWithCode } from '@api/utils/error-handling';
 import { config as dotenvConfig } from 'dotenv';
 import { validateEnvVars } from './validate-env-vars';
 dotenvConfig();
@@ -32,7 +33,10 @@ class Config {
   get port(): number {
     const port = parseInt(this.getKey('PORT'));
     if (isNaN(port)) {
-      throw new Error(`Environment variable PORT '${this.getKey('PORT')}' is not a number`);
+      throw new ErrorWithCode(
+        `Environment variable PORT '${this.getKey('PORT')}' is not a number`,
+        'INTERNAL_SERVER_ERROR',
+      );
     }
     return port;
   }

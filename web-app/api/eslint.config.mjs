@@ -26,6 +26,16 @@ export default defineConfig([
       import: importPlugin,
       'sort-keys-fix': sortKeysFix,
     },
+    settings: {
+      'import/parsers': {
+        '@typescript-eslint/parser': ['.ts', '.tsx'],
+      },
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.json',
+        },
+      },
+    },
     languageOptions: {
       ecmaVersion: 2024,
       parser: tseslint.parser,
@@ -66,6 +76,13 @@ export default defineConfig([
               message: 'Use @api/path/to/file instead of ../path/to/file',
             },
           ],
+        },
+      ],
+      'import/no-cycle': [
+        'error',
+        {
+          maxDepth: Infinity,
+          ignoreExternal: true,
         },
       ],
 

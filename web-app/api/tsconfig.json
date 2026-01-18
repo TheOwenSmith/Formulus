@@ -31,5 +31,5 @@
     "rootDir": "./src",
     "outDir": "./dist",
   },
-  "exclude": ["node_modules", "*.config.ts", "*.config.mjs"]
+  "exclude": ["node_modules", "dist", "generated", "*.config.ts", "*.config.mjs"]
 }

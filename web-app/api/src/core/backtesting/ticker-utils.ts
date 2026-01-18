@@ -1,6 +1,7 @@
 import { type Algorithm } from '@api/core/algorithms/algorithm';
-import { aggregateTimestamps, type Ticker, type Timestamp } from '@api/fetch/types';
-import { trySync } from '@api/utils/error-handling';
+import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
+import { aggregateTimestamps, tickerSchema, type Ticker, type Timestamp } from '@api/fetch/types';
+import { ErrorWithCode, trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import z from 'zod';
 import type { TickerData } from './backtest-algorithms-concurrently';
@@ -28,20 +29,23 @@ export function createIndexByTicker<T>(
 }
 
 export function getDistinctTickersByAggregate(
-  algorithmsByAggregate: Record<Timestamp, Algorithm[]>,
+  algorithmsByIndexByAggregate: Record<Timestamp, Map<number, Algorithm | AnyUserAlgorithmType>>,
 ): Record<Timestamp, Ticker[]> {
   return aggregateTimestamps.reduce(
     (acc, aggregate) => {
-      const distinctTickersSet = algorithmsByAggregate[aggregate].reduce((acc, algorithm) => {
-        algorithm.tickers.forEach((ticker) => acc.add(ticker));
-        return acc;
-      }, new Set<Ticker>());
-
+      const distinctTickersSet = new Set<Ticker>();
+      for (const algorithm of algorithmsByIndexByAggregate[aggregate].values()) {
+        getTickers(algorithm).forEach((ticker) => distinctTickersSet.add(ticker));
+      }
       acc[aggregate] = Array.from(distinctTickersSet);
       return acc;
     },
     {} as Record<Timestamp, Ticker[]>,
   );
+}
+
+export function getTickers(algorithm: Algorithm | AnyUserAlgorithmType): Ticker[] {
+  return 'tickers' in algorithm ? algorithm.tickers : [algorithm.ticker];
 }
 
 export function getAllTickers(distinctTickersByAggregate: Record<Timestamp, Ticker[]>): Ticker[] {
@@ -68,7 +72,10 @@ export function getFilenameAndIndexByAggregateByTicker(
   for (const tickData of tickerData) {
     const { ticker, aggregate, filename, index } = tickData;
     if (ticker in userInputtedDataByAggregateByTicker[aggregate]) {
-      throw new Error(`Duplicate data for '${ticker}' (${aggregate}) provided`);
+      throw new ErrorWithCode(
+        `Duplicate data for '${ticker}' (${aggregate}) provided`,
+        'BAD_REQUEST',
+      );
     }
 
     // Resolve filename and index
@@ -90,10 +97,13 @@ export function getFilenameAndIndexByAggregateByTicker(
 
     // Check if resolvedFilename and resolvedIndex exist
     if (!fs.existsSync(resolvedFilename)) {
-      throw new Error(`Filename '${resolvedFilename}' does not exist`);
+      throw new ErrorWithCode(
+        `Filename '${resolvedFilename}' does not exist`,
+        'INTERNAL_SERVER_ERROR',
+      );
     }
     if (!fs.existsSync(resolvedIndex)) {
-      throw new Error(`Index '${resolvedIndex}' does not exist`);
+      throw new ErrorWithCode(`Index '${resolvedIndex}' does not exist`, 'INTERNAL_SERVER_ERROR');
     }
 
     userInputtedDataByAggregateByTicker[aggregate][ticker] = {
@@ -122,10 +132,16 @@ export function getFilenameAndIndexByAggregateByTicker(
         }
 
         if (!fs.existsSync(impliedFilename)) {
-          throw new Error(`Assumed filename '${impliedFilename}' does not exist`);
+          throw new ErrorWithCode(
+            `Assumed filename '${impliedFilename}' does not exist`,
+            'INTERNAL_SERVER_ERROR',
+          );
         }
         if (!fs.existsSync(impliedIndex)) {
-          throw new Error(`Assumed index '${impliedIndex}' does not exist`);
+          throw new ErrorWithCode(
+            `Assumed index '${impliedIndex}' does not exist`,
+            'INTERNAL_SERVER_ERROR',
+          );
         }
         filenameByAggregateByTicker[aggregate][ticker] = impliedFilename;
         indexByAggregateByTicker[aggregate][ticker] = impliedIndex;
@@ -152,7 +168,7 @@ export function getFilenameAndIndexByAggregateByTicker(
 }
 
 const slippageJsonlLineSchema = z.object({
-  ticker: z.string(),
+  ticker: tickerSchema,
   slippage: z.number(),
 });
 export function getMarketSlippageByTicker(
@@ -160,7 +176,10 @@ export function getMarketSlippageByTicker(
   userInputtedSlippageByTicker: Partial<Record<Ticker, number>> = {},
 ): Record<Ticker, number> {
   if (!fs.existsSync(`./data/slippage.jsonl`)) {
-    throw new Error(`Slippage file './data/slippage.jsonl' does not exist`);
+    throw new ErrorWithCode(
+      `Slippage file './data/slippage.jsonl' does not exist`,
+      'INTERNAL_SERVER_ERROR',
+    );
   }
 
   const defaultSlippageByTicker = fs

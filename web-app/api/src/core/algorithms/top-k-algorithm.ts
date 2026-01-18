@@ -20,6 +20,34 @@ export type TopKAlgorithm = {
   tickers: [Ticker, ...Ticker[]];
 };
 
+export function scoresToActionsTopKAlgorithm(
+  scoresByTicker: Record<Ticker, number>,
+  positions: Record<Ticker, number>,
+  k: number,
+): Record<Ticker, Action> {
+  const maxHeap = new Heap<[Ticker, number]>(
+    (a: [Ticker, number], b: [Ticker, number]) => a[1] - b[1],
+  );
+  const result = {} as Record<Ticker, Action>;
+  for (const ticker in scoresByTicker) {
+    maxHeap.add([ticker, scoresByTicker[ticker]]);
+
+    // Min heap has capacity of k
+    if (maxHeap.size > k) {
+      // removeTicker is not top k score, so we sell or hold
+      const removedTicker = maxHeap.pop()![0];
+      result[removedTicker] = positions[removedTicker] > 0 ? Action.SELL : Action.HOLD;
+    }
+  }
+
+  while (maxHeap.size > 0) {
+    // removeTicker is top k score, so we buy or hold
+    const removedTicker = maxHeap.pop()![0];
+    result[removedTicker] = positions[removedTicker] > 0 ? Action.HOLD : Action.BUY;
+  }
+  return result;
+}
+
 export function createAlgorithmFromTopKAlgorithm({
   aggregate,
   algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
@@ -40,27 +68,7 @@ export function createAlgorithmFromTopKAlgorithm({
       positions,
       indicators,
     );
-    const maxHeap = new Heap<[Ticker, number]>(
-      (a: [Ticker, number], b: [Ticker, number]) => a[1] - b[1],
-    );
-    const result = {} as Record<Ticker, Action>;
-    for (const ticker in scoresByTicker) {
-      maxHeap.add([ticker, scoresByTicker[ticker]]);
-
-      // Min heap has capacity of k
-      if (maxHeap.size > k) {
-        // removeTicker is not top k score, so we sell or hold
-        const removedTicker = maxHeap.pop()![0];
-        result[removedTicker] = positions[removedTicker] > 0 ? Action.SELL : Action.HOLD;
-      }
-    }
-
-    while (maxHeap.size > 0) {
-      // removeTicker is top k score, so we buy or hold
-      const removedTicker = maxHeap.pop()![0];
-      result[removedTicker] = positions[removedTicker] > 0 ? Action.HOLD : Action.BUY;
-    }
-    return result;
+    return scoresToActionsTopKAlgorithm(scoresByTicker, positions, k);
   }
 
   return {

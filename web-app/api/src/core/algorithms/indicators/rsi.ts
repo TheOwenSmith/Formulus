@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -20,6 +21,7 @@ declare module './indicator' {
     [x: `RSI(${number})`]: (number | null)[];
   }
 }
+export const rsiIndicatorResultStringified = '[x: `RSI(${number})`]: (number | null)[];';
 
 export function computeRSI({
   bars,
@@ -31,10 +33,13 @@ export function computeRSI({
   metadata: IndicatorMetadata;
 }): (number | null)[] {
   if (period < 1) {
-    throw new Error('Period must be at least 1 to compute RSI');
+    throw new ErrorWithCode('Period must be at least 1 to compute RSI', 'BAD_REQUEST');
   }
   if (bars.length < period + 1) {
-    throw new Error(`Must have context length of at least ${period + 1} to compute RSI(${period})`);
+    throw new ErrorWithCode(
+      `Must have context length of at least ${period + 1} to compute RSI(${period})`,
+      'BAD_REQUEST',
+    );
   }
 
   const timestamp = bars.at(-1)![0];

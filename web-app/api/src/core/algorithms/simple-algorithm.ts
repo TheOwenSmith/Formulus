@@ -1,6 +1,6 @@
-import type { Bar, Ticker, Timestamp } from '@api/fetch/types';
+import { type Bar, type Ticker, type Timestamp } from '@api/fetch/types';
 import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
-import type { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
+import { type Indicator, type IndicatorResultByIndicator } from './indicators/indicator';
 
 export type SimpleAlgorithmImplementation = (
   context: Bar[],

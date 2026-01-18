@@ -1,5 +1,6 @@
 import { Action } from '@api/core/algorithms/algorithm';
 import type { Ticker } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import type { AlgorithmData } from './backtest-algorithms-concurrently';
 
 // See docs/Phoenix_Trader_Position_Management_System.pdf
@@ -27,7 +28,10 @@ export function updatePosition({
 
   for (const ticker of algorithmTickers) {
     if (!(ticker in actions)) {
-      throw new Error(`No action specified for ticker '${ticker}' in actions record`);
+      throw new ErrorWithCode(
+        `No action specified for ticker '${ticker}' in actions record`,
+        'BAD_REQUEST',
+      );
     }
 
     const has = algorithmData.positions[ticker] > 0;
@@ -211,7 +215,7 @@ function computeK({
     return potentialKRightEdge;
   }
 
-  throw new Error('k not found');
+  throw new ErrorWithCode('k not found', 'INTERNAL_SERVER_ERROR');
 }
 
 export function getPortfolioValue({

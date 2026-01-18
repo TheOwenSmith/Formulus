@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -18,6 +19,7 @@ declare module './indicator' {
     [x: `ATR(${number})`]: (number | null)[];
   }
 }
+export const atrIndicatorResultStringified = '[x: `ATR(${number})`]: (number | null)[];';
 
 export function computeATR({
   bars,
@@ -29,10 +31,13 @@ export function computeATR({
   metadata: IndicatorMetadata;
 }): (number | null)[] {
   if (period < 1) {
-    throw new Error('Period must be at least 1 to compute ATR');
+    throw new ErrorWithCode('Period must be at least 1 to compute ATR', 'BAD_REQUEST');
   }
   if (bars.length < period + 1) {
-    throw new Error(`Must have at least ${period + 1} bars to compute ATR(${period})`);
+    throw new ErrorWithCode(
+      `Must have at least ${period + 1} bars to compute ATR(${period})`,
+      'BAD_REQUEST',
+    );
   }
 
   const timestamp = bars.at(-1)![0];

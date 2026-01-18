@@ -1,4 +1,5 @@
 import type { Bar } from '@api/fetch/types';
+import { ErrorWithCode } from '@api/utils/error-handling';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -18,6 +19,7 @@ declare module './indicator' {
     [x: `EMA(${number})`]: (number | null)[];
   }
 }
+export const emaIndicatorResultStringified = '[x: `EMA(${number})`]: (number | null)[];';
 
 export function computeEMA({
   bars,
@@ -29,10 +31,13 @@ export function computeEMA({
   metadata: IndicatorMetadata;
 }): (number | null)[] {
   if (period < 1) {
-    throw new Error('Period must be at least 1 to compute EMA');
+    throw new ErrorWithCode('Period must be at least 1 to compute EMA', 'BAD_REQUEST');
   }
   if (bars.length < period) {
-    throw new Error(`Must have context length of at least ${period} to compute EMA(${period})`);
+    throw new ErrorWithCode(
+      `Must have context length of at least ${period} to compute EMA(${period})`,
+      'BAD_REQUEST',
+    );
   }
 
   const k = 2 / (period + 1);

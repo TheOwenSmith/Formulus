@@ -1,3 +1,5 @@
+import { ErrorWithCode } from '@api/utils/error-handling';
+
 const dayRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function toValidTimespan(
@@ -9,8 +11,9 @@ export function toValidTimespan(
 
   if (timespan[0] != null) {
     if (!dayRegex.test(timespan[0])) {
-      throw new Error(
+      throw new ErrorWithCode(
         `Timespan is invalid: start date '${timespan[0]}' is not a valid date; it must be of the form YYYY-MM-DD`,
+        'BAD_REQUEST',
       );
     }
     timespanDays[0] = timespan[0];
@@ -18,15 +21,19 @@ export function toValidTimespan(
 
   if (timespan[1] != null) {
     if (!dayRegex.test(timespan[1])) {
-      throw new Error(
+      throw new ErrorWithCode(
         `Timespan is invalid: end date '${timespan[1]}' is not a valid date; it must be of the form YYYY-MM-DD`,
+        'BAD_REQUEST',
       );
     }
     timespanDays[1] = timespan[1];
   }
 
   if (timespanDays[0] != null && timespanDays[1] != null && timespanDays[0] >= timespanDays[1]) {
-    throw new Error('Timespan is invalid: start date is after or equal to end date');
+    throw new ErrorWithCode(
+      'Timespan is invalid: start date is after or equal to end date',
+      'BAD_REQUEST',
+    );
   }
   return timespanDays;
 }

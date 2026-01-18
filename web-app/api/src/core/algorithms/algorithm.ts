@@ -1,17 +1,17 @@
 import type { Bar, Ticker, Timestamp } from '@api/fetch/types';
-import { tickerSchema, timestampSchema } from '@api/fetch/types';
 import z from 'zod';
-import {
-  indicatorSchema,
-  type Indicator,
-  type IndicatorResultByIndicator,
-} from './indicators/indicator';
+import { type Indicator, type IndicatorResultByIndicator } from './indicators/indicator';
 
 export const enum Action {
   BUY = 0,
   SELL = 1,
   HOLD = 2,
 }
+export const actionSchema = z.union([
+  z.literal(Action.BUY),
+  z.literal(Action.SELL),
+  z.literal(Action.HOLD),
+]);
 
 export type AlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,
@@ -30,39 +30,6 @@ export type Algorithm = {
   name: string;
   tickers: [Ticker, ...Ticker[]];
 };
-
-export const userAlgorithmSchema = z
-  .object({
-    aggregate: timestampSchema,
-    algorithmMaxHoldingProportion: z
-      .number()
-      .min(0)
-      .max(ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT)
-      .optional(),
-    contextLength: z.int().positive(),
-    indicators: indicatorSchema.array().optional(),
-    name: z.string().min(1).max(64),
-    tickers: tickerSchema.array().min(1),
-    userAlgorithmImplementationCode: z.string(),
-  })
-  .superRefine(({ tickers, name, indicators }, ctx) => {
-    if (new Set(tickers).size !== tickers.length) {
-      ctx.addIssue({
-        code: 'custom',
-        input: tickers,
-        message: `Tickers for algorithm '${name}' must be distinct`,
-      });
-    }
-
-    if (indicators != undefined && new Set(indicators).size !== indicators.length) {
-      ctx.addIssue({
-        code: 'custom',
-        input: indicators,
-        message: `Indicators for algorithm '${name}' must be distinct`,
-      });
-    }
-  });
-export type UserAlgorithm = z.infer<typeof userAlgorithmSchema>;
 
 export type MarketInvariantAlgorithm = {
   algorithmMaxHoldingProportion?: number;

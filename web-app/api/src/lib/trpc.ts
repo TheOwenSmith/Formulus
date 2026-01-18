@@ -2,7 +2,7 @@ import { createUserAuthenticationProcedure } from '@api/middleware/authenticatio
 import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
 import { usersRouter } from '@api/routes/users';
-import { initTRPC } from '@trpc/server';
+import { initTRPC, type TRPC_ERROR_CODE_KEY } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import { config } from './config';
 
@@ -34,3 +34,13 @@ export const appRouter = t.router({
   users: usersRouter(router, authProcedure),
 });
 export type AppRouter = typeof appRouter;
+
+export class ErrorWithCode extends Error {
+  code: TRPC_ERROR_CODE_KEY;
+  constructor(input: unknown, code: TRPC_ERROR_CODE_KEY) {
+    const message = input instanceof Error ? input.message : String(input);
+    super(message);
+    this.name = this.constructor.name;
+    this.code = code;
+  }
+}

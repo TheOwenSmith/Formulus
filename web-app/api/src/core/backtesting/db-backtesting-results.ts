@@ -3,8 +3,9 @@ import {
   convertTimestampToDbTimestamp,
 } from '@api/core/algorithms/db-algorithm';
 import type { Ticker, Timestamp } from '@api/fetch/types';
+import type { BacktestingResultsModel } from '@api/generated/prisma/models';
 import { prisma } from '@api/lib/prisma';
-import { tryAsync } from '@api/utils/error-handling';
+import { ErrorWithCode, tryAsync } from '@api/utils/error-handling';
 import { nanoid } from 'nanoid';
 import type { BacktestAlgorithmsResult, SimplePlot } from './backtest-algorithms-concurrently';
 import type { ProfitLossRatio } from './statistics';
@@ -17,57 +18,65 @@ export async function uploadBacktestingResults({
   creatorId: string;
   algorithmsIds: string[];
   result: BacktestAlgorithmsResult;
-}): Promise<void> {
-  await prisma.backtestingResults.create({
-    data: {
-      algorithmGraphs: {
-        create: result.algorithmGraphs.map((algorithmGraph) => ({
-          aggregate: convertTimestampToDbTimestamp(algorithmGraph.aggregate),
-          name: algorithmGraph.algorithmPlot.name,
-          plotYs: algorithmGraph.algorithmPlot.y,
+}): Promise<BacktestingResultsModel> {
+  const createBacktestingResultsResponse = await tryAsync(() =>
+    prisma.backtestingResults.create({
+      data: {
+        algorithmGraphs: {
+          create: result.algorithmGraphs.map((algorithmGraph) => ({
+            aggregate: convertTimestampToDbTimestamp(algorithmGraph.aggregate),
+            name: algorithmGraph.algorithmPlot.name,
+            plotYs: algorithmGraph.algorithmPlot.y,
 
-          descriptionMetrics: {
-            create: {
-              aggregate: convertTimestampToDbTimestamp(algorithmGraph.descriptionMetrics.aggregate),
-              algorithmReturn: algorithmGraph.descriptionMetrics.algorithmReturn,
-              averageHoldingDuration: algorithmGraph.descriptionMetrics.averageHoldingDuration,
-              contextLength: algorithmGraph.descriptionMetrics.contextLength,
-              expectancyPerTrade: algorithmGraph.descriptionMetrics.expectancyPerTrade,
-              growthRate: algorithmGraph.descriptionMetrics.growthRate,
-              maxHoldingPorportion: algorithmGraph.descriptionMetrics.maxHoldingPorportion,
-              positionsClosed: algorithmGraph.descriptionMetrics.positionsClosed,
-              profitLossRatio: algorithmGraph.descriptionMetrics.profitLossRatio,
-              sharpeRatio: algorithmGraph.descriptionMetrics.sharpeRatio,
-              tickers: algorithmGraph.descriptionMetrics.tickers,
-              timespanEnd: algorithmGraph.descriptionMetrics.timespan[1],
-              timespanStart: algorithmGraph.descriptionMetrics.timespan[0],
-              tradesMade: algorithmGraph.descriptionMetrics.tradesMade,
-              volatility: algorithmGraph.descriptionMetrics.volatility,
-              winRate: algorithmGraph.descriptionMetrics.winRate,
+            descriptionMetrics: {
+              create: {
+                aggregate: convertTimestampToDbTimestamp(
+                  algorithmGraph.descriptionMetrics.aggregate,
+                ),
+                algorithmReturn: algorithmGraph.descriptionMetrics.algorithmReturn,
+                averageHoldingDuration: algorithmGraph.descriptionMetrics.averageHoldingDuration,
+                contextLength: algorithmGraph.descriptionMetrics.contextLength,
+                expectancyPerTrade: algorithmGraph.descriptionMetrics.expectancyPerTrade,
+                growthRate: algorithmGraph.descriptionMetrics.growthRate,
+                maxHoldingPorportion: algorithmGraph.descriptionMetrics.maxHoldingPorportion,
+                positionsClosed: algorithmGraph.descriptionMetrics.positionsClosed,
+                profitLossRatio: algorithmGraph.descriptionMetrics.profitLossRatio,
+                sharpeRatio: algorithmGraph.descriptionMetrics.sharpeRatio,
+                tickers: algorithmGraph.descriptionMetrics.tickers,
+                timespanEnd: algorithmGraph.descriptionMetrics.timespan[1],
+                timespanStart: algorithmGraph.descriptionMetrics.timespan[0],
+                tradesMade: algorithmGraph.descriptionMetrics.tradesMade,
+                volatility: algorithmGraph.descriptionMetrics.volatility,
+                winRate: algorithmGraph.descriptionMetrics.winRate,
+              },
             },
-          },
-        })),
+          })),
+        },
+        algorithms: {
+          connect: algorithmsIds.map((id) => ({ id })),
+        },
+        creatorId,
+        publicId: nanoid(12),
+        tickerPlots: {
+          create: Object.entries(result.tickerPlotByAggregateByTicker)
+            .map(([aggregate, tickerPlots]) =>
+              Object.entries(tickerPlots).map(([ticker, plot]) => ({
+                aggregate: convertTimestampToDbTimestamp(aggregate as Timestamp),
+                ticker: ticker as Ticker,
+                name: plot.name,
+                plotYs: plot.y,
+              })),
+            )
+            .flat(),
+        },
+        timestampsByAggregate: result.timestampsByAggregate,
       },
-      algorithms: {
-        connect: algorithmsIds.map((id) => ({ id })),
-      },
-      creatorId,
-      publicId: nanoid(12),
-      tickerPlots: {
-        create: Object.entries(result.tickerPlotByAggregateByTicker)
-          .map(([aggregate, tickerPlots]) =>
-            Object.entries(tickerPlots).map(([ticker, plot]) => ({
-              aggregate: convertTimestampToDbTimestamp(aggregate as Timestamp),
-              ticker: ticker as Ticker,
-              name: plot.name,
-              plotYs: plot.y,
-            })),
-          )
-          .flat(),
-      },
-      timestampsByAggregate: result.timestampsByAggregate,
-    },
-  });
+    }),
+  );
+  if (!createBacktestingResultsResponse.ok) {
+    throw new ErrorWithCode(createBacktestingResultsResponse.error, 'INTERNAL_SERVER_ERROR');
+  }
+  return createBacktestingResultsResponse.data;
 }
 
 export async function retrieveBacktestingResultsByPublicId(
@@ -89,7 +98,7 @@ export async function retrieveBacktestingResultsByPublicId(
     }),
   );
   if (!getBacktestingResultsResponse.ok) {
-    throw getBacktestingResultsResponse.error;
+    throw new ErrorWithCode(getBacktestingResultsResponse.error, 'INTERNAL_SERVER_ERROR');
   }
   const dbBacktestingResults = getBacktestingResultsResponse.data;
   if (dbBacktestingResults == null) {

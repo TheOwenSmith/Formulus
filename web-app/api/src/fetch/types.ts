@@ -23,6 +23,7 @@ export const tickers = [
 ] as const;
 export type Ticker = (typeof tickers)[number] | (string & {});
 export const tickerSchema = z.enum(tickers);
+export type UserTicker = z.infer<typeof tickerSchema>;
 
 // Timestamp
 export const aggregateTimestamps = ['1min', '5min', '15min', '30min', '60min'] as const;

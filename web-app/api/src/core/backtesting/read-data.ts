@@ -1,5 +1,6 @@
 import { stringifiedBarSchema, type Bar } from '@api/fetch/types';
-import { trySync } from '@api/utils/error-handling';
+import { cleanup } from '@api/utils/cleanup';
+import { ErrorWithCode, trySync } from '@api/utils/error-handling';
 import { withCommas } from '@api/utils/number-utils';
 import fs from 'fs';
 import readline from 'readline';
@@ -7,7 +8,7 @@ import readline from 'readline';
 const LINES_PROGRESS_UPDATE_INTERVAL = 1_000_000;
 
 export type AggregateDataIterator = AsyncGenerator<{ bar: Bar; bytesProcessed: number }, null> & {
-  close: () => void;
+  close: () => Promise<void>;
 };
 
 export function getAggregateDataIterator({
@@ -24,7 +25,7 @@ export function getAggregateDataIterator({
   verboseLogging?: boolean;
 }): AggregateDataIterator {
   if (!fs.existsSync(filename)) {
-    throw new Error(`File '${filename}' does not exist`);
+    throw new ErrorWithCode(`File '${filename}' does not exist`, 'INTERNAL_SERVER_ERROR');
   }
 
   const fileStream = fs.createReadStream(filename, {
@@ -36,6 +37,10 @@ export function getAggregateDataIterator({
     crlfDelay: Infinity,
   });
   const iter = rlInterface[Symbol.asyncIterator]();
+
+  async function close() {
+    await cleanup([() => rlInterface.close(), () => fileStream.destroy()]);
+  }
 
   async function* generator(): AsyncGenerator<{ bar: Bar; bytesProcessed: number }, null> {
     let current = await iter.next();
@@ -57,6 +62,7 @@ export function getAggregateDataIterator({
             `Error parsing file '${filename}' line '${stringifiedLine}'`,
             parsedLine.error,
           );
+          await close();
           throw parsedLine.error;
         }
         const bar = parsedLine.data;
@@ -73,10 +79,5 @@ export function getAggregateDataIterator({
   }
 
   const gen = generator();
-  return Object.assign(gen, {
-    close: () => {
-      rlInterface.close();
-      fileStream.destroy();
-    },
-  });
+  return Object.assign(gen, { close });
 }

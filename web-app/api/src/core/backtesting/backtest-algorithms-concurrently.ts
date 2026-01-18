@@ -5,17 +5,20 @@ import {
 } from '@api/core/algorithms/algorithm';
 import {
   indicatorsToIndicatorResultsFunction,
+  type Indicator,
   type IndicatorResultByIndicator,
 } from '@api/core/algorithms/indicators/indicator';
 import type { IndicatorMetadata } from '@api/core/algorithms/indicators/indicator-metadata';
+import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import { aggregateTimestamps, type Bar, type Ticker, type Timestamp } from '@api/fetch/types';
 import { yearsBetween } from '@api/utils/date-utils';
-import { trySync } from '@api/utils/error-handling';
+import { ErrorWithCode, tryAsync, trySync } from '@api/utils/error-handling';
 import { groupBy } from '@api/utils/group-by';
 import { roundToDecimal, withCommas } from '@api/utils/number-utils';
 import { SharpeRatioCalculator } from '@api/utils/sharpe-ratio-calculator';
 import type { AtLeastOne } from '@api/utils/types';
 import cliProgress, { Presets } from 'cli-progress';
+import { BYTES_PROGRESS_UPDATE_INTERVAL } from './constants';
 import {
   countBytesToProcess,
   getIteratorBounds,
@@ -23,6 +26,13 @@ import {
 } from './iterator-utils';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator } from './read-data';
+import {
+  getBatchAlgorithmImplementationsDefaultFunction,
+  getBatchAlgorithmImplementationsRpcFunction,
+  type BatchAlgorithmImplementationsFn,
+  type ImplementationArgumentsByAlgorithmIndex,
+} from './rpc/get-batch-algorithm-implementations';
+import { type SupportedLanguage } from './rpc/languages';
 import { getAlgorithmGraph, updateGraph, type DescriptionMetrics } from './statistics';
 import {
   createIndexByTicker,
@@ -31,6 +41,7 @@ import {
   getDistinctTickersByAggregate,
   getFilenameAndIndexByAggregateByTicker,
   getMarketSlippageByTicker,
+  getTickers,
 } from './ticker-utils';
 
 export type TickerData = {
@@ -59,9 +70,6 @@ export type AlgorithmData = {
   winsLosses: [wins: number, losses: number];
 };
 
-export const MAX_POINTS_PER_PLOT = 1_000;
-const BYTES_PROGRESS_UPDATE_INTERVAL = 10_000;
-
 export type BacktestingAlgorithmsConcurrentlyOptions = {
   iteratorStrictParsing?: boolean;
   slippageByTicker?: Partial<Record<Ticker, number>>;
@@ -86,16 +94,29 @@ export type BacktestAlgorithmsResult = {
   timestampsByAggregate: Record<Timestamp, string[]>;
 };
 
+export async function backtestAlgorithmsConcurrently(inp: {
+  algorithms: Algorithm[];
+  options?: BacktestingAlgorithmsConcurrentlyOptions;
+  slippageMapFn?: (marketSlippage: number, price: number) => number;
+  timespan?: [string | null, string | null];
+}): Promise<BacktestAlgorithmsResult>;
+export async function backtestAlgorithmsConcurrently(inp: {
+  algorithms: AnyUserAlgorithmType[];
+  options?: BacktestingAlgorithmsConcurrentlyOptions;
+  slippageMapFn?: (marketSlippage: number, price: number) => number;
+  timespan?: [string | null, string | null];
+}): Promise<BacktestAlgorithmsResult>;
+
 export async function backtestAlgorithmsConcurrently({
   algorithms,
-  timespan: userInputtedTimespan,
-  slippageMapFn,
   options = {},
+  slippageMapFn,
+  timespan: userInputtedTimespan,
 }: {
-  algorithms: Algorithm[];
-  timespan?: [string | null, string | null];
-  slippageMapFn?: (marketSlippage: number, price: number) => number;
+  algorithms: Algorithm[] | AnyUserAlgorithmType[];
   options?: BacktestingAlgorithmsConcurrentlyOptions;
+  slippageMapFn?: (marketSlippage: number, price: number) => number;
+  timespan?: [string | null, string | null];
 }): Promise<BacktestAlgorithmsResult> {
   const {
     iteratorStrictParsing = false,
@@ -106,46 +127,86 @@ export async function backtestAlgorithmsConcurrently({
   const trackProgress = options.trackProgress ?? !verboseLogging;
 
   if (verboseLogging && trackProgress) {
-    throw new Error('Verbose logging and tracking progress cannot be used together');
+    throw new ErrorWithCode(
+      'Verbose logging and tracking progress cannot be used together',
+      'BAD_REQUEST',
+    );
   }
 
   if (algorithms.length === 0) {
-    throw new Error('No algorithms provided to backtest');
+    throw new ErrorWithCode('No algorithms provided to backtest', 'BAD_REQUEST');
   }
 
-  const startPrepareDataTimestamp = Date.now();
-  console.log('Preparing data...');
+  const language: SupportedLanguage | null =
+    'language' in algorithms[0] ? algorithms[0].language : null;
+  if (language != null) {
+    for (let i = 1; i < algorithms.length; i++) {
+      if ((algorithms[i] as AnyUserAlgorithmType).language !== language) {
+        throw new ErrorWithCode(
+          `All user algorithms must be the same language; expected '${language}' but got '${(algorithms[i] as AnyUserAlgorithmType).language}'`,
+          'BAD_REQUEST',
+        );
+      }
+    }
+  }
 
   // Verify no algorithm max holding proportion is greater than the limit
   for (const algorithm of algorithms) {
     const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } = algorithm;
     if (algorithmMaxHoldingProportion > ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT) {
-      throw new Error(
+      throw new ErrorWithCode(
         `Algorithm max holding proportion '${algorithmMaxHoldingProportion}' is greater than the limit ${ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT}`,
+        'BAD_REQUEST',
       );
     }
   }
 
-  const algorithmsByAggregatePartial: Partial<Record<Timestamp, Algorithm[]>> = groupBy(
-    algorithms,
-    (algorithm) => algorithm.aggregate,
+  const startPrepareDataTimestamp = Date.now();
+  console.log('Preparing data...');
+
+  const algorithmsWithIndexByAggregatePartial: Partial<
+    Record<Timestamp, [Algorithm | AnyUserAlgorithmType, number][]>
+  > = groupBy(
+    algorithms.map((algorithm, index) => [algorithm, index]),
+    ([algorithm, _index]) => algorithm.aggregate,
   );
-  const algorithmsByAggregate: Record<Timestamp, Algorithm[]> = aggregateTimestamps.reduce(
+  const algorithmsByIndexByAggregate: Record<
+    Timestamp,
+    Map<number, Algorithm | AnyUserAlgorithmType>
+  > = aggregateTimestamps.reduce(
     (acc, aggregate) => {
-      acc[aggregate] = algorithmsByAggregatePartial[aggregate] ?? [];
+      acc[aggregate] = new Map<number, Algorithm>();
+      if (algorithmsWithIndexByAggregatePartial[aggregate] == undefined) {
+        return acc;
+      }
+
+      for (const [algorithm, index] of algorithmsWithIndexByAggregatePartial[aggregate]) {
+        acc[aggregate].set(index, algorithm);
+      }
       return acc;
     },
-    {} as Record<Timestamp, Algorithm[]>,
+    {} as Record<Timestamp, Map<number, Algorithm | AnyUserAlgorithmType>>,
   );
 
-  const distinctTickersByAggregate: Record<Timestamp, Ticker[]> =
-    getDistinctTickersByAggregate(algorithmsByAggregate);
+  const distinctTickersByAggregate: Record<Timestamp, Ticker[]> = getDistinctTickersByAggregate(
+    algorithmsByIndexByAggregate,
+  );
   const allTickers: Ticker[] = getAllTickers(distinctTickersByAggregate);
 
   // Get filename and index by aggregate by ticker and slippage by ticker
   const { filenameByAggregateByTicker, indexByAggregateByTicker } =
     getFilenameAndIndexByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
   const marketSlippageByTicker = getMarketSlippageByTicker(allTickers, userInuttedSlippageByTicker);
+
+  const batchAlgorithmImplementationsFn: BatchAlgorithmImplementationsFn =
+    language != null
+      ? // If user algorithms are provided, create RPC function for batching algorithm implementations
+        await getBatchAlgorithmImplementationsRpcFunction(
+          algorithms as AnyUserAlgorithmType[],
+          language,
+        )
+      : // If default algorithms are provided, use default function for batching algorithm implementations
+        await getBatchAlgorithmImplementationsDefaultFunction(algorithms as Algorithm[]);
 
   // Get ticker iterator bounds
   const { timespan, iteratorBoundsByAggregateByTicker } = await getIteratorBounds(
@@ -213,38 +274,35 @@ export async function backtestAlgorithmsConcurrently({
       getTickerIteratorByTickerResponse.data;
 
     // Algorithm tracking variables
-    const currentAlgorithms = algorithmsByAggregate[aggregate];
-    const algorithmDataByAlgorithm: AlgorithmData[] = Array.from(
-      { length: currentAlgorithms.length },
-      (_, algorithmIndex) =>
-        ({
-          algorithmYs: [],
-          balance: 100,
-          cumulativeHoldingTime: 0,
-          cumulativeProfitLoss: [0, 0],
-          entracePriceExitPriceByTickerPosition: createIndexByTicker(
-            currentAlgorithms[algorithmIndex].tickers,
-            (_ticker) => [0, 0],
-          ),
-          entraceTimeByTickerPosition: createIndexByTicker(
-            currentAlgorithms[algorithmIndex].tickers,
-            (_ticker) => 0,
-          ),
-          indicatorResultsFunction: indicatorsToIndicatorResultsFunction(
-            currentAlgorithms[algorithmIndex].indicators ?? [],
-          ),
-          positions: createIndexByTicker(currentAlgorithms[algorithmIndex].tickers, (_ticker) => 0),
-          positionsClosed: 0,
-          sharpeRatioCalculator: new SharpeRatioCalculator(),
-          trades: 0,
-          winsLosses: [0, 0],
-        }) satisfies AlgorithmData,
-    );
+    const currentAlgorithmsByIndex: Map<number, Algorithm | AnyUserAlgorithmType> =
+      algorithmsByIndexByAggregate[aggregate];
+    const algorithmDataByAlgorithmIndex: Record<number, AlgorithmData> = {};
+    for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+      algorithmDataByAlgorithmIndex[algorithmIndex] = {
+        algorithmYs: [],
+        balance: 100,
+        cumulativeHoldingTime: 0,
+        cumulativeProfitLoss: [0, 0],
+        entracePriceExitPriceByTickerPosition: createIndexByTicker(
+          getTickers(algorithm),
+          (_ticker) => [0, 0],
+        ),
+        entraceTimeByTickerPosition: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
+        indicatorResultsFunction: indicatorsToIndicatorResultsFunction(
+          (algorithm.indicators ?? []) as Indicator[],
+        ),
+        positions: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
+        positionsClosed: 0,
+        sharpeRatioCalculator: new SharpeRatioCalculator(),
+        trades: 0,
+        winsLosses: [0, 0],
+      } satisfies AlgorithmData;
+    }
 
     // Calculate maximum context length for all algorithms
     const maxContextLengthByTicker = {} as Record<Ticker, number>;
-    for (const algorithm of currentAlgorithms) {
-      for (const ticker of algorithm.tickers) {
+    for (const algorithm of currentAlgorithmsByIndex.values()) {
+      for (const ticker of getTickers(algorithm)) {
         maxContextLengthByTicker[ticker] = Math.max(
           maxContextLengthByTicker[ticker] ?? 1,
           algorithm.contextLength,
@@ -296,7 +354,7 @@ export async function backtestAlgorithmsConcurrently({
       let nextTimestamp: string | null = null;
       let deltaBytesProcessed = 0;
       for (const ticker in tickerIteratorByTicker) {
-        const iteratorResult = await tickerIteratorByTicker[ticker].next();
+        const iteratorResult = await tickerIteratorByTicker[ticker as Ticker].next();
         if (iteratorResult.done) {
           // Iterator is finished; end of timespan reached
           hasNextBar = false;
@@ -309,8 +367,9 @@ export async function backtestAlgorithmsConcurrently({
         if (nextTimestamp == null) {
           nextTimestamp = nextBar[0];
         } else if (nextBar[0] !== nextTimestamp) {
-          throw new Error(
+          throw new ErrorWithCode(
             `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextTimestamp}' but got '${nextBar[0]}'`,
+            'INTERNAL_SERVER_ERROR',
           );
         }
 
@@ -377,21 +436,16 @@ export async function backtestAlgorithmsConcurrently({
         {} as Record<Ticker, number>,
       );
 
-      // Execute algorithm trades
-      for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
-        const algorithm = currentAlgorithms[algorithmIndex];
-        const {
-          tickers,
-          contextLength,
-          algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-        } = algorithm;
-        const algorithmData = algorithmDataByAlgorithm[algorithmIndex];
-
-        const positions = algorithmDataByAlgorithm[algorithmIndex].positions;
+      // Compile implementation arguments for all algorithms
+      const implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex =
+        new Map();
+      for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+        const { contextLength } = algorithm;
 
         // Ensure enough context to execute algorithm
         if (hasNextBar && ticks + 1 >= contextLength) {
-          const context = algorithm.tickers.reduce(
+          // Get context
+          const context = getTickers(algorithm).reduce(
             (acc, ticker) => {
               acc[ticker] = contextByTicker[ticker].slice(-contextLength);
               return acc;
@@ -399,8 +453,11 @@ export async function backtestAlgorithmsConcurrently({
             {} as Record<Ticker, Bar[]>,
           );
 
-          // Calculate indicators
-          const indicators = createIndexByTicker(algorithm.tickers, (ticker) => {
+          // Get positions and calculate indicators
+          const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
+          const positions = algorithmDataByAlgorithmIndex[algorithmIndex].positions;
+
+          const indicators = createIndexByTicker(getTickers(algorithm), (ticker) => {
             const indicatorResults = algorithmData.indicatorResultsFunction(
               context[ticker],
               indicatorMetadataByTicker[ticker],
@@ -408,9 +465,34 @@ export async function backtestAlgorithmsConcurrently({
             return indicatorResults;
           });
 
-          // Get actions from implementation
-          const actions = await algorithm.implementation(context, positions, indicators);
+          implementationArgumentsByAlgorithmIndex.set(algorithmIndex, [
+            context,
+            positions,
+            indicators,
+          ]);
+        } else if (!hasNextBar) {
+          implementationArgumentsByAlgorithmIndex.set(algorithmIndex, null);
+        }
+      }
 
+      // Execute algorithm implementations concurrently
+      const getAlgorithmActionsResponse = await tryAsync(() =>
+        batchAlgorithmImplementationsFn(implementationArgumentsByAlgorithmIndex),
+      );
+      if (!getAlgorithmActionsResponse.ok) {
+        throw getAlgorithmActionsResponse.error;
+      }
+      const actionsByAlgorithmIndex = getAlgorithmActionsResponse.data;
+
+      // Update positions and graph variables
+      for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+        const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } =
+          algorithm;
+        const tickers = getTickers(algorithm);
+        const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
+        const actions = actionsByAlgorithmIndex.get(algorithmIndex)!;
+
+        if (actions != null) {
           updatePosition({
             actions,
             algorithmData,
@@ -420,7 +502,7 @@ export async function backtestAlgorithmsConcurrently({
             slippageByTicker,
             ticks,
           });
-        } else if (!hasNextBar) {
+        } else {
           closeAllPositions({
             algorithmData,
             priceByTicker,
@@ -431,15 +513,15 @@ export async function backtestAlgorithmsConcurrently({
 
         const portfolioValue = getPortfolioValue({
           priceByTicker,
-          algorithmData: algorithmDataByAlgorithm[algorithmIndex],
+          algorithmData,
         });
-        algorithmDataByAlgorithm[algorithmIndex].sharpeRatioCalculator.addPrice(portfolioValue);
+        algorithmData.sharpeRatioCalculator.addPrice(portfolioValue);
 
         // Update plotting variables
         if (ticks % plotSpacing === 0) {
           updatePlotSpacing = updateGraph({
             graphIndex: 'algorithmYs',
-            graphObject: algorithmDataByAlgorithm[algorithmIndex],
+            graphObject: algorithmData,
             newPoint: roundToDecimal(portfolioValue, 2),
           });
         }
@@ -480,16 +562,25 @@ export async function backtestAlgorithmsConcurrently({
 
     // Compile algorithm plots
     const yearsBetweenStartAndEnd = yearsBetween(timespan[1], timespan[0]);
-    for (let algorithmIndex = 0; algorithmIndex < currentAlgorithms.length; algorithmIndex++) {
+    for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
       const algorithmGraph = await getAlgorithmGraph({
         aggregate,
-        algorithm: currentAlgorithms[algorithmIndex],
-        algorithmData: algorithmDataByAlgorithm[algorithmIndex],
+        algorithm,
+        algorithmData: algorithmDataByAlgorithmIndex[algorithmIndex],
         timespan,
         yearsBetweenStartAndEnd,
       });
       algorithmGraphs.push(algorithmGraph);
     }
+  }
+  const endBatchAlgorithmImplementationsResponse = await tryAsync(() =>
+    batchAlgorithmImplementationsFn.end?.(),
+  );
+  if (!endBatchAlgorithmImplementationsResponse.ok) {
+    throw new ErrorWithCode(
+      endBatchAlgorithmImplementationsResponse.error,
+      'INTERNAL_SERVER_ERROR',
+    );
   }
 
   if (trackProgress) {

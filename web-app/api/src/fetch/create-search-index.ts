@@ -1,4 +1,4 @@
-import { trySync } from '@api/utils/error-handling';
+import { ErrorWithCode, trySync } from '@api/utils/error-handling';
 import fs from 'fs';
 import { finished } from 'node:stream/promises';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
@@ -13,7 +13,10 @@ export async function createSearchIndex(ticker: Ticker, timestamp: Timestamp): P
   const writeToFile = `./data/index/${ticker}_${timestamp}.idx`;
 
   if (!fs.existsSync(readFile)) {
-    throw new Error(`Failed to read from file '${readFile}' because it does not exist`);
+    throw new ErrorWithCode(
+      `Failed to read from file '${readFile}' because it does not exist`,
+      'INTERNAL_SERVER_ERROR',
+    );
   }
 
   if (!fs.existsSync('./data/index')) {
