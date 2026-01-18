@@ -18,8 +18,10 @@ const options = {
 };
 
 if (!isWatch) {
+  console.log('Building API...');
   await build(options);
 } else {
+  console.log('Watching API...');
   const ctx = await context(options);
   await ctx.watch();
 }
