@@ -5,7 +5,7 @@ import type { Bar } from '@api/fetch/types';
 
 export const noMondaysAlgorithm: SimpleMarketInvariantAlgorithm = {
   contextLength: 1,
-  implementation: (context: Bar[]): Action => {
+  implementation: async (context: Bar[]): Promise<Action> => {
     const timestamp = context[0][0];
     if (dayOfWeek(timestamp) === 'Monday') {
       return Action.SELL;

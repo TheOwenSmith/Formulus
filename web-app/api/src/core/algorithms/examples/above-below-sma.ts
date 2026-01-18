@@ -6,11 +6,11 @@ export const aboveBelowSmaAlgorithm: MarketInvariantAlgorithm = {
   name: 'Above/Below SMA',
   contextLength: 20,
   indicators: ['SMA(20)'],
-  implementation: (
+  implementation: async (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
     indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-  ): Record<Ticker, Action> => {
+  ): Promise<Record<Ticker, Action>> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
       const sma = indicators[ticker]['SMA(20)']!.at(-1)!;

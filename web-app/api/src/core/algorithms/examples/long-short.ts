@@ -5,11 +5,11 @@ import type { Bar, Ticker } from '@api/fetch/types';
 export const longShortAlgorithm: Algorithm = {
   aggregate: '60min',
   contextLength: 15,
-  implementation: (
+  implementation: async (
     _context: Record<Ticker, Bar[]>,
     positions: Record<Ticker, number>,
     indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-  ): Record<Ticker, Action> => {
+  ): Promise<Record<Ticker, Action>> => {
     const haveSH = positions['SH'] > 0;
 
     const spyRSI = indicators['SPY']['RSI(14)']!.at(-1)!;

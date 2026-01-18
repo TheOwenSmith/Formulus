@@ -409,7 +409,7 @@ export async function backtestAlgorithmsConcurrently({
           });
 
           // Get actions from implementation
-          const actions = algorithm.implementation(context, positions, indicators);
+          const actions = await algorithm.implementation(context, positions, indicators);
 
           updatePosition({
             actions,
@@ -463,7 +463,7 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     for (const ticker in tickerIteratorByTicker) {
-      tickerIteratorByTicker[ticker].close();
+      await tickerIteratorByTicker[ticker].close();
     }
     if (verboseLogging) {
       console.log(`Finished processing ${aggregate} aggregate data`);

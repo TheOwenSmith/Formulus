@@ -4,6 +4,7 @@
 
 - All client-side code must live in `/client`.
 - All SVG paths must live in `/icons` (do not inline large SVG path data elsewhere).
+- All files in /api must use kebab-case filenames.
 
 ## Styling
 
@@ -43,3 +44,7 @@
 
 - Import shared backend types exclusively from `@shared/types.ts`.
 - Do NOT import types from `@api/shared/...`.
+
+## Name conventions
+
+- All files in `/api` should be in snake-case

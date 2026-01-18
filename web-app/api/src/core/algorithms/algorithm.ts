@@ -8,16 +8,16 @@ import {
 } from './indicators/indicator';
 
 export const enum Action {
-  BUY,
-  SELL,
-  HOLD,
+  BUY = 0,
+  SELL = 1,
+  HOLD = 2,
 }
 
 export type AlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,
   positions: Record<Ticker, number>,
   indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-) => Record<Ticker, Action>;
+) => Promise<Record<Ticker, Action>>;
 
 export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;
 export const ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT = 0.99;
@@ -42,7 +42,7 @@ export const userAlgorithmSchema = z
     contextLength: z.int().positive(),
     indicators: indicatorSchema.array().optional(),
     name: z.string().min(1).max(64),
-    tickers: tickerSchema.array(),
+    tickers: tickerSchema.array().min(1),
     userAlgorithmImplementationCode: z.string(),
   })
   .superRefine(({ tickers, name, indicators }, ctx) => {
@@ -62,6 +62,7 @@ export const userAlgorithmSchema = z
       });
     }
   });
+export type UserAlgorithm = z.infer<typeof userAlgorithmSchema>;
 
 export type MarketInvariantAlgorithm = {
   algorithmMaxHoldingProportion?: number;

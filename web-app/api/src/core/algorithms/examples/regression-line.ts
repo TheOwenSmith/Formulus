@@ -6,11 +6,11 @@ export const regressionLineAlgorithm: MarketInvariantAlgorithm = {
   name: 'Regression Line',
   contextLength: 50,
   indicators: ['LinearRegression(50)'],
-  implementation: (
+  implementation: async (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
     indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-  ): Record<Ticker, Action> => {
+  ): Promise<Record<Ticker, Action>> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
       const regressionLine = indicators[ticker]['LinearRegression(50)']!;

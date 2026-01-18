@@ -132,7 +132,7 @@ export function createAlgorithmFromContextMaps<T>({
   let implementation: AlgorithmImplementation;
   if (isRecord(contextMaps)) {
     // Individualized context map for each ticker
-    implementation = (context: Record<Ticker, Bar[]>): Record<Ticker, Action> => {
+    implementation = async (context: Record<Ticker, Bar[]>): Promise<Record<Ticker, Action>> => {
       const actionsByTicker = {} as Record<Ticker, Action>;
 
       for (const ticker in contextMaps) {
@@ -148,7 +148,7 @@ export function createAlgorithmFromContextMaps<T>({
     };
   } else {
     // Generalize context map for all tickers
-    implementation = (context: Record<Ticker, Bar[]>): Record<Ticker, Action> => {
+    implementation = async (context: Record<Ticker, Bar[]>): Promise<Record<Ticker, Action>> => {
       const actionsByTicker = {} as Record<Ticker, Action>;
 
       for (const ticker of tickers) {
@@ -203,10 +203,10 @@ export function createTopKAlgorithmFromContextMaps<T>({
     }
   }
 
-  const implementation = (
+  const implementation = async (
     context: Record<Ticker, Bar[]>,
     _position: Record<Ticker, number>,
-  ): Record<Ticker, number> => {
+  ): Promise<Record<Ticker, number>> => {
     const scoreByTicker = {} as Record<Ticker, number>;
 
     if (isRecord(contextMaps)) {

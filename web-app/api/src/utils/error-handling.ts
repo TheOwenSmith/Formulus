@@ -8,7 +8,7 @@ export function trySync<T>(wrapperFn: () => T): Result<T> {
   }
 }
 
-export async function tryAsync<T>(wrapperFn: () => Promise<T>): Promise<Result<T>> {
+export async function tryAsync<T>(wrapperFn: () => T | Promise<T>): Promise<Result<T>> {
   try {
     return { ok: true, data: await wrapperFn() };
   } catch (e) {

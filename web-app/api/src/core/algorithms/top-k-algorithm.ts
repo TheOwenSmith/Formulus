@@ -7,7 +7,7 @@ export type TopKAlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,
   positions: Record<Ticker, number>,
   indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-) => Record<Ticker, number>;
+) => Promise<Record<Ticker, number>>;
 
 export type TopKAlgorithm = {
   aggregate: Timestamp;
@@ -30,12 +30,16 @@ export function createAlgorithmFromTopKAlgorithm({
   name,
   tickers,
 }: TopKAlgorithm): Algorithm {
-  function algorithmImplementation(
+  async function algorithmImplementation(
     context: Record<Ticker, Bar[]>,
     positions: Record<Ticker, number>,
     indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
   ) {
-    const scoresByTicker: Record<Ticker, number> = implementation(context, positions, indicators);
+    const scoresByTicker: Record<Ticker, number> = await implementation(
+      context,
+      positions,
+      indicators,
+    );
     const maxHeap = new Heap<[Ticker, number]>(
       (a: [Ticker, number], b: [Ticker, number]) => a[1] - b[1],
     );

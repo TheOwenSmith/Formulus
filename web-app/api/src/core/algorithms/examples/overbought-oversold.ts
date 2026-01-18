@@ -6,11 +6,11 @@ export const overboughtOversoldAlgorithm: MarketInvariantAlgorithm = {
   name: 'Overbought/Oversold',
   contextLength: 15,
   indicators: ['RSI(14)'],
-  implementation: (
+  implementation: async (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
     indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-  ): Record<Ticker, Action> => {
+  ): Promise<Record<Ticker, Action>> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
       const rsi = indicators[ticker]['RSI(14)']!.at(-1)!;

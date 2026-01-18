@@ -7,11 +7,11 @@ export const superTrendDirectionAlgorithm: MarketInvariantAlgorithm = {
   name: 'Super Trend Direction',
   contextLength: 11,
   indicators: ['SuperTrend(10,3)'],
-  implementation: (
+  implementation: async (
     context: Record<Ticker, Bar[]>,
     _positions: Record<Ticker, number>,
     indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
-  ): Record<Ticker, Action> => {
+  ): Promise<Record<Ticker, Action>> => {
     const result = {} as Record<Ticker, Action>;
     for (const ticker in context) {
       const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;

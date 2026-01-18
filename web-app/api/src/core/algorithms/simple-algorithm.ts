@@ -6,7 +6,7 @@ export type SimpleAlgorithmImplementation = (
   context: Bar[],
   position: number,
   indicators: Partial<IndicatorResultByIndicator>,
-) => Action;
+) => Promise<Action>;
 
 export type SimpleAlgorithm = {
   aggregate: Timestamp;
@@ -31,13 +31,13 @@ export function createAlgorithmFromSimpleAlgorithm({
     aggregate,
     algorithmMaxHoldingProportion,
     contextLength,
-    implementation: (
+    implementation: async (
       context: Record<Ticker, Bar[]>,
       position: Record<Ticker, number>,
       indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
     ) =>
       ({
-        [ticker]: implementation(context[ticker], position[ticker], indicators[ticker]),
+        [ticker]: await implementation(context[ticker], position[ticker], indicators[ticker]),
       }) as Record<Ticker, Action>,
     indicators,
     name,
