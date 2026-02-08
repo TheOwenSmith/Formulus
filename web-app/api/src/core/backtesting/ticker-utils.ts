@@ -1,8 +1,9 @@
 import { type Algorithm } from '@api/core/algorithms/algorithm';
 import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import { aggregateTimestamps, tickerSchema, type Ticker, type Timestamp } from '@api/fetch/types';
-import { ErrorWithCode, trySync } from '@api/utils/error-handling';
+import { badRequest, fromThrowable, internal, type AppError } from '@api/utils/error-handling';
 import fs from 'fs';
+import { err, ok, type Result } from 'neverthrow';
 import z from 'zod';
 import type { TickerData } from './backtest-algorithms-concurrently';
 
@@ -61,10 +62,13 @@ export function getFilenameAndIndexByAggregateByTicker(
   tickerData: TickerData[],
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
   verboseLogging = false,
-): {
-  filenameByAggregateByTicker: IndexedByAggregateByTicker<string>;
-  indexByAggregateByTicker: IndexedByAggregateByTicker<string>;
-} {
+): Result<
+  {
+    filenameByAggregateByTicker: IndexedByAggregateByTicker<string>;
+    indexByAggregateByTicker: IndexedByAggregateByTicker<string>;
+  },
+  AppError
+> {
   const userInputtedDataByAggregateByTicker = emptyIndexByAggregateByTicker<{
     filename: string;
     index: string;
@@ -72,10 +76,7 @@ export function getFilenameAndIndexByAggregateByTicker(
   for (const tickData of tickerData) {
     const { ticker, aggregate, filename, index } = tickData;
     if (ticker in userInputtedDataByAggregateByTicker[aggregate]) {
-      throw new ErrorWithCode(
-        `Duplicate data for '${ticker}' (${aggregate}) provided`,
-        'BAD_REQUEST',
-      );
+      return err(badRequest(`Duplicate data for '${ticker}' (${aggregate}) provided`));
     }
 
     // Resolve filename and index
@@ -97,13 +98,10 @@ export function getFilenameAndIndexByAggregateByTicker(
 
     // Check if resolvedFilename and resolvedIndex exist
     if (!fs.existsSync(resolvedFilename)) {
-      throw new ErrorWithCode(
-        `Filename '${resolvedFilename}' does not exist`,
-        'INTERNAL_SERVER_ERROR',
-      );
+      return err(internal(`Filename '${resolvedFilename}' does not exist`));
     }
     if (!fs.existsSync(resolvedIndex)) {
-      throw new ErrorWithCode(`Index '${resolvedIndex}' does not exist`, 'INTERNAL_SERVER_ERROR');
+      return err(internal(`Index '${resolvedIndex}' does not exist`));
     }
 
     userInputtedDataByAggregateByTicker[aggregate][ticker] = {
@@ -132,16 +130,10 @@ export function getFilenameAndIndexByAggregateByTicker(
         }
 
         if (!fs.existsSync(impliedFilename)) {
-          throw new ErrorWithCode(
-            `Assumed filename '${impliedFilename}' does not exist`,
-            'INTERNAL_SERVER_ERROR',
-          );
+          return err(internal(`Assumed filename '${impliedFilename}' does not exist`));
         }
         if (!fs.existsSync(impliedIndex)) {
-          throw new ErrorWithCode(
-            `Assumed index '${impliedIndex}' does not exist`,
-            'INTERNAL_SERVER_ERROR',
-          );
+          return err(internal(`Assumed index '${impliedIndex}' does not exist`));
         }
         filenameByAggregateByTicker[aggregate][ticker] = impliedFilename;
         indexByAggregateByTicker[aggregate][ticker] = impliedIndex;
@@ -161,10 +153,10 @@ export function getFilenameAndIndexByAggregateByTicker(
       }
     }
   }
-  return {
+  return ok({
     filenameByAggregateByTicker,
     indexByAggregateByTicker,
-  };
+  });
 }
 
 const slippageJsonlLineSchema = z.object({
@@ -174,36 +166,36 @@ const slippageJsonlLineSchema = z.object({
 export function getMarketSlippageByTicker(
   allTickers: Ticker[],
   userInputtedSlippageByTicker: Partial<Record<Ticker, number>> = {},
-): Record<Ticker, number> {
-  if (!fs.existsSync(`./data/slippage.jsonl`)) {
-    throw new ErrorWithCode(
-      `Slippage file './data/slippage.jsonl' does not exist`,
-      'INTERNAL_SERVER_ERROR',
-    );
-  }
+): Result<Record<Ticker, number>, AppError> {
+  const slippageFileContentResponse = fromThrowable(
+    () => fs.readFileSync(`./data/slippage.jsonl`, { encoding: 'utf8' }),
+    (e) => internal(e),
+  );
+  if (slippageFileContentResponse.isErr()) return err(slippageFileContentResponse.error);
+  const slippageFileContent = slippageFileContentResponse.value;
 
-  const defaultSlippageByTicker = fs
-    .readFileSync(`./data/slippage.jsonl`, { encoding: 'utf8' })
-    .split('\n')
-    .reduce(
-      (acc, line) => {
-        // Parse JSONL line
-        if (line === '') return acc;
+  slippageFileContent.split('\n').map((line) => JSON.parse(line));
 
-        const parseJsonResponse = trySync(() => JSON.parse(line));
-        if (!parseJsonResponse.ok) throw parseJsonResponse.error;
-        const parsedJson = parseJsonResponse.data;
+  const defaultSlippageByTickerResponse = fromThrowable(
+    () =>
+      slippageFileContent.split('\n').reduce(
+        (acc, line) => {
+          // Parse JSONL line
+          if (line === '') return acc;
 
-        const zodParseResponse = trySync(() => slippageJsonlLineSchema.parse(parsedJson));
-        if (!zodParseResponse.ok) throw zodParseResponse.error;
-        const { ticker, slippage } = zodParseResponse.data;
+          const parsedJson = JSON.parse(line);
+          const { ticker, slippage } = slippageJsonlLineSchema.parse(parsedJson);
 
-        // Add to slippage by ticker
-        acc[ticker] = slippage;
-        return acc;
-      },
-      {} as Record<Ticker, number>,
-    );
+          // Add to slippage by ticker
+          acc[ticker] = slippage;
+          return acc;
+        },
+        {} as Record<Ticker, number>,
+      ),
+    (e) => internal(e),
+  );
+  if (defaultSlippageByTickerResponse.isErr()) return err(defaultSlippageByTickerResponse.error);
+  const defaultSlippageByTicker = defaultSlippageByTickerResponse.value;
 
   const marketSlippageByTicker = {} as Record<Ticker, number>;
   for (const ticker of allTickers) {
@@ -213,5 +205,5 @@ export function getMarketSlippageByTicker(
       marketSlippageByTicker[ticker] = defaultSlippageByTicker[ticker];
     }
   }
-  return marketSlippageByTicker;
+  return ok(marketSlippageByTicker);
 }
