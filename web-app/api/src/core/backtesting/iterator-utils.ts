@@ -133,7 +133,9 @@ export async function getIteratorBounds(
   >
 > {
   // Ensure timespan is valid
-  const correctedTimespan: [string | null, string | null] = toValidTimespan(userInputtedTimespan);
+  const getCorrectedTimespanResponse = toValidTimespan(userInputtedTimespan);
+  if (getCorrectedTimespanResponse.isErr()) return err(getCorrectedTimespanResponse.error);
+  const correctedTimespan: [string | null, string | null] = getCorrectedTimespanResponse.value;
 
   // Get the longest possible timespan
   const getLongestPossibleTimespanResponse =
