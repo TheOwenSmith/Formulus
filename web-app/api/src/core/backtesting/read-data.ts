@@ -1,13 +1,22 @@
 import { stringifiedBarSchema, type Bar } from '@api/fetch/types';
 import { cleanup } from '@api/utils/cleanup';
-import { ErrorWithCode, trySync } from '@api/utils/error-handling';
+import {
+  fromThrowable,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@api/utils/error-handling';
 import { withCommas } from '@api/utils/number-utils';
 import fs from 'fs';
+import { err, ok, type Result } from 'neverthrow';
 import readline from 'readline';
 
 const LINES_PROGRESS_UPDATE_INTERVAL = 1_000_000;
 
-export type AggregateDataIterator = AsyncGenerator<{ bar: Bar; bytesProcessed: number }, null> & {
+export type AggregateDataIterator = AsyncGenerator<
+  { bar: Bar; bytesProcessed: number },
+  Result<null, AppError>
+> & {
   close: () => Promise<void>;
 };
 
@@ -23,15 +32,22 @@ export function getAggregateDataIterator({
   parseStrictly: boolean;
   startByte?: number;
   verboseLogging?: boolean;
-}): AggregateDataIterator {
+}): Result<AggregateDataIterator, AppError> {
   if (!fs.existsSync(filename)) {
-    throw new ErrorWithCode(`File '${filename}' does not exist`, 'INTERNAL_SERVER_ERROR');
+    return err(internal(undefined, `File '${filename}' does not exist`));
   }
 
-  const fileStream = fs.createReadStream(filename, {
-    ...(startByte != undefined ? { start: startByte } : {}),
-    ...(endByte != undefined ? { end: endByte } : {}),
-  });
+  const createFileStreamResponse = fromThrowable(
+    () =>
+      fs.createReadStream(filename, {
+        ...(startByte != undefined ? { start: startByte } : {}),
+        ...(endByte != undefined ? { end: endByte } : {}),
+      }),
+    (e) => internal(e),
+  );
+  if (createFileStreamResponse.isErr()) return err(createFileStreamResponse.error);
+  const fileStream = createFileStreamResponse.value;
+
   const rlInterface = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity,
@@ -42,8 +58,13 @@ export function getAggregateDataIterator({
     await cleanup([() => rlInterface.close(), () => fileStream.destroy()]);
   }
 
-  async function* generator(): AsyncGenerator<{ bar: Bar; bytesProcessed: number }, null> {
-    let current = await iter.next();
+  async function* generator(): AsyncGenerator<
+    { bar: Bar; bytesProcessed: number },
+    Result<null, AppError>
+  > {
+    const getCurrentLineResponse = await fromThrowableAsync(iter.next, (e) => internal(e));
+    if (getCurrentLineResponse.isErr()) return err(getCurrentLineResponse.error);
+    let current = getCurrentLineResponse.value;
 
     let linesProcessed = 0;
     while (!current.done) {
@@ -56,16 +77,15 @@ export function getAggregateDataIterator({
       const bytesProcessed = Buffer.byteLength(stringifiedLine) + (linesProcessed > 1 ? 2 : 0);
 
       if (parseStrictly) {
-        const parsedLine = trySync(() => stringifiedBarSchema.parse(stringifiedLine.split(',')));
-        if (!parsedLine.ok) {
-          console.error(
-            `Error parsing file '${filename}' line '${stringifiedLine}'`,
-            parsedLine.error,
-          );
+        const parsedLine = fromThrowable(
+          () => stringifiedBarSchema.parse(stringifiedLine.split(',')),
+          (e) => internal(e, `Error parsing file '${filename}' line '${stringifiedLine}'`),
+        );
+        if (parsedLine.isErr()) {
           await close();
-          throw parsedLine.error;
+          return err(parsedLine.error);
         }
-        const bar = parsedLine.data;
+        const bar = parsedLine.value;
         yield { bar, bytesProcessed };
       } else {
         const split = stringifiedLine.split(',');
@@ -73,11 +93,13 @@ export function getAggregateDataIterator({
         yield { bar, bytesProcessed };
       }
 
-      current = await iter.next();
+      const getNextLineResponse = await fromThrowableAsync(iter.next, (e) => internal(e));
+      if (getNextLineResponse.isErr()) return err(getNextLineResponse.error);
+      current = getNextLineResponse.value;
     }
-    return null;
+    return ok(null);
   }
 
   const gen = generator();
-  return Object.assign(gen, { close });
+  return ok(Object.assign(gen, { close }));
 }

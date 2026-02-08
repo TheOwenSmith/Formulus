@@ -1,8 +1,9 @@
 import { DATE_LENGTH, LINE_LENGTH } from '@api/fetch/create-search-index';
 import { aggregateTimestamps, type Ticker } from '@api/fetch/types';
 import { toValidTimespan } from '@api/utils/date-utils';
-import { ErrorWithCode, trySync } from '@api/utils/error-handling';
+import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
 import fsp from 'fs/promises';
+import { err, ok, Result } from 'neverthrow';
 import { getAggregateDataIterator, type AggregateDataIterator } from './read-data';
 import { emptyIndexByAggregateByTicker, type IndexedByAggregateByTicker } from './ticker-utils';
 
@@ -15,11 +16,17 @@ async function searchIndexForTickFileByte(
   indexFilename: string,
   findDate: string,
   bound: Bound,
-): Promise<[day: string, tickFileByte: number]> {
-  const indexFile = await fsp.open(indexFilename, 'r');
-  const { size } = await indexFile.stat();
+): Promise<Result<[day: string, tickFileByte: number], AppError>> {
+  // Open index file
+  const openIndexFileResponse = await fromThrowableAsync(
+    () => fsp.open(indexFilename, 'r'),
+    (e) => internal(e),
+  );
+  if (openIndexFileResponse.isErr()) return err(openIndexFileResponse.error);
+  const indexFile = openIndexFileResponse.value;
 
   // Binary search the index file for findDate
+  const { size } = await indexFile.stat();
   let left = 0;
   let right = size / LINE_LENGTH - 1;
 
@@ -30,9 +37,14 @@ async function searchIndexForTickFileByte(
     const mid = (left + right) >> 1; // Math.floor((left + right) / 2);
 
     // Read the index line
-    await indexFile.read(buffer, 0, LINE_LENGTH, mid * LINE_LENGTH);
-    const indexLine = buffer.toString('utf-8');
+    const readResponse = await fromThrowableAsync(
+      () => indexFile.read(buffer, 0, LINE_LENGTH, mid * LINE_LENGTH),
+      (e) => internal(e),
+    );
+    if (readResponse.isErr()) return err(readResponse.error);
 
+    // Parse index line
+    const indexLine = buffer.toString('utf-8');
     const indexDay = indexLine.slice(0, DATE_LENGTH);
     if (indexDay === findDate) {
       left = mid;
@@ -53,13 +65,21 @@ async function searchIndexForTickFileByte(
   const tickFileByte = parseInt(indexLine.slice(DATE_LENGTH));
 
   await indexFile.close();
-  return [day, tickFileByte];
+  return ok([day, tickFileByte]);
 }
 
-async function getIndexTimespan(indexFilename: string): Promise<[string, string]> {
-  const indexFile = await fsp.open(indexFilename, 'r');
-  const { size } = await indexFile.stat();
+async function getIndexTimespan(
+  indexFilename: string,
+): Promise<Result<[string, string], AppError>> {
+  // Open index file
+  const openIndexFileResponse = await fromThrowableAsync(
+    () => fsp.open(indexFilename, 'r'),
+    (e) => internal(e),
+  );
+  if (openIndexFileResponse.isErr()) return err(openIndexFileResponse.error);
+  const indexFile = openIndexFileResponse.value;
 
+  const { size } = await indexFile.stat();
   const buffer = Buffer.alloc(LINE_LENGTH);
 
   // Get first day
@@ -73,18 +93,21 @@ async function getIndexTimespan(indexFilename: string): Promise<[string, string]
   const lastDay = lastLine.slice(0, DATE_LENGTH);
 
   await indexFile.close();
-  return [firstDay, lastDay];
+  return ok([firstDay, lastDay]);
 }
 
 async function getLongestPossibleTimespan(
   indexByAggregateByTicker: IndexedByAggregateByTicker<string>,
-): Promise<[string, string]> {
+): Promise<Result<[string, string], AppError>> {
   let latestFirstDay: string | null = null;
   let earliestLastDay: string | null = null;
   for (const aggregate of aggregateTimestamps) {
     for (const ticker in indexByAggregateByTicker[aggregate]) {
       const indexFilename = indexByAggregateByTicker[aggregate][ticker];
-      const [firstDay, lastDay] = await getIndexTimespan(indexFilename);
+      const getIndexTimespanResponse = await getIndexTimespan(indexFilename);
+      if (getIndexTimespanResponse.isErr()) return err(getIndexTimespanResponse.error);
+      const [firstDay, lastDay] = getIndexTimespanResponse.value;
+
       if (latestFirstDay == null || firstDay > latestFirstDay) {
         latestFirstDay = firstDay;
       }
@@ -94,21 +117,30 @@ async function getLongestPossibleTimespan(
       }
     }
   }
-  return [latestFirstDay!, earliestLastDay!];
+  return ok([latestFirstDay!, earliestLastDay!]);
 }
 
 export async function getIteratorBounds(
   indexByAggregateByTicker: IndexedByAggregateByTicker<string>,
   userInputtedTimespan?: [string | null, string | null] | undefined,
-): Promise<{
-  timespan: [string, string];
-  iteratorBoundsByAggregateByTicker: IndexedByAggregateByTicker<[number, number]>;
-}> {
+): Promise<
+  Result<
+    {
+      timespan: [string, string];
+      iteratorBoundsByAggregateByTicker: IndexedByAggregateByTicker<[number, number]>;
+    },
+    AppError
+  >
+> {
   // Ensure timespan is valid
   const correctedTimespan: [string | null, string | null] = toValidTimespan(userInputtedTimespan);
 
   // Get the longest possible timespan
-  const longestPossibleTimespan = await getLongestPossibleTimespan(indexByAggregateByTicker);
+  const getLongestPossibleTimespanResponse =
+    await getLongestPossibleTimespan(indexByAggregateByTicker);
+  if (getLongestPossibleTimespanResponse.isErr())
+    return err(getLongestPossibleTimespanResponse.error);
+  const longestPossibleTimespan = getLongestPossibleTimespanResponse.value;
 
   // Bound the timespan to the longest possible timespan
   const boundedTimespan: [string, string] = [
@@ -141,28 +173,37 @@ export async function getIteratorBounds(
     for (const ticker in indexByAggregateByTicker[aggregate]) {
       const indexFilename = indexByAggregateByTicker[aggregate][ticker];
 
-      const [startDay, tickFileStartByte] = await searchIndexForTickFileByte(
+      const searchIndexForStartDayResponse = await searchIndexForTickFileByte(
         indexFilename,
         boundedTimespan[0],
         Bound.FIRST_GREATER_OR_EQUAL,
       );
-      const [endDay, tickFileEndByte] = await searchIndexForTickFileByte(
+      if (searchIndexForStartDayResponse.isErr()) return err(searchIndexForStartDayResponse.error);
+      const [startDay, tickFileStartByte] = searchIndexForStartDayResponse.value;
+
+      const searchIndexForEndDayResponse = await searchIndexForTickFileByte(
         indexFilename,
         boundedTimespan[1],
         Bound.FIRST_LESS_OR_EQUAL,
       );
+      if (searchIndexForEndDayResponse.isErr()) return err(searchIndexForEndDayResponse.error);
+      const [endDay, tickFileEndByte] = searchIndexForEndDayResponse.value;
 
       if (timespan == null) {
         timespan = [startDay, endDay];
       } else if (startDay !== timespan[0]) {
-        throw new ErrorWithCode(
-          `Failed to match iterator '${ticker}' (${aggregate}) to the start day; expected '${startDay}' but got '${timespan[0]}'`,
-          'INTERNAL_SERVER_ERROR',
+        return err(
+          internal(
+            undefined,
+            `Failed to match iterator '${ticker}' (${aggregate}) to the start day; expected '${startDay}' but got '${timespan[0]}'`,
+          ),
         );
       } else if (endDay !== timespan[1]) {
-        throw new ErrorWithCode(
-          `Failed to match iterator '${ticker}' (${aggregate}) to the end day; expected '${endDay}' but got '${timespan[1]}'`,
-          'INTERNAL_SERVER_ERROR',
+        return err(
+          internal(
+            undefined,
+            `Failed to match iterator '${ticker}' (${aggregate}) to the end day; expected '${endDay}' but got '${timespan[1]}'`,
+          ),
         );
       }
 
@@ -173,7 +214,7 @@ export async function getIteratorBounds(
       ];
     }
   }
-  return { timespan: timespan!, iteratorBoundsByAggregateByTicker };
+  return ok({ timespan: timespan!, iteratorBoundsByAggregateByTicker });
 }
 
 export function countBytesToProcess(
@@ -211,19 +252,17 @@ export function getTickerIteratorsByTicker({
 
       const [startByte, endByte] = iteratorBoundsByTicker[ticker];
 
-      const getIteratorResponse = trySync(() =>
-        getAggregateDataIterator({
-          endByte,
-          filename: tickDataFilename,
-          parseStrictly,
-          startByte,
-          verboseLogging,
-        }),
-      );
-      if (!getIteratorResponse.ok) {
+      const getIteratorResponse = getAggregateDataIterator({
+        endByte,
+        filename: tickDataFilename,
+        parseStrictly,
+        startByte,
+        verboseLogging,
+      });
+      if (getIteratorResponse.isErr()) {
         throw getIteratorResponse.error;
       }
-      acc[ticker] = getIteratorResponse.data;
+      acc[ticker] = getIteratorResponse.value;
       return acc;
     },
     {} as Record<Ticker, AggregateDataIterator>,

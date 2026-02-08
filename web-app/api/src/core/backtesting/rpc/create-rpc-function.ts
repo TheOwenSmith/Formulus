@@ -332,7 +332,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
   }
 
   // Return RPC function
-  call.end = () => end(internal('Runner force quit early'));
+  call.end = () => end(internal(undefined, 'Runner force quit early'));
   return ok(call);
 }
 

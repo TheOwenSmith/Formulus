@@ -98,10 +98,10 @@ export function getFilenameAndIndexByAggregateByTicker(
 
     // Check if resolvedFilename and resolvedIndex exist
     if (!fs.existsSync(resolvedFilename)) {
-      return err(internal(`Filename '${resolvedFilename}' does not exist`));
+      return err(internal(undefined, `Filename '${resolvedFilename}' does not exist`));
     }
     if (!fs.existsSync(resolvedIndex)) {
-      return err(internal(`Index '${resolvedIndex}' does not exist`));
+      return err(internal(undefined, `Index '${resolvedIndex}' does not exist`));
     }
 
     userInputtedDataByAggregateByTicker[aggregate][ticker] = {
@@ -130,10 +130,10 @@ export function getFilenameAndIndexByAggregateByTicker(
         }
 
         if (!fs.existsSync(impliedFilename)) {
-          return err(internal(`Assumed filename '${impliedFilename}' does not exist`));
+          return err(internal(undefined, `Assumed filename '${impliedFilename}' does not exist`));
         }
         if (!fs.existsSync(impliedIndex)) {
-          return err(internal(`Assumed index '${impliedIndex}' does not exist`));
+          return err(internal(undefined, `Assumed index '${impliedIndex}' does not exist`));
         }
         filenameByAggregateByTicker[aggregate][ticker] = impliedFilename;
         indexByAggregateByTicker[aggregate][ticker] = impliedIndex;
