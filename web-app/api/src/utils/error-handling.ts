@@ -1,5 +1,5 @@
 import type { TRPC_ERROR_CODE_KEY } from '@trpc/server';
-import { Result, ResultAsync } from 'neverthrow';
+import { ok, Result, ResultAsync } from 'neverthrow';
 
 export const fromThrowable = <T>(
   fn: () => T,
@@ -31,4 +31,15 @@ export function badRequest(message: string, error?: unknown): AppError {
     message,
     error,
   };
+}
+
+export function safeReduce<T, U, E>(
+  arr: T[],
+  reducer: (acc: U, value: T) => Result<U, E>,
+  startAcc: U,
+): Result<U, E> {
+  return arr.reduce<Result<U, E>>(
+    (accResult, value) => accResult.andThen((acc: U) => reducer(acc, value)),
+    ok(startAcc) as Result<U, E>,
+  );
 }

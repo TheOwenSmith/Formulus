@@ -1,7 +1,13 @@
 import { type Algorithm } from '@api/core/algorithms/algorithm';
 import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import { aggregateTimestamps, tickerSchema, type Ticker, type Timestamp } from '@api/fetch/types';
-import { badRequest, fromThrowable, internal, type AppError } from '@api/utils/error-handling';
+import {
+  badRequest,
+  fromThrowable,
+  internal,
+  safeReduce,
+  type AppError,
+} from '@api/utils/error-handling';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';
 import z from 'zod';
@@ -174,34 +180,31 @@ export function getMarketSlippageByTicker(
   if (slippageFileContentResponse.isErr()) return err(slippageFileContentResponse.error);
   const slippageFileContent = slippageFileContentResponse.value;
 
-  const defaultSlippageByTickerResult = slippageFileContent
-    .split('\n')
-    .reduce<Result<Record<Ticker, number>, AppError>>(
-      (accResult: Result<Record<Ticker, number>, AppError>, line: string) =>
-        accResult.andThen((acc) => {
-          // Parse JSONL line
-          if (line === '') return ok(acc);
+  const defaultSlippageByTickerResult = safeReduce(
+    slippageFileContent.split('\n'),
+    (acc: Record<Ticker, number>, line: string): Result<Record<Ticker, number>, AppError> => {
+      if (line === '') return ok(acc);
 
-          const parseJsonResponse = fromThrowable(
-            () => JSON.parse(line),
-            (e) => internal(e),
-          );
-          if (parseJsonResponse.isErr()) {
-            return err(parseJsonResponse.error);
-          }
-          const parsedJson = parseJsonResponse.value;
+      const parseJsonResponse = fromThrowable(
+        () => JSON.parse(line),
+        (e) => internal(e),
+      );
+      if (parseJsonResponse.isErr()) {
+        return err(parseJsonResponse.error);
+      }
+      const parsedJson = parseJsonResponse.value;
 
-          return fromThrowable(
-            () => slippageJsonlLineSchema.parse(parsedJson),
-            (e) => internal(e),
-          ).map(({ ticker, slippage }) => {
-            // Add to slippage by ticker
-            acc[ticker] = slippage;
-            return acc;
-          });
-        }),
-      ok({} as Record<Ticker, number>),
-    );
+      return fromThrowable(
+        () => slippageJsonlLineSchema.parse(parsedJson),
+        (e) => internal(e),
+      ).map(({ ticker, slippage }) => {
+        // Add to slippage by ticker
+        acc[ticker] = slippage;
+        return acc;
+      });
+    },
+    {} as Record<Ticker, number>,
+  );
 
   if (defaultSlippageByTickerResult.isErr()) return err(defaultSlippageByTickerResult.error);
   const defaultSlippageByTicker = defaultSlippageByTickerResult.value;

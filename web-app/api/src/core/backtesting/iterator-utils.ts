@@ -1,7 +1,7 @@
 import { DATE_LENGTH, LINE_LENGTH } from '@api/fetch/create-search-index';
 import { aggregateTimestamps, type Ticker } from '@api/fetch/types';
 import { toValidTimespan } from '@api/utils/date-utils';
-import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
+import { fromThrowableAsync, internal, safeReduce, type AppError } from '@api/utils/error-handling';
 import fsp from 'fs/promises';
 import { err, ok, Result } from 'neverthrow';
 import { getAggregateDataIterator, type AggregateDataIterator } from './read-data';
@@ -243,27 +243,27 @@ export function getTickerIteratorsByTicker({
   parseStrictly: boolean;
   verboseLogging?: boolean;
 }): Result<Record<Ticker, AggregateDataIterator>, AppError> {
-  return distinctTickers.reduce<Result<Record<Ticker, AggregateDataIterator>, AppError>>(
-    (accResult, ticker) =>
-      accResult.andThen((acc) => {
-        const tickDataFilename = filenameByTicker[ticker];
-        if (verboseLogging) {
-          console.log(`Fetching '${tickDataFilename}'...`);
-        }
+  return safeReduce(
+    distinctTickers,
+    (acc: Record<Ticker, AggregateDataIterator>, ticker: Ticker) => {
+      const tickDataFilename = filenameByTicker[ticker];
+      if (verboseLogging) {
+        console.log(`Fetching '${tickDataFilename}'...`);
+      }
 
-        const [startByte, endByte] = iteratorBoundsByTicker[ticker];
+      const [startByte, endByte] = iteratorBoundsByTicker[ticker];
 
-        return getAggregateDataIterator({
-          endByte,
-          filename: tickDataFilename,
-          parseStrictly,
-          startByte,
-          verboseLogging,
-        }).map((iterator) => {
-          acc[ticker] = iterator;
-          return acc;
-        });
-      }),
-    ok({} as Record<Ticker, AggregateDataIterator>),
+      return getAggregateDataIterator({
+        endByte,
+        filename: tickDataFilename,
+        parseStrictly,
+        startByte,
+        verboseLogging,
+      }).map((iterator) => {
+        acc[ticker] = iterator;
+        return acc;
+      });
+    },
+    {} as Record<Ticker, AggregateDataIterator>,
   );
 }
