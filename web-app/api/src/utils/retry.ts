@@ -1,3 +1,5 @@
+import { err, ok, type Result } from 'neverthrow';
+import { internal, type AppError } from './error-handling';
 import { sleep } from './misc';
 import { withCommas } from './number-utils';
 
@@ -13,12 +15,12 @@ export async function retryWithBackoff<T>({
   initialDelayMs?: number;
   maxDelayMs?: number;
   verboseLogging?: boolean;
-}): Promise<T> {
+}): Promise<Result<T, AppError>> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      return ok(await fn());
     } catch (error) {
       if (verboseLogging) {
         console.error(error);
@@ -26,7 +28,7 @@ export async function retryWithBackoff<T>({
       lastError = error;
 
       if (attempt === maxRetries) {
-        throw error;
+        return err(internal(error, 'Max retries reached'));
       }
 
       // Exponential backoff with jitter
@@ -43,5 +45,5 @@ export async function retryWithBackoff<T>({
     }
   }
 
-  throw lastError;
+  return err(internal(lastError, 'Max retries reached'));
 }

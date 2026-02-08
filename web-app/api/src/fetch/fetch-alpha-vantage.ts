@@ -1,10 +1,5 @@
 import { config } from '@api/lib/config';
-import {
-  fromThrowable,
-  fromThrowableAsync,
-  internal,
-  type AppError,
-} from '@api/utils/error-handling';
+import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
 import { retryWithBackoff } from '@api/utils/retry';
 import { zodSafeFetch } from '@api/utils/zod-safe-fetch';
 import fs from 'fs';
@@ -91,21 +86,17 @@ export async function fetchAlphaVantageData({
       if (verboseLogging) {
         console.log(`Fetching '${ticker}' (${timestamp}) data for ${month}...`);
       }
-      const fetchWithRetryResponse = await fromThrowableAsync(
-        () =>
-          retryWithBackoff({
-            fn: async () => {
-              const response = await zodSafeFetch({ url, schema: apiResponseSchema });
-              if ('Information' in response) {
-                throw new Error('Rate limit reached');
-              }
-              return response;
-            },
-            maxRetries: 6,
-            verboseLogging,
-          }),
-        (e) => internal(e),
-      );
+      const fetchWithRetryResponse = await retryWithBackoff({
+        fn: async () => {
+          const response = await zodSafeFetch({ url, schema: apiResponseSchema });
+          if ('Information' in response) {
+            throw new Error('Rate limit reached');
+          }
+          return response;
+        },
+        maxRetries: 6,
+        verboseLogging,
+      });
       if (fetchWithRetryResponse.isErr()) {
         return err(fetchWithRetryResponse.error);
       }
