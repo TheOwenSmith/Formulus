@@ -1,8 +1,7 @@
 import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
-import { tryAsync } from '@api/utils/error-handling';
-import { TRPCError } from '@trpc/server';
+import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
 import { z } from 'zod';
 
 export function usersRouter(
@@ -12,66 +11,60 @@ export function usersRouter(
   return router({
     deleteAccount: authProcedure.mutation(async ({ ctx }) => {
       // Delete user (cascade will delete sessions, accounts, etc.)
-      const deleteUserResponse = await tryAsync(() =>
-        prisma.user.delete({
-          where: { id: ctx.user.id },
-        }),
+      const deleteUserResponse = await fromThrowableAsync(
+        () =>
+          prisma.user.delete({
+            where: { id: ctx.user.id },
+          }),
+        (e) => internal(e, 'An unexpected error occurred while deleting the user'),
       );
-      if (!deleteUserResponse.ok) {
-        console.error(`[${ctx.req.path}]`, deleteUserResponse.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'An unexpected error occurred while deleting the user',
-        });
+      if (deleteUserResponse.isErr()) {
+        throw deleteUserResponse.error;
       }
       return { success: true };
     }),
     getCurrentUser: authProcedure.query(async ({ ctx }) => {
-      const getUserResponse = await tryAsync(() =>
-        prisma.user.findUnique({
-          where: { id: ctx.user.id },
-        }),
+      const getUserResponse = await fromThrowableAsync(
+        () =>
+          prisma.user.findUnique({
+            where: { id: ctx.user.id },
+          }),
+        (e) => internal(e, 'An unexpected error occurred while retrieving the current user'),
       );
-      if (!getUserResponse.ok) {
-        console.error(`[${ctx.req.path}]`, getUserResponse.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'An unexpected error occurred while retrieving the current user',
-        });
+      if (getUserResponse.isErr()) {
+        throw getUserResponse.error;
       }
-      const user = getUserResponse.data;
+      const user = getUserResponse.value;
 
       if (user == null) {
-        throw new TRPCError({
+        throw {
           code: 'BAD_GATEWAY',
           message: 'The current user could does not exist',
-        });
+        } satisfies AppError;
       }
       return { user };
     }),
     getProfileStats: authProcedure.query(async ({ ctx }) => {
-      const getProfileStatsResponse = await tryAsync(() =>
-        prisma.$transaction([
-          prisma.algorithm.count({
-            where: { creatorId: ctx.user.id },
-          }),
-          prisma.backtestingResults.count({
-            where: { creatorId: ctx.user.id },
-          }),
-          prisma.backtestingShare.count({
-            where: { userId: ctx.user.id },
-          }),
-        ]),
+      const getProfileStatsResponse = await fromThrowableAsync(
+        () =>
+          prisma.$transaction([
+            prisma.algorithm.count({
+              where: { creatorId: ctx.user.id },
+            }),
+            prisma.backtestingResults.count({
+              where: { creatorId: ctx.user.id },
+            }),
+            prisma.backtestingShare.count({
+              where: { userId: ctx.user.id },
+            }),
+          ]),
+        (e) => internal(e, 'An unexpected error occurred while retrieving profile statistics'),
       );
-      if (!getProfileStatsResponse.ok) {
-        console.error(`[${ctx.req.path}]`, getProfileStatsResponse.error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'An unexpected error occurred while retrieving profile statistics',
-        });
+      if (getProfileStatsResponse.isErr()) {
+        throw getProfileStatsResponse.error;
       }
       const [numberOfAlgorithms, numberOfBacktestingResults, numberOfBacktestingShares] =
-        getProfileStatsResponse.data;
+        getProfileStatsResponse.value;
 
       return {
         numberOfAlgorithms,
@@ -97,20 +90,18 @@ export function usersRouter(
           updateData.image = input.image;
         }
 
-        const updateUserResponse = await tryAsync(() =>
-          prisma.user.update({
-            where: { id: ctx.user.id },
-            data: updateData,
-          }),
+        const updateUserResponse = await fromThrowableAsync(
+          () =>
+            prisma.user.update({
+              where: { id: ctx.user.id },
+              data: updateData,
+            }),
+          (e) => internal(e, 'An unexpected error occurred while updating the user'),
         );
-        if (!updateUserResponse.ok) {
-          console.error(`[${ctx.req.path}]`, updateUserResponse.error);
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'An unexpected error occurred while updating the user',
-          });
+        if (updateUserResponse.isErr()) {
+          throw updateUserResponse.error;
         }
-        const updatedUser = updateUserResponse.data;
+        const updatedUser = updateUserResponse.value;
         return { updatedUser };
       }),
   });
