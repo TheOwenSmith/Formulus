@@ -12,12 +12,13 @@ import type { IndicatorMetadata } from '@api/core/algorithms/indicators/indicato
 import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import { aggregateTimestamps, type Bar, type Ticker, type Timestamp } from '@api/fetch/types';
 import { yearsBetween } from '@api/utils/date-utils';
-import { ErrorWithCode, tryAsync, trySync } from '@api/utils/error-handling';
+import { badRequest, internal, type AppError } from '@api/utils/error-handling';
 import { groupBy } from '@api/utils/group-by';
 import { roundToDecimal, withCommas } from '@api/utils/number-utils';
 import { SharpeRatioCalculator } from '@api/utils/sharpe-ratio-calculator';
 import type { AtLeastOne } from '@api/utils/types';
 import cliProgress, { Presets } from 'cli-progress';
+import { err, ok, type Result } from 'neverthrow';
 import { BYTES_PROGRESS_UPDATE_INTERVAL } from './constants';
 import {
   countBytesToProcess,
@@ -99,13 +100,13 @@ export async function backtestAlgorithmsConcurrently(inp: {
   options?: BacktestingAlgorithmsConcurrentlyOptions;
   slippageMapFn?: (marketSlippage: number, price: number) => number;
   timespan?: [string | null, string | null];
-}): Promise<BacktestAlgorithmsResult>;
+}): Promise<Result<BacktestAlgorithmsResult, AppError>>;
 export async function backtestAlgorithmsConcurrently(inp: {
   algorithms: AnyUserAlgorithmType[];
   options?: BacktestingAlgorithmsConcurrentlyOptions;
   slippageMapFn?: (marketSlippage: number, price: number) => number;
   timespan?: [string | null, string | null];
-}): Promise<BacktestAlgorithmsResult>;
+}): Promise<Result<BacktestAlgorithmsResult, AppError>>;
 
 export async function backtestAlgorithmsConcurrently({
   algorithms,
@@ -117,7 +118,7 @@ export async function backtestAlgorithmsConcurrently({
   options?: BacktestingAlgorithmsConcurrentlyOptions;
   slippageMapFn?: (marketSlippage: number, price: number) => number;
   timespan?: [string | null, string | null];
-}): Promise<BacktestAlgorithmsResult> {
+}): Promise<Result<BacktestAlgorithmsResult, AppError>> {
   const {
     iteratorStrictParsing = false,
     slippageByTicker: userInuttedSlippageByTicker,
@@ -127,14 +128,11 @@ export async function backtestAlgorithmsConcurrently({
   const trackProgress = options.trackProgress ?? !verboseLogging;
 
   if (verboseLogging && trackProgress) {
-    throw new ErrorWithCode(
-      'Verbose logging and tracking progress cannot be used together',
-      'BAD_REQUEST',
-    );
+    return err(badRequest('Verbose logging and tracking progress cannot be used together'));
   }
 
   if (algorithms.length === 0) {
-    throw new ErrorWithCode('No algorithms provided to backtest', 'BAD_REQUEST');
+    return err(badRequest('No algorithms provided to backtest'));
   }
 
   const language: SupportedLanguage | null =
@@ -142,9 +140,10 @@ export async function backtestAlgorithmsConcurrently({
   if (language != null) {
     for (let i = 1; i < algorithms.length; i++) {
       if ((algorithms[i] as AnyUserAlgorithmType).language !== language) {
-        throw new ErrorWithCode(
-          `All user algorithms must be the same language; expected '${language}' but got '${(algorithms[i] as AnyUserAlgorithmType).language}'`,
-          'BAD_REQUEST',
+        return err(
+          badRequest(
+            `All user algorithms must be the same language; expected '${language}' but got '${(algorithms[i] as AnyUserAlgorithmType).language}'`,
+          ),
         );
       }
     }
@@ -154,9 +153,10 @@ export async function backtestAlgorithmsConcurrently({
   for (const algorithm of algorithms) {
     const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } = algorithm;
     if (algorithmMaxHoldingProportion > ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT) {
-      throw new ErrorWithCode(
-        `Algorithm max holding proportion '${algorithmMaxHoldingProportion}' is greater than the limit ${ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT}`,
-        'BAD_REQUEST',
+      return err(
+        badRequest(
+          `Algorithm max holding proportion '${algorithmMaxHoldingProportion}' is greater than the limit ${ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT}`,
+        ),
       );
     }
   }
@@ -194,11 +194,26 @@ export async function backtestAlgorithmsConcurrently({
   const allTickers: Ticker[] = getAllTickers(distinctTickersByAggregate);
 
   // Get filename and index by aggregate by ticker and slippage by ticker
+  const getFilenameAndIndexByAggregateByTickerResponse = getFilenameAndIndexByAggregateByTicker(
+    tickerData,
+    distinctTickersByAggregate,
+    verboseLogging,
+  );
+  if (getFilenameAndIndexByAggregateByTickerResponse.isErr()) {
+    return err(getFilenameAndIndexByAggregateByTickerResponse.error);
+  }
   const { filenameByAggregateByTicker, indexByAggregateByTicker } =
-    getFilenameAndIndexByAggregateByTicker(tickerData, distinctTickersByAggregate, verboseLogging);
-  const marketSlippageByTicker = getMarketSlippageByTicker(allTickers, userInuttedSlippageByTicker);
+    getFilenameAndIndexByAggregateByTickerResponse.value;
+  const marketSlippageByTickerResponse = getMarketSlippageByTicker(
+    allTickers,
+    userInuttedSlippageByTicker,
+  );
+  if (marketSlippageByTickerResponse.isErr()) {
+    return err(marketSlippageByTickerResponse.error);
+  }
+  const marketSlippageByTicker = marketSlippageByTickerResponse.value;
 
-  const batchAlgorithmImplementationsFn: BatchAlgorithmImplementationsFn =
+  const batchAlgorithmImplementationsFnResponse: Result<BatchAlgorithmImplementationsFn, AppError> =
     language != null
       ? // If user algorithms are provided, create RPC function for batching algorithm implementations
         await getBatchAlgorithmImplementationsRpcFunction(
@@ -206,13 +221,22 @@ export async function backtestAlgorithmsConcurrently({
           language,
         )
       : // If default algorithms are provided, use default function for batching algorithm implementations
-        await getBatchAlgorithmImplementationsDefaultFunction(algorithms as Algorithm[]);
+        ok(await getBatchAlgorithmImplementationsDefaultFunction(algorithms as Algorithm[]));
+  if (batchAlgorithmImplementationsFnResponse.isErr()) {
+    return err(batchAlgorithmImplementationsFnResponse.error);
+  }
+  const batchAlgorithmImplementationsFn = batchAlgorithmImplementationsFnResponse.value;
 
   // Get ticker iterator bounds
-  const { timespan, iteratorBoundsByAggregateByTicker } = await getIteratorBounds(
+  const getIteratorBoundsResponse = await getIteratorBounds(
     indexByAggregateByTicker,
     userInputtedTimespan,
   );
+  if (getIteratorBoundsResponse.isErr()) {
+    return err(getIteratorBoundsResponse.error);
+  }
+  const { timespan, iteratorBoundsByAggregateByTicker } = getIteratorBoundsResponse.value;
+
   console.log(`Testing timespan: ${timespan[0]} to ${timespan[1]}`);
   const bytesToProcess = countBytesToProcess(iteratorBoundsByAggregateByTicker);
   console.log(`Bytes to process: ${withCommas(bytesToProcess)}`);
@@ -258,26 +282,32 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     // Fetch ticker iterators for all tickers
-    const getTickerIteratorByTickerResponse = trySync(() =>
-      getTickerIteratorsByTicker({
-        distinctTickers: distinctTickersByAggregate[aggregate],
-        filenameByTicker: filenameByAggregateByTicker[aggregate],
-        iteratorBoundsByTicker: iteratorBoundsByAggregateByTicker[aggregate],
-        parseStrictly: iteratorStrictParsing,
-        verboseLogging,
-      }),
-    );
-    if (!getTickerIteratorByTickerResponse.ok) {
-      throw getTickerIteratorByTickerResponse.error;
+    const getTickerIteratorByTickerResponse = getTickerIteratorsByTicker({
+      distinctTickers: distinctTickersByAggregate[aggregate],
+      filenameByTicker: filenameByAggregateByTicker[aggregate],
+      iteratorBoundsByTicker: iteratorBoundsByAggregateByTicker[aggregate],
+      parseStrictly: iteratorStrictParsing,
+      verboseLogging,
+    });
+    if (getTickerIteratorByTickerResponse.isErr()) {
+      return err(getTickerIteratorByTickerResponse.error);
     }
     const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
-      getTickerIteratorByTickerResponse.data;
+      getTickerIteratorByTickerResponse.value;
 
     // Algorithm tracking variables
     const currentAlgorithmsByIndex: Map<number, Algorithm | AnyUserAlgorithmType> =
       algorithmsByIndexByAggregate[aggregate];
     const algorithmDataByAlgorithmIndex: Record<number, AlgorithmData> = {};
     for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+      const indicatorsToIndicatorResultsFunctionResponse = indicatorsToIndicatorResultsFunction(
+        (algorithm.indicators ?? []) as Indicator[],
+      );
+      if (indicatorsToIndicatorResultsFunctionResponse.isErr()) {
+        return err(indicatorsToIndicatorResultsFunctionResponse.error);
+      }
+      const indicatorResultsFunction = indicatorsToIndicatorResultsFunctionResponse.value;
+
       algorithmDataByAlgorithmIndex[algorithmIndex] = {
         algorithmYs: [],
         balance: 100,
@@ -288,9 +318,7 @@ export async function backtestAlgorithmsConcurrently({
           (_ticker) => [0, 0],
         ),
         entraceTimeByTickerPosition: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
-        indicatorResultsFunction: indicatorsToIndicatorResultsFunction(
-          (algorithm.indicators ?? []) as Indicator[],
-        ),
+        indicatorResultsFunction,
         positions: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
         positionsClosed: 0,
         sharpeRatioCalculator: new SharpeRatioCalculator(),
@@ -367,9 +395,11 @@ export async function backtestAlgorithmsConcurrently({
         if (nextTimestamp == null) {
           nextTimestamp = nextBar[0];
         } else if (nextBar[0] !== nextTimestamp) {
-          throw new ErrorWithCode(
-            `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextTimestamp}' but got '${nextBar[0]}'`,
-            'INTERNAL_SERVER_ERROR',
+          return err(
+            internal(
+              undefined,
+              `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextTimestamp}' but got '${nextBar[0]}'`,
+            ),
           );
         }
 
@@ -476,13 +506,13 @@ export async function backtestAlgorithmsConcurrently({
       }
 
       // Execute algorithm implementations concurrently
-      const getAlgorithmActionsResponse = await tryAsync(() =>
-        batchAlgorithmImplementationsFn(implementationArgumentsByAlgorithmIndex),
+      const getAlgorithmActionsResponse = await batchAlgorithmImplementationsFn(
+        implementationArgumentsByAlgorithmIndex,
       );
-      if (!getAlgorithmActionsResponse.ok) {
-        throw getAlgorithmActionsResponse.error;
+      if (getAlgorithmActionsResponse.isErr()) {
+        return err(getAlgorithmActionsResponse.error);
       }
-      const actionsByAlgorithmIndex = getAlgorithmActionsResponse.data;
+      const actionsByAlgorithmIndex = getAlgorithmActionsResponse.value;
 
       // Update positions and graph variables
       for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
@@ -545,7 +575,10 @@ export async function backtestAlgorithmsConcurrently({
     }
 
     for (const ticker in tickerIteratorByTicker) {
-      await tickerIteratorByTicker[ticker].close();
+      const closeTickerIteratorResponse = await tickerIteratorByTicker[ticker].close();
+      if (closeTickerIteratorResponse.isErr()) {
+        return err(closeTickerIteratorResponse.error);
+      }
     }
     if (verboseLogging) {
       console.log(`Finished processing ${aggregate} aggregate data`);
@@ -573,14 +606,15 @@ export async function backtestAlgorithmsConcurrently({
       algorithmGraphs.push(algorithmGraph);
     }
   }
-  const endBatchAlgorithmImplementationsResponse = await tryAsync(() =>
-    batchAlgorithmImplementationsFn.end?.(),
-  );
-  if (!endBatchAlgorithmImplementationsResponse.ok) {
-    throw new ErrorWithCode(
-      endBatchAlgorithmImplementationsResponse.error,
-      'INTERNAL_SERVER_ERROR',
-    );
+
+  // End RPC function
+  const endBatchAlgorithmImplementationsResult = await batchAlgorithmImplementationsFn.end?.();
+  if (
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- Typescript throws another error if we use optional chaining
+    endBatchAlgorithmImplementationsResult != null &&
+    endBatchAlgorithmImplementationsResult.isErr()
+  ) {
+    return err(endBatchAlgorithmImplementationsResult.error);
   }
 
   if (trackProgress) {
@@ -588,5 +622,5 @@ export async function backtestAlgorithmsConcurrently({
     progressBar.stop();
     console.log(`Time taken: ${withCommas(Date.now() - progressStartTimestamp)}ms`);
   }
-  return { algorithmGraphs, tickerPlotByAggregateByTicker, timestampsByAggregate };
+  return ok({ algorithmGraphs, tickerPlotByAggregateByTicker, timestampsByAggregate });
 }
