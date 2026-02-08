@@ -127,14 +127,23 @@ export function indicatorsToIndicatorResultsFunction(
     return err(badRequest(`Unknown indicator: '${indicator}'`));
   }
 
-  return ok((bars: Bar[], metadata: IndicatorMetadata) => {
-    const result = {} as Partial<IndicatorResultByIndicator>;
-    for (const indicator of indicators) {
-      const indicatorFunction = indicatorFunctionByIndicator[indicator];
-      if (indicatorFunction != undefined) {
-        (result as Record<PropertyKey, unknown>)[indicator] = indicatorFunction(bars, metadata);
+  return ok(
+    (
+      bars: Bar[],
+      metadata: IndicatorMetadata,
+    ): Result<Partial<IndicatorResultByIndicator>, AppError> => {
+      const result = {} as Partial<IndicatorResultByIndicator>;
+      for (const indicator of indicators) {
+        const indicatorFunction = indicatorFunctionByIndicator[indicator];
+        if (indicatorFunction != undefined) {
+          const indicatorFunctionResult = indicatorFunction(bars, metadata);
+          if (indicatorFunctionResult.isErr()) {
+            return err(indicatorFunctionResult.error);
+          }
+          (result as Record<PropertyKey, unknown>)[indicator] = indicatorFunctionResult.value;
+        }
       }
-    }
-    return result;
-  });
+      return ok(result);
+    },
+  );
 }
