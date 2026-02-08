@@ -9,7 +9,6 @@ import { type AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import { backtestAlgorithmsConcurrently } from '@api/core/backtesting/backtest-algorithms-concurrently';
 import type { SupportedLanguage } from '@api/core/backtesting/rpc/languages';
 import { interactiveBrokersSlippageFunction } from '@api/core/backtesting/slippage-functions';
-import { tryAsync } from '@api/utils/error-handling';
 import 'source-map-support/register.js';
 
 // console.log('Uploading algorithms...');
@@ -38,15 +37,13 @@ const algorithms: AnyUserAlgorithmType[] = [
 // }
 
 console.log('Backtesting algorithms...');
-const backtestResponse = await tryAsync(() =>
-  backtestAlgorithmsConcurrently({
-    algorithms,
-    slippageMapFn: interactiveBrokersSlippageFunction,
-    timespan: ['2024-01-01', '2025-01-31'],
-  }),
-);
-if (!backtestResponse.ok) {
-  throw backtestResponse.error;
+const backtestingResultsResponse = await backtestAlgorithmsConcurrently({
+  algorithms,
+  slippageMapFn: interactiveBrokersSlippageFunction,
+  timespan: ['2024-01-01', '2025-01-31'],
+});
+if (backtestingResultsResponse.isErr()) {
+  throw backtestingResultsResponse.error;
 }
 // const backtestingResults = backtestResponse.data;
 
