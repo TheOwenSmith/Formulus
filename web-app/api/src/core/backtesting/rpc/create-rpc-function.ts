@@ -1,8 +1,16 @@
 import { docker } from '@api/lib/docker';
 import { cleanup } from '@api/utils/cleanup';
-import { ErrorWithCode, tryAsync, trySync } from '@api/utils/error-handling';
+import {
+  badRequest,
+  fromThrowable,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@api/utils/error-handling';
 import { randomUUID } from 'crypto';
+import type { Container } from 'dockerode';
 import fs from 'fs';
+import { err, ok, Result } from 'neverthrow';
 import os from 'os';
 import path from 'path';
 import { PassThrough } from 'stream';
@@ -47,45 +55,20 @@ export async function createRpcFunction<In extends unknown[], Out>({
   files: Record<string, string>;
   image: string;
   startCommand: string[];
-  userCodePostValidation?: (args: In, result: Out) => void;
+  userCodePostValidation?: (args: In, result: Out) => Result<undefined, AppError>;
   userResponseSchema: ZodType<Out>;
-}): Promise<RpcFunction<In, Out>> {
-  // Write code files to temp directory
-  const jobId = randomUUID();
-  const hostJobDir = path.join(os.tmpdir(), 'runner-jobs', jobId);
-  fs.mkdirSync(hostJobDir, { recursive: true });
-
+}): Promise<Result<RpcFunction<In, Out>, AppError>> {
+  // Validate filenames
   for (const filename in files) {
     if (!/^[a-zA-Z0-9-_()]+\.[a-z]+$/.test(filename)) {
-      throw new ErrorWithCode(`Invalid filename '${filename}'`, 'BAD_REQUEST');
+      return err(badRequest(`Invalid filename '${filename}'`));
     }
-    fs.writeFileSync(path.join(hostJobDir, filename), files[filename], { encoding: 'utf8' });
   }
 
+  // Initialize variables
+  const jobId = randomUUID();
+  const hostJobDir = path.join(os.tmpdir(), 'runner-jobs', jobId);
   const hostJobDirAbs = path.resolve(hostJobDir);
-
-  // Create docker container
-  const createContainerResponse = await tryAsync(() =>
-    docker.createContainer({
-      Cmd: startCommand,
-      HostConfig: {
-        AutoRemove: true,
-        Binds: [`${hostJobDirAbs}:/sandbox:ro`],
-        CpuQuota: 50_000,
-        Memory: 256 * 1024 * 1024, // 256MB
-        NetworkMode: 'none',
-        PidsLimit: 64,
-        ReadonlyRootfs: false,
-      },
-      Image: image,
-      OpenStdin: true,
-      StdinOnce: false,
-      Tty: false,
-      WorkingDir: '/app',
-    }),
-  );
-  if (!createContainerResponse.ok) throw createContainerResponse.error;
-  const container = createContainerResponse.data;
 
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -93,18 +76,20 @@ export async function createRpcFunction<In extends unknown[], Out>({
   let inflight: {
     args: In;
     resolve: (value: Out) => void;
-    reject: (err: Error) => void;
+    reject: (err: AppError) => void;
     timer: NodeJS.Timeout;
   } | null = null;
   let compilation: {
-    resolve: (message: string) => void;
-    reject: (err: Error) => void;
-    timer: NodeJS.Timeout;
+    resolve: () => void;
+    reject: (err: AppError) => void;
   } | null = null;
   let ended = false;
 
+  let container: Container | null = null;
+  let stream: NodeJS.ReadWriteStream | null = null;
+
   // Cleanup function
-  async function end(error: Error): Promise<void> {
+  async function end(error: AppError): Promise<void> {
     if (ended) return;
     ended = true;
 
@@ -114,18 +99,17 @@ export async function createRpcFunction<In extends unknown[], Out>({
       () => stderr.removeAllListeners(),
       () => stdout.destroy(),
       () => stderr.destroy(),
-      () => stream.end(),
+      () => stream?.end(),
       () => fs.rmSync(hostJobDirAbs, { recursive: true, force: true }),
       async () => {
         console.log('Killing container...');
-        await container.kill();
+        await container?.kill();
         console.log('Container killed');
         return;
       },
       () => fs.rmSync(hostJobDirAbs, { recursive: true, force: true }),
       () => {
         if (inflight != null) {
-          console.log('Clearing inflight');
           clearTimeout(inflight.timer);
           inflight.reject(error);
           inflight = null;
@@ -134,21 +118,68 @@ export async function createRpcFunction<In extends unknown[], Out>({
       () => {
         if (compilation != null) {
           compilation.reject(error);
-          clearTimeout(compilation.timer);
           compilation = null;
         }
       },
     ]);
   }
 
-  const startContainerResponse = await tryAsync(() => container.start());
-  if (!startContainerResponse.ok) {
-    await end(new ErrorWithCode(startContainerResponse.error, 'INTERNAL_SERVER_ERROR'));
-    throw startContainerResponse.error;
+  // Write code files to temp directory
+  const createHostJobDirResponse = fromThrowable(
+    () => fs.mkdirSync(hostJobDir, { recursive: true }),
+    (e) => internal(e),
+  );
+  if (createHostJobDirResponse.isErr()) return err(createHostJobDirResponse.error);
+
+  for (const filename in files) {
+    const writeFileResponse = fromThrowable(
+      () =>
+        fs.writeFileSync(path.join(hostJobDir, filename), files[filename], { encoding: 'utf8' }),
+      (e) => internal(e),
+    );
+    if (writeFileResponse.isErr()) {
+      await end(writeFileResponse.error);
+      return err(writeFileResponse.error);
+    }
+  }
+
+  // Create docker container
+  const createContainerResponse = await fromThrowableAsync(
+    () =>
+      docker.createContainer({
+        Cmd: startCommand,
+        HostConfig: {
+          AutoRemove: true,
+          Binds: [`${hostJobDirAbs}:/sandbox:ro`],
+          CpuQuota: 50_000,
+          Memory: 256 * 1024 * 1024, // 256MB
+          NetworkMode: 'none',
+          PidsLimit: 64,
+          ReadonlyRootfs: false,
+        },
+        Image: image,
+        OpenStdin: true,
+        StdinOnce: false,
+        Tty: false,
+        WorkingDir: '/app',
+      }),
+    (e) => internal(e),
+  );
+  if (createContainerResponse.isErr()) return err(createContainerResponse.error);
+  container = createContainerResponse.value;
+
+  const startContainerResponse = await fromThrowableAsync(
+    () => container.start(),
+    (e) => internal(e),
+  );
+  if (startContainerResponse.isErr()) {
+    await end(startContainerResponse.error);
+    return err(startContainerResponse.error);
   }
   console.log('Container started');
 
-  const createStreamResponse = await tryAsync(
+  // Create stream
+  const createStreamResponse = await fromThrowableAsync(
     () =>
       container.attach({
         hijack: true,
@@ -156,65 +187,76 @@ export async function createRpcFunction<In extends unknown[], Out>({
         stdin: true,
         stdout: true,
         stream: true,
-      }) as unknown as Promise<NodeJS.ReadWriteStream>,
+      }),
+    (e) => internal(e),
   );
-  if (!createStreamResponse.ok) {
-    await end(new ErrorWithCode(createStreamResponse.error, 'INTERNAL_SERVER_ERROR'));
-    throw createStreamResponse.error;
+  if (createStreamResponse.isErr()) {
+    await end(createStreamResponse.error);
+    return err(createStreamResponse.error);
   }
-  const stream = createStreamResponse.data;
+  stream = createStreamResponse.value;
 
   stdout.on('data', async (data: Buffer) => {
     if (data.length > MAX_OUT_BYTES) {
-      await end(new ErrorWithCode('Output exceeded stream limit of 1MB', 'PAYLOAD_TOO_LARGE'));
+      await end({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'Output exceeded stream limit of 1MB',
+      });
       return;
     }
 
     if (compilation != null) {
       if (data.toString('utf-8') !== 'compiled\n') {
-        await end(new ErrorWithCode(data.toString('utf-8'), 'BAD_REQUEST'));
+        await end(badRequest('Compilation failed', data.toString('utf-8')));
         return;
       }
-      compilation.resolve('');
+      compilation.resolve();
       compilation = null;
       return;
     }
 
-    const jsonParseResponse = trySync(() => JSON.parse(data.toString('utf-8')));
-    if (!jsonParseResponse.ok) {
-      await end(new ErrorWithCode(jsonParseResponse.error, 'BAD_REQUEST'));
+    const jsonParseResponse = fromThrowable(
+      () => JSON.parse(data.toString('utf-8')),
+      (e) => badRequest('Failed to parse JSON', e),
+    );
+    if (jsonParseResponse.isErr()) {
+      await end(jsonParseResponse.error);
       return;
     }
-    const parsedJson = jsonParseResponse.data;
+    const parsedJson = jsonParseResponse.value;
 
     // Should follow { ok: true, result: Out } | { ok: false, error: Error } structure
-    const zodResultSchemaParseResponse = trySync(() => resultSchema.parse(parsedJson));
-    if (!zodResultSchemaParseResponse.ok) {
-      await end(new ErrorWithCode(zodResultSchemaParseResponse.error, 'BAD_REQUEST'));
+    const zodResultSchemaParseResponse = fromThrowable(
+      () => resultSchema.parse(parsedJson),
+      (e) => badRequest('Failed to parse result', e),
+    );
+    if (zodResultSchemaParseResponse.isErr()) {
+      await end(zodResultSchemaParseResponse.error);
       return;
     }
-    const rpcOutput = zodResultSchemaParseResponse.data;
+    const rpcOutput = zodResultSchemaParseResponse.value;
 
     if (!rpcOutput.ok) {
-      await end(new ErrorWithCode(rpcOutput.error, 'BAD_REQUEST'));
+      await end(badRequest('Invalid result', rpcOutput.error));
       return;
     }
 
     // Should follow Out structure
-    const zodUserResponseSchemaResponse = trySync(() => userResponseSchema.parse(rpcOutput.result));
-    if (!zodUserResponseSchemaResponse.ok) {
-      await end(new ErrorWithCode(zodUserResponseSchemaResponse.error, 'BAD_REQUEST'));
+    const zodUserResponseSchemaResponse = fromThrowable(
+      () => userResponseSchema.parse(rpcOutput.result),
+      (e) => badRequest('Invalid user response', e),
+    );
+    if (zodUserResponseSchemaResponse.isErr()) {
+      await end(zodUserResponseSchemaResponse.error);
       return;
     }
-    const userCodeResult = zodUserResponseSchemaResponse.data;
+    const userCodeResult = zodUserResponseSchemaResponse.value;
 
     // Post-validatiom
     if (userCodePostValidation != null && inflight != null) {
-      const postValidationResponse = trySync(() =>
-        userCodePostValidation(inflight!.args, userCodeResult),
-      );
-      if (!postValidationResponse.ok) {
-        await end(new ErrorWithCode(postValidationResponse.error, 'BAD_REQUEST'));
+      const postValidationResponse = userCodePostValidation(inflight.args, userCodeResult);
+      if (postValidationResponse.isErr()) {
+        await end(postValidationResponse.error);
         return;
       }
     }
@@ -226,50 +268,63 @@ export async function createRpcFunction<In extends unknown[], Out>({
 
   stderr.on('data', async (data: Buffer) => {
     if (data.length > MAX_OUT_BYTES) {
-      await end(new ErrorWithCode('Output exceeded stream limit of 1MB', 'PAYLOAD_TOO_LARGE'));
+      await end({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'Output exceeded stream limit of 1MB',
+      });
       return;
     }
 
-    await end(new ErrorWithCode(data.toString('utf-8'), 'BAD_REQUEST'));
+    await end(badRequest('Code execution error', data.toString('utf-8')));
   });
 
   // Demux Docker's multiplexed stream into stdout/stderr
-  const demuxStreamResponse = await tryAsync(() =>
-    docker.modem.demuxStream(stream, stdout, stderr),
+  const demuxStreamResponse = await fromThrowable(
+    () => docker.modem.demuxStream(stream, stdout, stderr),
+    (e) => internal(e),
   );
-  if (!demuxStreamResponse.ok) {
-    await end(new ErrorWithCode(demuxStreamResponse.error, 'INTERNAL_SERVER_ERROR'));
-    throw demuxStreamResponse.error;
+  if (demuxStreamResponse.isErr()) {
+    await end(demuxStreamResponse.error);
+    return err(demuxStreamResponse.error);
   }
 
-  const compilationResponse = await tryAsync(
-    () =>
-      new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject('Compilation timed out'), COMPILING_TIMEOUT_MS);
-        compilation = { resolve, reject, timer };
-      }),
-  );
-  if (!compilationResponse.ok) {
-    await end(new ErrorWithCode(compilationResponse.error, 'BAD_REQUEST'));
-    throw compilationResponse.error;
+  const compilationResponse = await new Promise<Result<undefined, AppError>>((resolve) => {
+    const timer = setTimeout(
+      () => resolve(err(badRequest('Compilation timed out'))),
+      COMPILING_TIMEOUT_MS,
+    );
+    compilation = {
+      resolve: () => {
+        clearTimeout(timer);
+        resolve(ok(undefined));
+      },
+      reject: (e: AppError) => {
+        clearTimeout(timer);
+        resolve(err(e));
+      },
+    };
+  });
+  if (compilationResponse.isErr()) {
+    await end(compilationResponse.error);
+    return err(compilationResponse.error);
   }
   console.log('Code compiled');
 
   function call(...args: In): Promise<Out> {
     const p = new Promise<Out>((resolve, reject) => {
       const timer = setTimeout(() => {
-        void end(new ErrorWithCode('User code timed out', 'BAD_REQUEST'));
+        void end(badRequest('User code timed out'));
       }, RPC_TIMEOUT_MS);
       inflight = { args, resolve, reject, timer };
     });
 
-    stream.write(JSON.stringify({ args }) + '\n');
+    stream!.write(JSON.stringify({ args }) + '\n');
     return p;
   }
 
   // Return RPC function
-  call.end = () => end(new ErrorWithCode('Runner force quit early', 'INTERNAL_SERVER_ERROR'));
-  return call;
+  call.end = () => end(internal('Runner force quit early'));
+  return ok(call);
 }
 
 export async function createBatchRpcFunctionFromUserCode<
@@ -283,7 +338,7 @@ export async function createBatchRpcFunctionFromUserCode<
   userCodeByFilename: Record<string, string>;
   userResponseSchemas: Record<number, ZodType<Out[number]>>;
   language: SupportedLanguage;
-}): Promise<RpcFunction<[In], Out>> {
+}): Promise<Result<RpcFunction<[In], Out>, AppError>> {
   const userResponseSchema = z.record(z.coerce.number(), z.unknown()).superRefine((data, ctx) => {
     for (const index in data) {
       if (!(index in userResponseSchemas)) {
@@ -307,20 +362,18 @@ export async function createBatchRpcFunctionFromUserCode<
     }
   });
 
-  function userCodePostValidiation(args: [In], userCodeResult: Out): void {
+  function userCodePostValidiation(args: [In], userCodeResult: Out): Result<undefined, AppError> {
     for (const index in args[0]) {
       if (!(index in userCodeResult)) {
-        throw new ErrorWithCode(
-          `Expected data from index '${index}' but received none`,
-          'BAD_REQUEST',
-        );
+        return err(badRequest(`Expected data from index '${index}' but received none`));
       }
     }
     for (const index in userCodeResult) {
       if (!(index in args[0])) {
-        throw new ErrorWithCode(`Recieved unexpected data from index '${index}'`, 'BAD_REQUEST');
+        return err(badRequest(`Recieved unexpected data from index '${index}'`));
       }
     }
+    return ok(undefined);
   }
 
   const extension = EXTENSION_BY_LANGUAGE[language];
