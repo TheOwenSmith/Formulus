@@ -44,7 +44,7 @@ const RPC_TIMEOUT_MS = 3_000;
 export type RpcFunction<In extends unknown[], Out> = ((
   ...args: In
 ) => Promise<Result<Out, AppError>>) & {
-  end: () => Promise<void>;
+  end: () => Promise<Result<undefined, AppError>>;
 };
 
 export async function createRpcFunction<In extends unknown[], Out>({
@@ -90,12 +90,12 @@ export async function createRpcFunction<In extends unknown[], Out>({
   let stream: NodeJS.ReadWriteStream | null = null;
 
   // Cleanup function
-  async function end(error: AppError): Promise<void> {
-    if (ended) return;
+  async function end(error: AppError): Promise<Result<undefined, AppError>> {
+    if (ended) return ok(undefined);
     ended = true;
 
     console.log('Cleaning up...');
-    await cleanup([
+    const cleanupResult = await cleanup([
       () => stdout.removeAllListeners(),
       () => stderr.removeAllListeners(),
       () => stdout.destroy(),
@@ -122,6 +122,8 @@ export async function createRpcFunction<In extends unknown[], Out>({
         }
       },
     ]);
+    if (cleanupResult.isErr()) return err(internal(cleanupResult.error));
+    return ok(undefined);
   }
 
   // Write code files to temp directory

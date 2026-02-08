@@ -17,7 +17,7 @@ export type AggregateDataIterator = AsyncGenerator<
   { bar: Bar; bytesProcessed: number },
   Result<null, AppError>
 > & {
-  close: () => Promise<void>;
+  close: () => Promise<Result<undefined, AppError>>;
 };
 
 export function getAggregateDataIterator({
@@ -54,8 +54,10 @@ export function getAggregateDataIterator({
   });
   const iter = rlInterface[Symbol.asyncIterator]();
 
-  async function close() {
-    await cleanup([() => rlInterface.close(), () => fileStream.destroy()]);
+  async function close(): Promise<Result<undefined, AppError>> {
+    const cleanupResult = await cleanup([() => rlInterface.close(), () => fileStream.destroy()]);
+    if (cleanupResult.isErr()) return err(internal(cleanupResult.error));
+    return ok(undefined);
   }
 
   async function* generator(): AsyncGenerator<

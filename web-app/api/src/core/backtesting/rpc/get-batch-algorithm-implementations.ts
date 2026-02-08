@@ -24,7 +24,7 @@ export type ImplementationArgumentsByAlgorithmIndex = Map<
 export type BatchAlgorithmImplementationsFn = ((
   implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex,
 ) => Promise<Result<Map<number, Record<Ticker, Action> | null>, AppError>>) & {
-  end?: () => Promise<void>;
+  end?: () => Promise<Result<undefined, AppError>>;
 };
 
 export async function getBatchAlgorithmImplementationsRpcFunction(

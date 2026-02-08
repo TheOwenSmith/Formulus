@@ -174,28 +174,37 @@ export function getMarketSlippageByTicker(
   if (slippageFileContentResponse.isErr()) return err(slippageFileContentResponse.error);
   const slippageFileContent = slippageFileContentResponse.value;
 
-  slippageFileContent.split('\n').map((line) => JSON.parse(line));
-
-  const defaultSlippageByTickerResponse = fromThrowable(
-    () =>
-      slippageFileContent.split('\n').reduce(
-        (acc, line) => {
+  const defaultSlippageByTickerResult = slippageFileContent
+    .split('\n')
+    .reduce<Result<Record<Ticker, number>, AppError>>(
+      (accResult: Result<Record<Ticker, number>, AppError>, line: string) =>
+        accResult.andThen((acc) => {
           // Parse JSONL line
-          if (line === '') return acc;
+          if (line === '') return ok(acc);
 
-          const parsedJson = JSON.parse(line);
-          const { ticker, slippage } = slippageJsonlLineSchema.parse(parsedJson);
+          const parseJsonResponse = fromThrowable(
+            () => JSON.parse(line),
+            (e) => internal(e),
+          );
+          if (parseJsonResponse.isErr()) {
+            return err(parseJsonResponse.error);
+          }
+          const parsedJson = parseJsonResponse.value;
 
-          // Add to slippage by ticker
-          acc[ticker] = slippage;
-          return acc;
-        },
-        {} as Record<Ticker, number>,
-      ),
-    (e) => internal(e),
-  );
-  if (defaultSlippageByTickerResponse.isErr()) return err(defaultSlippageByTickerResponse.error);
-  const defaultSlippageByTicker = defaultSlippageByTickerResponse.value;
+          return fromThrowable(
+            () => slippageJsonlLineSchema.parse(parsedJson),
+            (e) => internal(e),
+          ).map(({ ticker, slippage }) => {
+            // Add to slippage by ticker
+            acc[ticker] = slippage;
+            return acc;
+          });
+        }),
+      ok({} as Record<Ticker, number>),
+    );
+
+  if (defaultSlippageByTickerResult.isErr()) return err(defaultSlippageByTickerResult.error);
+  const defaultSlippageByTicker = defaultSlippageByTickerResult.value;
 
   const marketSlippageByTicker = {} as Record<Ticker, number>;
   for (const ticker of allTickers) {

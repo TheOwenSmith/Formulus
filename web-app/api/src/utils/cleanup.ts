@@ -1,13 +1,16 @@
-import { tryAsync } from './error-handling';
+import { Result } from 'neverthrow';
+import { fromThrowableAsync, internal } from './error-handling';
 
-export async function cleanup(fns: (() => unknown)[]) {
-  const errors: unknown[] = [];
+export async function cleanup(
+  fns: (() => void | Promise<void>)[],
+): Promise<Result<void[], unknown>> {
+  const results: Result<void, unknown>[] = [];
   for (const fn of fns) {
-    const fnResponse = await tryAsync(() => fn());
-    if (!fnResponse.ok) errors.push(fnResponse.error);
+    const fnResult = await fromThrowableAsync(
+      () => Promise.resolve(fn()),
+      (e) => internal(e),
+    );
+    results.push(fnResult);
   }
-
-  if (errors.length > 0) {
-    throw new AggregateError(errors);
-  }
+  return Result.combine(results);
 }

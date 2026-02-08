@@ -242,29 +242,28 @@ export function getTickerIteratorsByTicker({
   iteratorBoundsByTicker: Record<Ticker, [number, number]>;
   parseStrictly: boolean;
   verboseLogging?: boolean;
-}): Record<Ticker, AggregateDataIterator> {
-  return distinctTickers.reduce(
-    (acc, ticker) => {
-      const tickDataFilename = filenameByTicker[ticker];
-      if (verboseLogging) {
-        console.log(`Fetching '${tickDataFilename}'...`);
-      }
+}): Result<Record<Ticker, AggregateDataIterator>, AppError> {
+  return distinctTickers.reduce<Result<Record<Ticker, AggregateDataIterator>, AppError>>(
+    (accResult, ticker) =>
+      accResult.andThen((acc) => {
+        const tickDataFilename = filenameByTicker[ticker];
+        if (verboseLogging) {
+          console.log(`Fetching '${tickDataFilename}'...`);
+        }
 
-      const [startByte, endByte] = iteratorBoundsByTicker[ticker];
+        const [startByte, endByte] = iteratorBoundsByTicker[ticker];
 
-      const getIteratorResponse = getAggregateDataIterator({
-        endByte,
-        filename: tickDataFilename,
-        parseStrictly,
-        startByte,
-        verboseLogging,
-      });
-      if (getIteratorResponse.isErr()) {
-        throw getIteratorResponse.error;
-      }
-      acc[ticker] = getIteratorResponse.value;
-      return acc;
-    },
-    {} as Record<Ticker, AggregateDataIterator>,
+        return getAggregateDataIterator({
+          endByte,
+          filename: tickDataFilename,
+          parseStrictly,
+          startByte,
+          verboseLogging,
+        }).map((iterator) => {
+          acc[ticker] = iterator;
+          return acc;
+        });
+      }),
+    ok({} as Record<Ticker, AggregateDataIterator>),
   );
 }
