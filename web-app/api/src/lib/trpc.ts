@@ -2,7 +2,7 @@ import { createUserAuthenticationProcedure } from '@api/middleware/authenticatio
 import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
 import { usersRouter } from '@api/routes/users';
-import { initTRPC, type TRPC_ERROR_CODE_KEY } from '@trpc/server';
+import { initTRPC } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import { config } from './config';
 
@@ -10,7 +10,11 @@ export const createContext = (x: CreateExpressContextOptions) => x;
 export type Context = Awaited<ReturnType<typeof createContext>>;
 
 export const t = initTRPC.context<Context>().create({
-  errorFormatter({ shape }) {
+  errorFormatter({ shape, error, ctx }) {
+    if (error.code === 'INTERNAL_SERVER_ERROR') {
+      console.error(`[${ctx?.req.path ?? '??'}]`, error);
+    }
+
     return {
       ...shape,
       // In prod, hide stack traces completely
@@ -18,6 +22,10 @@ export const t = initTRPC.context<Context>().create({
         ...shape.data,
         stack: config.env === 'dev' ? shape.data.stack : undefined,
       },
+      message:
+        config.env === 'dev' || error.code !== 'INTERNAL_SERVER_ERROR'
+          ? shape.message
+          : "An unexpected error occurred (it's not you, it's us)",
     };
   },
 });
@@ -31,16 +39,11 @@ export const appRouter = t.router({
   backtesting: backtestingRouter(router, authProcedure),
   env: t.procedure.query(() => config.env),
   heartbeat: t.procedure.query(() => true),
+  thisIsAnError: t.procedure.query(() => {
+    throw {
+      message: 'This is an error',
+    };
+  }),
   users: usersRouter(router, authProcedure),
 });
 export type AppRouter = typeof appRouter;
-
-export class ErrorWithCode extends Error {
-  code: TRPC_ERROR_CODE_KEY;
-  constructor(input: unknown, code: TRPC_ERROR_CODE_KEY) {
-    const message = input instanceof Error ? input.message : String(input);
-    super(message);
-    this.name = this.constructor.name;
-    this.code = code;
-  }
-}
