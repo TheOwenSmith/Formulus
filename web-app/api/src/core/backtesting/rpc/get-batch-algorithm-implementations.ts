@@ -6,7 +6,8 @@ import {
 } from '@api/core/algorithms/pipeline';
 import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import type { Bar, Ticker } from '@api/fetch/types';
-import { tryAsync } from '@api/utils/error-handling';
+import type { AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import { createBatchRpcFunctionFromUserCode } from './create-rpc-function';
 import { EXTENSION_BY_LANGUAGE, type SupportedLanguage } from './languages';
 
@@ -22,42 +23,45 @@ export type ImplementationArgumentsByAlgorithmIndex = Map<
 
 export type BatchAlgorithmImplementationsFn = ((
   implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex,
-) => Promise<Map<number, Record<Ticker, Action> | null>>) & { end?: () => Promise<void> };
+) => Promise<Result<Map<number, Record<Ticker, Action> | null>, AppError>>) & {
+  end?: () => Promise<void>;
+};
 
 export async function getBatchAlgorithmImplementationsRpcFunction(
   algorithms: AnyUserAlgorithmType[],
   language: SupportedLanguage,
-): Promise<BatchAlgorithmImplementationsFn> {
+): Promise<Result<BatchAlgorithmImplementationsFn, AppError>> {
   // Get algorithm pipelines
   const algorithmPipelines: UserAlgorithmPipeline[] =
     getAlgorithmPipelinesFromUserAlgorithms(algorithms);
 
   // Create RPC function
-  const createBatchRpcFunctionResponse = await tryAsync(() =>
-    createBatchRpcFunctionFromUserCode<Record<number, unknown[]>, Record<number, unknown>>({
-      userCodeByFilename: algorithms.reduce(
-        (acc, algorithm) => {
-          const filename = `${algorithm.name.replaceAll(' ', '_')}.${EXTENSION_BY_LANGUAGE[language]}`;
-          acc[filename] = algorithm.userAlgorithmImplementationCode;
-          return acc;
-        },
-        {} as Record<string, string>,
-      ),
-      userResponseSchemas: algorithms.map(
-        (_algorithm, algorithmIndex) => algorithmPipelines[algorithmIndex].userResponseSchema,
-      ),
-      language,
-    }),
-  );
-  if (!createBatchRpcFunctionResponse.ok) {
-    throw createBatchRpcFunctionResponse.error;
+  const createBatchRpcFunctionResponse = await createBatchRpcFunctionFromUserCode<
+    Record<number, unknown[]>,
+    Record<number, unknown>
+  >({
+    userCodeByFilename: algorithms.reduce(
+      (acc, algorithm) => {
+        const filename = `${algorithm.name.replaceAll(' ', '_')}.${EXTENSION_BY_LANGUAGE[language]}`;
+        acc[filename] = algorithm.userAlgorithmImplementationCode;
+        return acc;
+      },
+      {} as Record<string, string>,
+    ),
+    userResponseSchemas: algorithms.map(
+      (_algorithm, algorithmIndex) => algorithmPipelines[algorithmIndex].userResponseSchema,
+    ),
+    language,
+  });
+  if (createBatchRpcFunctionResponse.isErr()) {
+    return err(createBatchRpcFunctionResponse.error);
   }
-  const batchAlgorithmImplementationsRpcFunction = createBatchRpcFunctionResponse.data;
+  const batchAlgorithmImplementationsRpcFunction = createBatchRpcFunctionResponse.value;
 
   // Creat callable batch function
   const batchAlgorithmImplementationsFn = async (
     implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex,
-  ): Promise<Map<number, Record<Ticker, Action> | null>> => {
+  ): Promise<Result<Map<number, Record<Ticker, Action> | null>, AppError>> => {
     const actionsByAlgorithmIndex = new Map<number, Record<Ticker, Action> | null>();
 
     const rpcInput: Record<number, unknown[]> = {};
@@ -77,13 +81,12 @@ export async function getBatchAlgorithmImplementationsRpcFunction(
       }
     }
 
-    const userOutputByAlgorithmIndexResponse = await tryAsync(() =>
-      batchAlgorithmImplementationsRpcFunction(rpcInput),
-    );
-    if (!userOutputByAlgorithmIndexResponse.ok) {
-      throw userOutputByAlgorithmIndexResponse.error;
+    const userOutputByAlgorithmIndexResponse =
+      await batchAlgorithmImplementationsRpcFunction(rpcInput);
+    if (userOutputByAlgorithmIndexResponse.isErr()) {
+      return err(userOutputByAlgorithmIndexResponse.error);
     }
-    const userOutputByAlgorithmIndex = userOutputByAlgorithmIndexResponse.data;
+    const userOutputByAlgorithmIndex = userOutputByAlgorithmIndexResponse.value;
 
     for (const [
       algorithmIndex,
@@ -100,10 +103,10 @@ export async function getBatchAlgorithmImplementationsRpcFunction(
         actionsByAlgorithmIndex.set(Number(algorithmIndex), actionsByTicker);
       }
     }
-    return actionsByAlgorithmIndex;
+    return ok(actionsByAlgorithmIndex);
   };
   batchAlgorithmImplementationsFn.end = batchAlgorithmImplementationsRpcFunction.end;
-  return batchAlgorithmImplementationsFn;
+  return ok(batchAlgorithmImplementationsFn);
 }
 
 export async function getBatchAlgorithmImplementationsDefaultFunction(
@@ -111,22 +114,24 @@ export async function getBatchAlgorithmImplementationsDefaultFunction(
 ): Promise<BatchAlgorithmImplementationsFn> {
   return async (
     implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex,
-  ): Promise<Map<number, Record<Ticker, Action> | null>> => {
-    return new Map<number, Record<Ticker, Action> | null>(
-      // structure returned by Promise.all is [algorithmIndex: number, actions: Record<Ticker, Action> | null][]
-      await Promise.all(
-        [...implementationArgumentsByAlgorithmIndex.entries()].map(
-          async ([algorithmIndex, params]) => {
-            const algorithm = algorithms[algorithmIndex];
-            if (params != null) {
-              return [algorithmIndex, await algorithm.implementation(...params)] as [
-                number,
-                Record<Ticker, Action>,
-              ];
-            } else {
-              return [algorithmIndex, null] as [number, Record<Ticker, Action> | null];
-            }
-          },
+  ): Promise<Result<Map<number, Record<Ticker, Action> | null>, AppError>> => {
+    return ok(
+      new Map<number, Record<Ticker, Action> | null>(
+        // structure returned by Promise.all is [algorithmIndex: number, actions: Record<Ticker, Action> | null][]
+        await Promise.all(
+          [...implementationArgumentsByAlgorithmIndex.entries()].map(
+            async ([algorithmIndex, params]) => {
+              const algorithm = algorithms[algorithmIndex];
+              if (params != null) {
+                return [algorithmIndex, await algorithm.implementation(...params)] as [
+                  number,
+                  Record<Ticker, Action>,
+                ];
+              } else {
+                return [algorithmIndex, null] as [number, Record<Ticker, Action> | null];
+              }
+            },
+          ),
         ),
       ),
     );

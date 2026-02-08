@@ -41,7 +41,9 @@ const MAX_OUT_BYTES = 1 * 1024 * 1024; // 1MB
 const COMPILING_TIMEOUT_MS = 40_000;
 const RPC_TIMEOUT_MS = 3_000;
 
-export type RpcFunction<In extends unknown[], Out> = ((...args: In) => Promise<Out>) & {
+export type RpcFunction<In extends unknown[], Out> = ((
+  ...args: In
+) => Promise<Result<Out, AppError>>) & {
   end: () => Promise<void>;
 };
 
@@ -77,7 +79,6 @@ export async function createRpcFunction<In extends unknown[], Out>({
     args: In;
     resolve: (value: Out) => void;
     reject: (err: AppError) => void;
-    timer: NodeJS.Timeout;
   } | null = null;
   let compilation: {
     resolve: () => void;
@@ -110,7 +111,6 @@ export async function createRpcFunction<In extends unknown[], Out>({
       () => fs.rmSync(hostJobDirAbs, { recursive: true, force: true }),
       () => {
         if (inflight != null) {
-          clearTimeout(inflight.timer);
           inflight.reject(error);
           inflight = null;
         }
@@ -261,7 +261,6 @@ export async function createRpcFunction<In extends unknown[], Out>({
       }
     }
 
-    clearTimeout(inflight?.timer);
     inflight?.resolve(userCodeResult);
     inflight = null;
   });
@@ -310,12 +309,22 @@ export async function createRpcFunction<In extends unknown[], Out>({
   }
   console.log('Code compiled');
 
-  function call(...args: In): Promise<Out> {
-    const p = new Promise<Out>((resolve, reject) => {
+  function call(...args: In): Promise<Result<Out, AppError>> {
+    const p = new Promise<Result<Out, AppError>>((resolve) => {
       const timer = setTimeout(() => {
         void end(badRequest('User code timed out'));
       }, RPC_TIMEOUT_MS);
-      inflight = { args, resolve, reject, timer };
+      inflight = {
+        args,
+        resolve: (result: Out) => {
+          clearTimeout(timer);
+          resolve(ok(result));
+        },
+        reject: (e: AppError) => {
+          clearTimeout(timer);
+          resolve(err(e));
+        },
+      };
     });
 
     stream!.write(JSON.stringify({ args }) + '\n');
