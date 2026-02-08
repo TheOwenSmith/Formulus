@@ -9,14 +9,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig([
   {
-    ignores: [
-      'dist',
-      'node_modules',
-      'generated',
-      'src/generated',
-      '*.config.{ts,mjs,js}',
-      'build.ts',
-    ],
+    ignores: ['dist', 'node_modules', 'generated', 'src/generated', '*.config.{ts,mjs,js}'],
   },
   {
     files: ['**/*.{ts,tsx}'],

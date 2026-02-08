@@ -1,38 +1,47 @@
-import js from '@eslint/js';
+// @ts-check
+
+import eslint from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier/flat';
 import importPlugin from 'eslint-plugin-import';
-import reactHooks from 'eslint-plugin-react-hooks';
-import reactRefresh from 'eslint-plugin-react-refresh';
 import sortKeysFix from 'eslint-plugin-sort-keys';
-import { defineConfig, globalIgnores } from 'eslint/config';
-import globals from 'globals';
+import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  {
+    ignores: ['dist', 'node_modules', '*.config.{ts,mjs,js}'],
+  },
   {
     files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
+    extends: [eslint.configs.recommended, ...tseslint.configs.recommended, eslintConfigPrettier],
     plugins: {
       '@typescript-eslint': tseslint.plugin,
       import: importPlugin,
       'sort-keys-fix': sortKeysFix,
     },
+    settings: {
+      'import/parsers': {
+        '@typescript-eslint/parser': ['.ts', '.tsx'],
+      },
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.json',
+        },
+      },
+    },
     languageOptions: {
-      ecmaVersion: 2023,
-      globals: globals.browser,
+      ecmaVersion: 2024,
       parser: tseslint.parser,
       parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        project: './tsconfig.json',
+        // tsConfigRootDir: process.cwd(),
         tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
+      // Safety
+      '@typescript-eslint/no-floating-promises': 'error',
+
       // Clean code
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
@@ -46,6 +55,7 @@ export default defineConfig([
           argsIgnorePattern: '^_', // ignore function args starting with _
         },
       ],
+      // 'capitalized-comments': ['warn', 'always', { ignoreInlineComments: true }],
 
       // Import/Export rules
       'import/no-default-export': 'error',
@@ -56,14 +66,21 @@ export default defineConfig([
             // Block TS path alias to api
             {
               group: ['@api/*'],
-              message: 'Client code cannot import from @api. Use @shared.',
+              message: 'Worker code cannot import from @api. Use @shared.',
             },
             // Block ../* imports
             {
               group: ['../*'],
-              message: 'Use @client/path/to/file instead of ../path/to/file',
+              message: 'Use @worker/path/to/file instead of ../path/to/file',
             },
           ],
+        },
+      ],
+      'import/no-cycle': [
+        'error',
+        {
+          maxDepth: Infinity,
+          ignoreExternal: true,
         },
       ],
 
