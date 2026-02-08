@@ -1,6 +1,7 @@
 import { Action } from '@api/core/algorithms/algorithm';
 import type { Ticker } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, internal, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import type { AlgorithmData } from './backtest-algorithms-concurrently';
 
 // See docs/Phoenix_Trader_Position_Management_System.pdf
@@ -20,7 +21,7 @@ export function updatePosition({
   priceByTicker: Record<Ticker, number>;
   slippageByTicker: Record<Ticker, number>;
   ticks: number;
-}) {
+}): Result<undefined, AppError> {
   // Initialize sets
   const h: Ticker[] = [];
   const th: Ticker[] = [];
@@ -28,10 +29,7 @@ export function updatePosition({
 
   for (const ticker of algorithmTickers) {
     if (!(ticker in actions)) {
-      throw new ErrorWithCode(
-        `No action specified for ticker '${ticker}' in actions record`,
-        'BAD_REQUEST',
-      );
+      return err(badRequest(`No action specified for ticker '${ticker}' in actions record`));
     }
 
     const has = algorithmData.positions[ticker] > 0;
@@ -47,7 +45,7 @@ export function updatePosition({
   }
 
   // Compute k
-  const k = computeK({
+  const kResult = computeK({
     algorithmPositions: algorithmData.positions,
     b,
     c: algorithmData.balance,
@@ -57,6 +55,10 @@ export function updatePosition({
     slippageByTicker,
     th,
   });
+  if (kResult.isErr()) {
+    return err(kResult.error);
+  }
+  const k = kResult.value;
 
   // Sell
   for (const ticker of th) {
@@ -110,6 +112,7 @@ export function updatePosition({
     algorithmData.entraceTimeByTickerPosition[ticker] = ticks;
     algorithmData.trades++;
   }
+  return ok(undefined);
 }
 
 const TOLERANCE = 1e-8;
@@ -131,7 +134,7 @@ function computeK({
   r: number;
   slippageByTicker: Record<Ticker, number>;
   th: Ticker[];
-}): number {
+}): Result<number, AppError> {
   const sortedPositionSlippageTuple: [number, number][] = [];
 
   // Compute constants beta and phi
@@ -160,7 +163,7 @@ function computeK({
 
   const n = h.length;
   if (n === 0) {
-    return beta / phi;
+    return ok(beta / phi);
   }
 
   // Sort by price
@@ -199,23 +202,23 @@ function computeK({
       sortedPositionSlippageTuple[i][0] - TOLERANCE <= potentialK &&
       potentialK < sortedPositionSlippageTuple[i + 1][0] + TOLERANCE
     ) {
-      return potentialK;
+      return ok(potentialK);
     }
   }
 
   // Assuming k<p_0
   const potentialKLeftEdge = (beta - sigma_pr[0]) / (phi - s_r[0]);
   if (potentialKLeftEdge < sortedPositionSlippageTuple[0][0] + TOLERANCE) {
-    return potentialKLeftEdge;
+    return ok(potentialKLeftEdge);
   }
 
   // Assume k>=p{i+1}
   const potentialKRightEdge = (beta + sigma_pl.at(-1)!) / (phi + s_l.at(-1)!);
   if (potentialKRightEdge >= sortedPositionSlippageTuple.at(-1)![0] - TOLERANCE) {
-    return potentialKRightEdge;
+    return ok(potentialKRightEdge);
   }
 
-  throw new ErrorWithCode('k not found', 'INTERNAL_SERVER_ERROR');
+  return err(internal('k not found'));
 }
 
 export function getPortfolioValue({

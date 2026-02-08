@@ -534,7 +534,7 @@ export async function backtestAlgorithmsConcurrently({
         const actions = actionsByAlgorithmIndex.get(algorithmIndex)!;
 
         if (actions != null) {
-          updatePosition({
+          const updatePositionResult = updatePosition({
             actions,
             algorithmData,
             algorithmMaxHoldingProportion,
@@ -543,6 +543,9 @@ export async function backtestAlgorithmsConcurrently({
             slippageByTicker,
             ticks,
           });
+          if (updatePositionResult.isErr()) {
+            return err(updatePositionResult.error);
+          }
         } else {
           closeAllPositions({
             algorithmData,
