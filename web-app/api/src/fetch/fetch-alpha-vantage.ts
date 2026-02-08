@@ -1,8 +1,14 @@
 import { config } from '@api/lib/config';
-import { tryAsync, trySync } from '@api/utils/error-handling';
+import {
+  fromThrowable,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@api/utils/error-handling';
 import { retryWithBackoff } from '@api/utils/retry';
 import { zodSafeFetch } from '@api/utils/zod-safe-fetch';
 import fs from 'fs';
+import { err, ok, Result } from 'neverthrow';
 import z from 'zod';
 import type { Bar } from './types';
 import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
@@ -36,20 +42,33 @@ export async function fetchAlphaVantageData({
   years: number;
   timestamp: Timestamp;
   verboseLogging?: boolean;
-}) {
+}): Promise<Result<undefined, AppError>> {
   console.log(`Fetching data for '${ticker}' (${timestamp})...`);
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
   const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
 
   const writeToFile = `./data/uncleaned/${ticker}_${timestamp}.csv`;
   if (!fs.existsSync('./data/uncleaned')) {
-    const makeDirResponse = trySync(() => fs.mkdirSync('./data/uncleaned', { recursive: true }));
-    if (!makeDirResponse.ok) throw makeDirResponse.error;
+    const makeDirResponse = fromThrowable(
+      () => fs.mkdirSync('./data/uncleaned', { recursive: true }),
+      (e) => internal(e),
+    );
+    if (makeDirResponse.isErr()) {
+      return err(makeDirResponse.error);
+    }
   }
 
   // Write header
-  const writeHeaderResponse = trySync(() => fs.writeFileSync(writeToFile, tickDataCsvHeader));
-  if (!writeHeaderResponse.ok) throw writeHeaderResponse.error;
+  const writeHeaderResponse = fromThrowable(
+    () => fs.writeFileSync(writeToFile, tickDataCsvHeader),
+    (e) => internal(e),
+  );
+  if (writeHeaderResponse.isErr()) {
+    return err(writeHeaderResponse.error);
+  }
+  if (writeHeaderResponse.isErr()) {
+    return err(writeHeaderResponse.error);
+  }
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -72,21 +91,25 @@ export async function fetchAlphaVantageData({
       if (verboseLogging) {
         console.log(`Fetching '${ticker}' (${timestamp}) data for ${month}...`);
       }
-      const fetchWithRetryResponse = await tryAsync(() =>
-        retryWithBackoff({
-          fn: async () => {
-            const response = await zodSafeFetch({ url, schema: apiResponseSchema });
-            if ('Information' in response) {
-              throw new Error('Rate limit reached');
-            }
-            return response;
-          },
-          maxRetries: 6,
-          verboseLogging,
-        }),
+      const fetchWithRetryResponse = await fromThrowableAsync(
+        () =>
+          retryWithBackoff({
+            fn: async () => {
+              const response = await zodSafeFetch({ url, schema: apiResponseSchema });
+              if ('Information' in response) {
+                throw new Error('Rate limit reached');
+              }
+              return response;
+            },
+            maxRetries: 6,
+            verboseLogging,
+          }),
+        (e) => internal(e),
       );
-      if (!fetchWithRetryResponse.ok) throw fetchWithRetryResponse.error;
-      const apiResponse = fetchWithRetryResponse.data;
+      if (fetchWithRetryResponse.isErr()) {
+        return err(fetchWithRetryResponse.error);
+      }
+      const apiResponse = fetchWithRetryResponse.value;
 
       if ('Error Message' in apiResponse) {
         // Data does not exist for this ticker, so skip this month
@@ -112,8 +135,14 @@ export async function fetchAlphaVantageData({
       });
 
       const content = chunks.join('\n') + '\n';
-      const fileWriteResponse = trySync(() => fs.appendFileSync(writeToFile, content));
-      if (!fileWriteResponse.ok) throw fileWriteResponse.error;
+      const fileWriteResponse = fromThrowable(
+        () => fs.appendFileSync(writeToFile, content),
+        (e) => internal(e),
+      );
+      if (fileWriteResponse.isErr()) {
+        return err(fileWriteResponse.error);
+      }
     }
   }
+  return ok(undefined);
 }
