@@ -12,7 +12,7 @@ import type { IndicatorMetadata } from '@api/core/algorithms/indicators/indicato
 import type { AnyUserAlgorithmType } from '@api/core/algorithms/user-algorithm';
 import { aggregateTimestamps, type Bar, type Ticker, type Timestamp } from '@api/fetch/types';
 import { yearsBetween } from '@api/utils/date-utils';
-import { badRequest, internal, type AppError } from '@api/utils/error-handling';
+import { badRequest, internal, safeReduce, type AppError } from '@api/utils/error-handling';
 import { groupBy } from '@api/utils/group-by';
 import { roundToDecimal, withCommas } from '@api/utils/number-utils';
 import { SharpeRatioCalculator } from '@api/utils/sharpe-ratio-calculator';
@@ -63,7 +63,7 @@ export type AlgorithmData = {
   indicatorResultsFunction: (
     bars: Bar[],
     metadata: IndicatorMetadata,
-  ) => Partial<IndicatorResultByIndicator>;
+  ) => Result<Partial<IndicatorResultByIndicator>, AppError>;
   positions: Record<Ticker, number>;
   positionsClosed: number;
   sharpeRatioCalculator: SharpeRatioCalculator;
@@ -487,13 +487,24 @@ export async function backtestAlgorithmsConcurrently({
           const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
           const positions = algorithmDataByAlgorithmIndex[algorithmIndex].positions;
 
-          const indicators = createIndexByTicker(getTickers(algorithm), (ticker) => {
-            const indicatorResults = algorithmData.indicatorResultsFunction(
-              context[ticker],
-              indicatorMetadataByTicker[ticker],
-            );
-            return indicatorResults;
-          });
+          const getIndicatorsResult = safeReduce(
+            getTickers(algorithm),
+            (acc: Record<Ticker, Partial<IndicatorResultByIndicator>>, ticker: Ticker) => {
+              const getIndicatorResultsResponse = algorithmData.indicatorResultsFunction(
+                context[ticker],
+                indicatorMetadataByTicker[ticker],
+              );
+              return getIndicatorResultsResponse.map((indicatorResults) => {
+                acc[ticker] = indicatorResults;
+                return acc;
+              });
+            },
+            {} as Record<Ticker, Partial<IndicatorResultByIndicator>>,
+          );
+          if (getIndicatorsResult.isErr()) {
+            return err(getIndicatorsResult.error);
+          }
+          const indicators = getIndicatorsResult.value;
 
           implementationArgumentsByAlgorithmIndex.set(algorithmIndex, [
             context,

@@ -16,7 +16,7 @@ export type ImplementationArgumentsByAlgorithmIndex = Map<
   | [
       Record<Ticker, Bar[]>,
       Record<Ticker, number>,
-      Record<Ticker, Result<Partial<IndicatorResultByIndicator>, AppError>>,
+      Record<Ticker, Partial<IndicatorResultByIndicator>>,
     ]
   | null
 >;
