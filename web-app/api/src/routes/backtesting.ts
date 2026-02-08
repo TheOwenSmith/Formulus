@@ -1,8 +1,7 @@
 import { retrieveBacktestingResultsByPublicId } from '@api/core/backtesting/db-backtesting-results';
 import { type TRPCContext } from '@api/lib/trpc';
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
-import { tryAsync } from '@api/utils/error-handling';
-import { TRPCError } from '@trpc/server';
+import { fromThrowableAsync, internal } from '@api/utils/error-handling';
 import { nanoid } from 'nanoid';
 import z from 'zod';
 
@@ -18,7 +17,7 @@ export function backtestingRouter(
           timespan: z.tuple([z.string().nullable(), z.string().nullable()]).optional(),
         }),
       )
-      .mutation(async ({ input }) => {
+      .mutation(async () => {
         // const { algorithms, timespan } = input;
         // const backtestingResults = await backtestAlgorithmsConcurrently({
         //   algorithms,
@@ -36,19 +35,16 @@ export function backtestingRouter(
           publicId: z.string(),
         }),
       )
-      .query(async ({ input, ctx }) => {
-        const retrievedBacktestingResultsResponse = await tryAsync(() =>
-          retrieveBacktestingResultsByPublicId(input.publicId),
+      .query(async ({ input }) => {
+        const retrievedBacktestingResultsResponse = await fromThrowableAsync(
+          () => retrieveBacktestingResultsByPublicId(input.publicId),
+          (e) =>
+            internal(e, 'An unexpected error occurred while retrieving the backtesting results'),
         );
-        if (!retrievedBacktestingResultsResponse.ok) {
-          console.error(`[${ctx.req.path}]`, retrievedBacktestingResultsResponse.error);
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'An unexpected error occurred while retrieving the backtesting results',
-          });
+        if (retrievedBacktestingResultsResponse.isErr()) {
+          throw retrievedBacktestingResultsResponse.error;
         }
-        const backtestingResults = retrievedBacktestingResultsResponse.data;
-        return backtestingResults;
+        return retrievedBacktestingResultsResponse.value;
       }),
   });
 }
