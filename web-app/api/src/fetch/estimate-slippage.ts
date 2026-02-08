@@ -1,6 +1,6 @@
 import { getAggregateDataIterator } from '@api/core/backtesting/read-data';
-import { ErrorWithCode, trySync } from '@api/utils/error-handling';
-import fs from 'fs';
+import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import type { Ticker } from './types';
 
 function sampleVar(xs: number[]): number | null {
@@ -77,24 +77,23 @@ function estimateOneWaySlippageBpsFrom1mCloses(closes1m: number[]): number | nul
   return oneWayBps;
 }
 
-export async function estimateSlippageBps(ticker: Ticker): Promise<number | null> {
+export async function estimateSlippageBps(
+  ticker: Ticker,
+): Promise<Result<number | null, AppError>> {
   const filename = `./data/cleaned/${ticker}_1min.csv`;
-  if (!fs.existsSync(filename)) {
-    throw new ErrorWithCode(
-      `Could not estimate slippage for '${ticker}' because minute data file '${filename}' does not exist`,
-      'INTERNAL_SERVER_ERROR',
-    );
-  }
-
-  const getIteratorResponse = trySync(() =>
-    getAggregateDataIterator({
-      filename,
-      parseStrictly: false,
-      verboseLogging: false,
-    }),
+  const getIteratorResponse = fromThrowable(
+    () =>
+      getAggregateDataIterator({
+        filename,
+        parseStrictly: false,
+        verboseLogging: false,
+      }),
+    (e) => internal(e),
   );
-  if (!getIteratorResponse.ok) throw getIteratorResponse.error;
-  const iterator = getIteratorResponse.data;
+  if (getIteratorResponse.isErr()) {
+    return err(getIteratorResponse.error);
+  }
+  const iterator = getIteratorResponse.value;
 
   // Group closes by day
   const closesByDay: number[][] = [];
@@ -123,7 +122,7 @@ export async function estimateSlippageBps(ticker: Ticker): Promise<number | null
   }
 
   if (closesByDay.length === 0) {
-    return null;
+    return ok(null);
   }
 
   // Estimate slippage from closes and take the average
@@ -136,12 +135,12 @@ export async function estimateSlippageBps(ticker: Ticker): Promise<number | null
   }
 
   if (slippageEstimates.length === 0) {
-    return null;
+    return ok(null);
   }
 
   // Take the averge
   const averageSlippage =
     slippageEstimates.reduce((sum, val) => sum + val, 0) / slippageEstimates.length;
 
-  return averageSlippage;
+  return ok(averageSlippage);
 }
