@@ -7,6 +7,7 @@ import type { BacktestingResultsModel } from '@api/generated/prisma/models';
 import { prisma } from '@api/lib/prisma';
 import { ErrorWithCode, tryAsync } from '@api/utils/error-handling';
 import { nanoid } from 'nanoid';
+import { err, ok, type Result } from 'neverthrow';
 import type { BacktestAlgorithmsResult, SimplePlot } from './backtest-algorithms-concurrently';
 import type { ProfitLossRatio } from './statistics';
 
@@ -18,7 +19,7 @@ export async function uploadBacktestingResults({
   creatorId: string;
   algorithmsIds: string[];
   result: BacktestAlgorithmsResult;
-}): Promise<BacktestingResultsModel> {
+}): Promise<Result<BacktestingResultsModel, ErrorWithCode>> {
   const createBacktestingResultsResponse = await tryAsync(() =>
     prisma.backtestingResults.create({
       data: {
@@ -73,15 +74,15 @@ export async function uploadBacktestingResults({
       },
     }),
   );
-  if (!createBacktestingResultsResponse.ok) {
-    throw new ErrorWithCode(createBacktestingResultsResponse.error, 'INTERNAL_SERVER_ERROR');
+  if (createBacktestingResultsResponse.isErr()) {
+    return err(new ErrorWithCode(createBacktestingResultsResponse.error, 'INTERNAL_SERVER_ERROR'));
   }
-  return createBacktestingResultsResponse.data;
+  return ok(createBacktestingResultsResponse.value);
 }
 
 export async function retrieveBacktestingResultsByPublicId(
   publicId: string,
-): Promise<BacktestAlgorithmsResult | null> {
+): Promise<Result<BacktestAlgorithmsResult | null, ErrorWithCode>> {
   const getBacktestingResultsResponse = await tryAsync(() =>
     prisma.backtestingResults.findUnique({
       where: {
@@ -97,12 +98,12 @@ export async function retrieveBacktestingResultsByPublicId(
       },
     }),
   );
-  if (!getBacktestingResultsResponse.ok) {
-    throw new ErrorWithCode(getBacktestingResultsResponse.error, 'INTERNAL_SERVER_ERROR');
+  if (getBacktestingResultsResponse.isErr()) {
+    return err(new ErrorWithCode(getBacktestingResultsResponse.error, 'INTERNAL_SERVER_ERROR'));
   }
-  const dbBacktestingResults = getBacktestingResultsResponse.data;
+  const dbBacktestingResults = getBacktestingResultsResponse.value;
   if (dbBacktestingResults == null) {
-    return null;
+    return ok(null);
   }
 
   const formattedBacktestingResults: BacktestAlgorithmsResult = {
@@ -150,5 +151,5 @@ export async function retrieveBacktestingResultsByPublicId(
       string[]
     >,
   };
-  return formattedBacktestingResults;
+  return ok(formattedBacktestingResults);
 }

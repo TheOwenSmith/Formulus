@@ -1,15 +1,19 @@
-import type { SupportedLanguage } from '@api/core/backtesting/rpc/create-rpc-function';
 import { getTickers } from '@api/core/backtesting/ticker-utils';
 import type { tickers, Timestamp, UserTicker } from '@api/fetch/types';
 import {
   AlgorithmType as DbAlgorithmType,
   Timestamp as DbTimestamp,
+  SupportedLanguage,
 } from '@api/generated/prisma/enums';
 import type { AlgorithmModel } from '@api/generated/prisma/models/Algorithm';
 import { prisma } from '@api/lib/prisma';
-import { ErrorWithCode, tryAsync } from '@api/utils/error-handling';
+import { badRequest, fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
+import type { Result } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import type { Indicator } from './indicators/indicator';
-import { AlgorithmType, type AnyUserAlgorithmType } from './user-algorithm';
+import { AlgorithmType, type AnyUserAlgorithmType, type UserAlgorithm } from './user-algorithm';
+import type { UserSimpleAlgorithm } from './user-simple-algorithm';
+import type { UserTopKAlgorithm } from './user-top-k-algorithm';
 
 export function convertTimestampToDbTimestamp(timestamp: Timestamp): DbTimestamp {
   switch (timestamp) {
@@ -85,60 +89,62 @@ export async function uploadAlgorithm({
 }: {
   algorithm: AnyUserAlgorithmType;
   creatorId: string;
-}): Promise<AlgorithmModel> {
+}): Promise<Result<AlgorithmModel, AppError>> {
   if (algorithm.type === AlgorithmType.TOP_K && !('k' in algorithm)) {
-    throw new ErrorWithCode(
-      'Failed to upload algorithm: k is required for TOP_K algorithms',
-      'BAD_REQUEST',
+    return err(
+      badRequest('Failed to upload algorithm: k is required for TOP_K algorithms', 'BAD_REQUEST'),
     );
   }
 
-  const createAlgorithmResponse = await tryAsync(() =>
-    prisma.algorithm.create({
-      data: {
-        aggregate: convertTimestampToDbTimestamp(algorithm.aggregate),
-        algorithmMaxHoldingProportion: algorithm.algorithmMaxHoldingProportion,
-        contextLength: algorithm.contextLength,
-        creator: {
-          connect: {
-            id: creatorId,
+  const createAlgorithmResult = await fromThrowableAsync(
+    () =>
+      prisma.algorithm.create({
+        data: {
+          aggregate: convertTimestampToDbTimestamp(algorithm.aggregate),
+          algorithmMaxHoldingProportion: algorithm.algorithmMaxHoldingProportion,
+          contextLength: algorithm.contextLength,
+          creator: {
+            connect: {
+              id: creatorId,
+            },
           },
+          indicators: algorithm.indicators ?? [],
+          k: 'k' in algorithm ? algorithm.k : undefined,
+          language: algorithm.language as SupportedLanguage,
+          name: algorithm.name,
+          tickers: getTickers(algorithm),
+          type: convertAlgorithmTypeToDbAlgorithmType(algorithm.type),
+          userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
         },
-        indicators: algorithm.indicators ?? [],
-        k: 'k' in algorithm ? algorithm.k : undefined,
-        language: algorithm.language,
-        name: algorithm.name,
-        tickers: getTickers(algorithm),
-        type: convertAlgorithmTypeToDbAlgorithmType(algorithm.type),
-        userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
-      },
-    }),
+      }),
+    (e) => internal(e),
   );
-  if (!createAlgorithmResponse.ok) {
-    throw new ErrorWithCode(createAlgorithmResponse.error, 'INTERNAL_SERVER_ERROR');
-  }
-  return createAlgorithmResponse.data;
+  return createAlgorithmResult;
 }
 
-export async function retrieveAlgorithmById(id: string): Promise<AnyUserAlgorithmType | null> {
-  const getDbAlgorithmResponse = await tryAsync(() =>
-    prisma.algorithm.findUnique({
-      where: {
-        id,
-      },
-    }),
+export async function retrieveAlgorithmById(
+  id: string,
+): Promise<Result<AnyUserAlgorithmType | null, AppError>> {
+  const getDbAlgorithmResult = await fromThrowableAsync(
+    () =>
+      prisma.algorithm.findUnique({
+        where: {
+          id,
+        },
+      }),
+    (e) => internal(e),
   );
-  if (!getDbAlgorithmResponse.ok) {
-    throw new ErrorWithCode(getDbAlgorithmResponse.error, 'INTERNAL_SERVER_ERROR');
+  if (getDbAlgorithmResult.isErr()) {
+    return err(getDbAlgorithmResult.error);
   }
-  const dbAlgorithm = getDbAlgorithmResponse.data;
+  const dbAlgorithm = getDbAlgorithmResult.value;
 
   if (dbAlgorithm == null) {
-    return null;
+    return ok(null);
   }
   switch (dbAlgorithm.type) {
     case DbAlgorithmType.NORMAL:
-      return {
+      return ok({
         aggregate: convertDbTimestampToTimestamp(dbAlgorithm.aggregate),
         algorithmMaxHoldingProportion: dbAlgorithm.algorithmMaxHoldingProportion ?? undefined,
         contextLength: dbAlgorithm.contextLength,
@@ -146,23 +152,23 @@ export async function retrieveAlgorithmById(id: string): Promise<AnyUserAlgorith
         language: dbAlgorithm.language as SupportedLanguage,
         name: dbAlgorithm.name,
         tickers: dbAlgorithm.tickers as (typeof tickers)[number][],
-        type: convertDbAlgorithmTypeToAlgorithmType(dbAlgorithm.type),
+        type: convertDbAlgorithmTypeToAlgorithmType(dbAlgorithm.type) as AlgorithmType.NORMAL,
         userAlgorithmImplementationCode: dbAlgorithm.userAlgorithmImplementationCode,
-      };
+      } satisfies UserAlgorithm);
     case DbAlgorithmType.SIMPLE:
-      return {
+      return ok({
         aggregate: convertDbTimestampToTimestamp(dbAlgorithm.aggregate),
         algorithmMaxHoldingProportion: dbAlgorithm.algorithmMaxHoldingProportion ?? undefined,
         contextLength: dbAlgorithm.contextLength,
         indicators: dbAlgorithm.indicators as Indicator[],
         language: dbAlgorithm.language as SupportedLanguage,
         name: dbAlgorithm.name,
-        tickers: dbAlgorithm.tickers as UserTicker[],
-        type: convertDbAlgorithmTypeToAlgorithmType(dbAlgorithm.type),
+        ticker: dbAlgorithm.tickers[0] as UserTicker,
+        type: convertDbAlgorithmTypeToAlgorithmType(dbAlgorithm.type) as AlgorithmType.SIMPLE,
         userAlgorithmImplementationCode: dbAlgorithm.userAlgorithmImplementationCode,
-      };
+      } satisfies UserSimpleAlgorithm);
     case DbAlgorithmType.TOP_K:
-      return {
+      return ok({
         aggregate: convertDbTimestampToTimestamp(dbAlgorithm.aggregate),
         algorithmMaxHoldingProportion: dbAlgorithm.algorithmMaxHoldingProportion ?? undefined,
         contextLength: dbAlgorithm.contextLength,
@@ -171,9 +177,9 @@ export async function retrieveAlgorithmById(id: string): Promise<AnyUserAlgorith
         language: dbAlgorithm.language as SupportedLanguage,
         name: dbAlgorithm.name,
         tickers: dbAlgorithm.tickers as UserTicker[],
-        type: convertDbAlgorithmTypeToAlgorithmType(dbAlgorithm.type),
+        type: convertDbAlgorithmTypeToAlgorithmType(dbAlgorithm.type) as AlgorithmType.TOP_K,
         userAlgorithmImplementationCode: dbAlgorithm.userAlgorithmImplementationCode,
-      };
+      } satisfies UserTopKAlgorithm);
     default: {
       const _exhaustiveCheck: never = dbAlgorithm.type;
       return _exhaustiveCheck;
