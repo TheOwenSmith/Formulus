@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -35,15 +36,14 @@ export function computeLinearRegression({
   bars: Bar[];
   period: number;
   metadata: IndicatorMetadata;
-}): { slope: number; intercept: number } {
+}): Result<{ slope: number; intercept: number }, AppError> {
   if (period < 2) {
-    throw new ErrorWithCode('Period must be at least 2 to compute LinearRegression', 'BAD_REQUEST');
+    return err(badRequest('Period must be at least 2 to compute LinearRegression'));
   }
   const b = bars.length;
   if (b < period) {
-    throw new ErrorWithCode(
-      `Must have at least ${period} bars to compute LinearRegression(${period})`,
-      'BAD_REQUEST',
+    return err(
+      badRequest(`Must have at least ${period} bars to compute LinearRegression(${period})`),
     );
   }
 
@@ -85,13 +85,13 @@ export function computeLinearRegression({
     };
 
     // Shift the regression line by (b - period) to the left
-    return { slope, intercept };
+    return ok({ slope, intercept });
   } else {
     // If the timestamp is the same as the last update, return cached result
     const lastUpdateTimestamp = linearRegressionMetadata.timestamp;
     if (timestamp === lastUpdateTimestamp) {
       const { slope, intercept } = linearRegressionMetadata;
-      return { slope, intercept };
+      return ok({ slope, intercept });
     }
 
     // Compute constants
@@ -120,6 +120,6 @@ export function computeLinearRegression({
     linearRegressionMetadata.sumYWithoutLast = sumY - bars[b - period][4];
     linearRegressionMetadata.timestamp = timestamp;
 
-    return { slope, intercept };
+    return ok({ slope, intercept });
   }
 }

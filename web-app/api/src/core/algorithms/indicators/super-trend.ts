@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import { computeATR } from './atr';
 import type { IndicatorMetadata } from './indicator-metadata';
 
@@ -45,19 +46,24 @@ export function computeSuperTrend({
   period?: number;
   multiplier?: number;
   metadata: IndicatorMetadata;
-}): ({ superTrendValue: number; direction: Direction } | null)[] {
+}): Result<({ superTrendValue: number; direction: Direction } | null)[], AppError> {
   if (period < 1) {
-    throw new ErrorWithCode('Period must be at least 1 to compute SuperTrend', 'BAD_REQUEST');
+    return err(badRequest('Period must be at least 1 to compute SuperTrend'));
   }
   if (bars.length < period + 1) {
-    throw new ErrorWithCode(
-      `Must have context length of at least ${period + 1} to compute SuperTrend(${period},${multiplier})`,
-      'BAD_REQUEST',
+    return err(
+      badRequest(
+        `Must have context length of at least ${period + 1} to compute SuperTrend(${period},${multiplier})`,
+      ),
     );
   }
 
   // Compute ATR
-  const atrs: (number | null)[] = computeATR({ bars, period, metadata });
+  const computeAtrResult = computeATR({ bars, period, metadata });
+  if (computeAtrResult.isErr()) {
+    return err(computeAtrResult.error);
+  }
+  const atrs: (number | null)[] = computeAtrResult.value;
 
   const timestamp = bars.at(-1)![0];
   const key = `${period},${multiplier}`;
@@ -113,14 +119,14 @@ export function computeSuperTrend({
       superTrend,
       timestamp,
     };
-    return superTrend;
+    return ok(superTrend);
   } else {
     const superTrend = superTrendMetadata.superTrend;
     const lastUpdateTimestamp = superTrendMetadata.timestamp;
 
     // If the timestamp is the same as the last update, return cached result
     if (timestamp === lastUpdateTimestamp) {
-      return superTrend;
+      return ok(superTrend);
     }
 
     const high = bars.at(-1)![2];
@@ -149,6 +155,6 @@ export function computeSuperTrend({
     superTrend.push({ superTrendValue, direction });
 
     superTrendMetadata.timestamp = timestamp;
-    return superTrend;
+    return ok(superTrend);
   }
 }

@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import z from 'zod';
 import { computeATR } from './atr';
 import { computeEMA } from './ema';
@@ -32,11 +33,20 @@ export const indicatorSchema = z
 
 export function indicatorsToIndicatorResultsFunction(
   indicators: Indicator[],
-): (bars: Bar[], metadata: IndicatorMetadata) => Partial<IndicatorResultByIndicator> {
+): Result<
+  (
+    bars: Bar[],
+    metadata: IndicatorMetadata,
+  ) => Result<Partial<IndicatorResultByIndicator>, AppError>,
+  AppError
+> {
   const indicatorFunctionByIndicator: Partial<
     Record<
       Indicator,
-      (bars: Bar[], metadata: IndicatorMetadata) => IndicatorResultByIndicator[Indicator]
+      (
+        bars: Bar[],
+        metadata: IndicatorMetadata,
+      ) => Result<IndicatorResultByIndicator[Indicator], AppError>
     >
   > = {};
 
@@ -114,10 +124,10 @@ export function indicatorsToIndicatorResultsFunction(
         });
       continue;
     }
-    throw new ErrorWithCode(`Unknown indicator: '${indicator}'`, 'BAD_REQUEST');
+    return err(badRequest(`Unknown indicator: '${indicator}'`));
   }
 
-  return (bars: Bar[], metadata: IndicatorMetadata) => {
+  return ok((bars: Bar[], metadata: IndicatorMetadata) => {
     const result = {} as Partial<IndicatorResultByIndicator>;
     for (const indicator of indicators) {
       const indicatorFunction = indicatorFunctionByIndicator[indicator];
@@ -126,5 +136,5 @@ export function indicatorsToIndicatorResultsFunction(
       }
     }
     return result;
-  };
+  });
 }

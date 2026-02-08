@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -31,14 +32,13 @@ export function computeRSI({
   bars: Bar[];
   period?: number;
   metadata: IndicatorMetadata;
-}): (number | null)[] {
+}): Result<(number | null)[], AppError> {
   if (period < 1) {
-    throw new ErrorWithCode('Period must be at least 1 to compute RSI', 'BAD_REQUEST');
+    return err(badRequest('Period must be at least 1 to compute RSI'));
   }
   if (bars.length < period + 1) {
-    throw new ErrorWithCode(
-      `Must have context length of at least ${period + 1} to compute RSI(${period})`,
-      'BAD_REQUEST',
+    return err(
+      badRequest(`Must have context length of at least ${period + 1} to compute RSI(${period})`),
     );
   }
 
@@ -77,14 +77,14 @@ export function computeRSI({
       metadata.rsi = {};
     }
     metadata.rsi![period] = { rsi, avgGain, avgLoss, timestamp };
-    return rsi;
+    return ok(rsi);
   } else {
     const { rsi } = rsiMetadata;
     const lastUpdateTimestamp = rsiMetadata.timestamp;
 
     // If the timestamp is the same as the last update, return cached result
     if (timestamp === lastUpdateTimestamp) {
-      return rsi;
+      return ok(rsi);
     }
 
     // Compute new rsi using Wilder's smoothing
@@ -113,6 +113,6 @@ export function computeRSI({
     rsiMetadata.avgGain = avgGain;
     rsiMetadata.avgLoss = avgLoss;
     rsiMetadata.timestamp = timestamp;
-    return rsi;
+    return ok(rsi);
   }
 }

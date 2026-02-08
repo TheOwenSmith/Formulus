@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -29,14 +30,13 @@ export function computeEMA({
   bars: Bar[];
   period?: number;
   metadata: IndicatorMetadata;
-}): (number | null)[] {
+}): Result<(number | null)[], AppError> {
   if (period < 1) {
-    throw new ErrorWithCode('Period must be at least 1 to compute EMA', 'BAD_REQUEST');
+    return err(badRequest('Period must be at least 1 to compute EMA'));
   }
   if (bars.length < period) {
-    throw new ErrorWithCode(
-      `Must have context length of at least ${period} to compute EMA(${period})`,
-      'BAD_REQUEST',
+    return err(
+      badRequest(`Must have context length of at least ${period} to compute EMA(${period})`),
     );
   }
 
@@ -65,7 +65,7 @@ export function computeEMA({
       metadata.ema = {};
     }
     metadata.ema![period] = { ema, timestamp };
-    return ema;
+    return ok(ema);
   } else {
     // Compute using metadata
     const { ema } = emaMetadata;
@@ -73,7 +73,7 @@ export function computeEMA({
 
     // If the timestamp is the same as the last update, return cached result
     if (timestamp === lastUpdateTimestamp) {
-      return ema;
+      return ok(ema);
     }
 
     const prevEma = ema.at(-1)!;
@@ -85,6 +85,6 @@ export function computeEMA({
     ema.push(nextEma);
 
     emaMetadata.timestamp = timestamp;
-    return ema;
+    return ok(ema);
   }
 }

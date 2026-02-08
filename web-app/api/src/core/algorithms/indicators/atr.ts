@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, type Result } from 'neverthrow';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -29,15 +30,12 @@ export function computeATR({
   bars: Bar[];
   period?: number;
   metadata: IndicatorMetadata;
-}): (number | null)[] {
+}): Result<(number | null)[], AppError> {
   if (period < 1) {
-    throw new ErrorWithCode('Period must be at least 1 to compute ATR', 'BAD_REQUEST');
+    return err(badRequest('Period must be at least 1 to compute ATR'));
   }
   if (bars.length < period + 1) {
-    throw new ErrorWithCode(
-      `Must have at least ${period + 1} bars to compute ATR(${period})`,
-      'BAD_REQUEST',
-    );
+    return err(badRequest(`Must have at least ${period + 1} bars to compute ATR(${period})`));
   }
 
   const timestamp = bars.at(-1)![0];
@@ -68,7 +66,7 @@ export function computeATR({
       metadata.atr = {};
     }
     metadata.atr![period] = { atr, timestamp };
-    return atr;
+    return ok(atr);
   } else {
     // Compute using metadata
     const { atr } = atrMetadata;
@@ -76,7 +74,7 @@ export function computeATR({
 
     // If the timestamp is the same as the last update, return cached result
     if (timestamp === lastUpdateTimestamp) {
-      return atr;
+      return ok(atr);
     }
 
     // Calculate TR for the new bar
@@ -93,6 +91,6 @@ export function computeATR({
     atr.push(nextAtr);
 
     atrMetadata.timestamp = timestamp;
-    return atr;
+    return ok(atr);
   }
 }

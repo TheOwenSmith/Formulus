@@ -1,5 +1,6 @@
 import type { Bar } from '@api/fetch/types';
-import { ErrorWithCode } from '@api/utils/error-handling';
+import { badRequest, type AppError } from '@api/utils/error-handling';
+import { err, ok, Result } from 'neverthrow';
 import type { IndicatorMetadata } from './indicator-metadata';
 
 declare module './indicator-metadata' {
@@ -30,14 +31,13 @@ export function computeSMA({
   bars: Bar[];
   period?: number;
   metadata: IndicatorMetadata;
-}): (number | null)[] {
+}): Result<(number | null)[], AppError> {
   if (period < 1) {
-    throw new ErrorWithCode('Period must be at least 1 to compute SMA', 'BAD_REQUEST');
+    return err(badRequest('Period must be at least 1 to compute SMA'));
   }
   if (bars.length < period) {
-    throw new ErrorWithCode(
-      `Must have context length of at least ${period} to compute SMA(${period})`,
-      'BAD_REQUEST',
+    return err(
+      badRequest(`Must have context length of at least ${period} to compute SMA(${period})`),
     );
   }
 
@@ -68,7 +68,7 @@ export function computeSMA({
       sma,
       timestamp,
     };
-    return sma;
+    return ok(sma);
   } else {
     // Compute using metadata
     const { sma, sumWithoutLast } = smaMetadata;
@@ -76,7 +76,7 @@ export function computeSMA({
 
     // If the timestamp is the same as the last update, return cached result
     if (timestamp === lastUpdateTimestamp) {
-      return sma;
+      return ok(sma);
     }
 
     // Update rolling sum and SMA
@@ -88,6 +88,6 @@ export function computeSMA({
     // Update metadata for next call
     smaMetadata.sumWithoutLast = sum - bars[bars.length - period][4];
     smaMetadata.timestamp = timestamp;
-    return sma;
+    return ok(sma);
   }
 }
