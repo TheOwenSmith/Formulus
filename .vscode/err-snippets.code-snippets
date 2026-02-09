@@ -1,25 +1,4 @@
 {
-  "Handle Error (JS/TS)": {
-    "scope": "javascript,typescript",
-    "prefix": "err",
-    "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
-      "if (!$2.ok) throw $2.error;",
-      "const $4 = $2.data;",
-      "$5"
-    ],
-    "description": "Handle a synchronous or asynchronous error by using the trySync() or tryAsync() function, respectively"
-  },
-  "Handle Error Void (JS/TS)": {
-    "scope": "javascript,typescript",
-    "prefix": "errv",
-    "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
-      "if (!$2.ok) throw $2.error;",
-      "$4"
-    ],
-    "description": "Handle a synchronous or asynchronous error by using the trySync() or tryAsync() function, respectively"
-  },
   "Handle Error (React)": {
     "scope": "typescriptreact",
     "prefix": "err",
@@ -34,7 +13,7 @@
     ],
     "description": "Handle a synchronous or asynchronous error by using the trySync() or tryAsync() function, respectively"
   },
-  "Handle Error Void (React)": {
+  "Handle Error (Void) (React)": {
     "scope": "typescriptreact",
     "prefix": "errv",
     "body": [
@@ -45,46 +24,102 @@
       "}",
       "$4"
     ],
-    "description": "Handle a synchronous or asynchronous error by using the trySync() or tryAsync() function, respectively"
+    "description": "Handle a synchronous or asynchronous error (void) by using the trySync() or tryAsync() function, respectively"
   },
-  "Handle TRPC Error": {
+  "Handle Error (JS/TS)": {
+    "scope": "javascript,typescript",
+    "prefix": "err",
+    "body": [
+      "const ${2:response} = ${3|fromThrowable,await fromThrowableAsync|}(",
+      "\t() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}},",
+      "\t(e) => ${4|internal,badRequest|}(${5:e}),",
+      ");",
+      "if ($2.isErr()) return err($2.error);",
+      "const $6 = $2.value;",
+      "$7"
+    ],
+    "description": "Handle a synchronous or asynchronous error by using the fromThrowable() or fromThrowableAsync() function, respectively"
+  },
+  "Handle Error (Void) (JS/TS)": {
+    "scope": "javascript,typescript",
+    "prefix": "errvoid",
+    "body": [
+      "const ${2:response} = ${3|fromThrowable,await fromThrowableAsync|}(",
+      "\t() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}},",
+      "\t(e) => ${4|internal,badRequest|}(${5:e}),",
+      ");",
+      "if ($2.isErr()) return err($2.error);",
+      "$6"
+    ],
+    "description": "Handle a synchronous or asynchronous error (void) by using the fromThrowable() or fromThrowableAsync() function, respectively"
+  },
+  "Handle Error From Neverthrow-Configured Function (JS/TS)": {
+    "scope": "javascript,typescript",
+    "prefix": "errfrom",
+    "body": [
+      "const ${2:response} = ${TM_SELECTED_TEXT:${CLIPBOARD:$1}};",
+      "if ($2.isErr()) return err($2.error);",
+      "const $3 = $2.value;",
+      "$4"
+    ],
+    "description": "Handle a synchronous or asynchronous error"
+  },
+  "Handle Error (Void) From Neverthrow-Configured Function (JS/TS)": {
+    "scope": "javascript,typescript",
+    "prefix": "errfromvoid",
+    "body": [
+      "const ${2:response} = ${TM_SELECTED_TEXT:${CLIPBOARD:$1}};",
+      "if ($2.isErr()) return err($2.error);",
+      "$3"
+    ],
+    "description": "Handle a synchronous or asynchronous error (void)"
+  },
+  "Handle Top-Level Error": {
     "scope": "javascript,typescript",
     "prefix": "terr",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
-      "if (!$2.ok) {",
-      "\tthrow new TRPCError({ code: '${4|BAD_REQUEST,UNAUTHORIZED,FORBIDDEN,NOT_FOUND,TOO_MANY_REQUEST|}', message: '$5' });",
-      "}",
-      "const $6 = $2.data;",
+      "const ${2:response} = ${3|fromThrowable,await fromThrowableAsync|}(",
+      "\t() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}},",
+      "\t(e) => ${4|internal,badRequest|}(${5:e}),",
+      ");",
+      "if ($2.isErr()) throw $2.error;",
+      "const $6 = $2.value;",
       "$7"
     ],
-    "description": "Handle a synchronous or asynchronous TRPC error by using the trySync() or tryAsync() function, respectively"
+    "description": "Handle a top-level synchronous or asynchronous error by using the fromThrowable() or fromThrowableAsync() function, respectively"
   },
-  "Handle TRPC Internal Server Error": {
+  "Handle Top-Level Error (Void)": {
     "scope": "javascript,typescript",
-    "prefix": "terrint",
+    "prefix": "terrvoid",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
-      "if (!$2.ok) {",
-      "\tconsole.error(`[${ctx.req.path}]`, $2.error);",
-      "\tthrow new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected error occurred while $4' });",
-      "}",
-      "const $5 = $2.data;",
+      "const ${2:response} = ${3|fromThrowable,await fromThrowableAsync|}(",
+      "\t() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}},",
+      "\t(e) => ${4|internal,badRequest|}(${5:e}),",
+      ");",
+      "if ($2.isErr()) throw $2.error;",
       "$6"
     ],
-    "description": "Handle a synchronous or asynchronous TRPC interal server error by using the trySync() or tryAsync() function, respectively"
+    "description": "Handle a top-level synchronous or asynchronous error (void) by using the fromThrowable() or fromThrowableAsync() function, respectively"
   },
-  "Handle TRPC Internal Server Error Void": {
+  "Handle Top-Level Error From Neverthrow-Configured Function (JS/TS)": {
     "scope": "javascript,typescript",
-    "prefix": "terrintv",
+    "prefix": "terrfrom",
     "body": [
-      "const ${2:response} = ${3|trySync,await tryAsync|}(() => ${TM_SELECTED_TEXT:${CLIPBOARD:$1}});",
-      "if (!$2.ok) {",
-      "\tconsole.error(`[${ctx.req.path}]`, $2.error);",
-      "\tthrow new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected error occurred while $4' });",
-      "}",
-      "$5"
+      "const ${2:response} = ${TM_SELECTED_TEXT:${CLIPBOARD:$1}};",
+      "if ($2.isErr()) throw $2.error;",
+      "const $3 = $2.value;",
+      "$4"
     ],
-    "description": "Handle a synchronous or asynchronous TRPC interal server error by using the trySync() or tryAsync() function, respectively"
+    "description": "Handle a top-level synchronous or asynchronous error from a neverthrow-configured function"
+  },
+  "Handle Top-Level Error (Void) From Neverthrow-Configured Function (JS/TS)": {
+    "scope": "javascript,typescript",
+    "prefix": "terrfromvoid",
+    "body": [
+      "const ${2:response} = ${TM_SELECTED_TEXT:${CLIPBOARD:$1}};",
+      "if ($2.isErr()) throw $2.error;",
+      "$3"
+    ],
+    "description": "Handle a top-level synchronous or asynchronous error (void) from a neverthrow-configured function"
   }
 }
