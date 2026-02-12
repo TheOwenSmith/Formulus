@@ -1,7 +1,7 @@
 import { generateGradientFromTailwind } from '@client/utils/colorUtils';
 import { yearsBetween } from '@client/utils/dateUtils';
 import { withCommasRounded } from '@client/utils/numberUtils';
-import type { DescriptionMetrics, SimplePlot } from '@shared/types';
+import type { DescriptionMetrics, SimplePlot } from '@shared/worker';
 import { useMemo } from 'react';
 
 interface HeadlineMetricsProps {

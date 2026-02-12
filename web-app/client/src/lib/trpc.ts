@@ -1,4 +1,4 @@
-import type { AppRouter } from '@shared/types';
+import type { AppRouter } from '@shared/worker';
 import { QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';

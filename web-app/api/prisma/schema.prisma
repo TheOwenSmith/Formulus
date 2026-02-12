@@ -104,6 +104,8 @@ enum AlgorithmType {
 enum SupportedLanguage {
   javascript
   python
+  typescript
+  cpp
 }
 
 model Algorithm {

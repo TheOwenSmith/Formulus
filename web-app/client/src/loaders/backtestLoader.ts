@@ -1,5 +1,5 @@
 import { queryClient, trpcCredentials } from '@client/lib/trpc';
-import type { BacktestAlgorithmsResult } from '@shared/types';
+import type { BacktestAlgorithmsResult } from '@shared/worker';
 import type { LoaderFunctionArgs } from 'react-router-dom';
 
 export async function backtestLoader({ params }: LoaderFunctionArgs) {

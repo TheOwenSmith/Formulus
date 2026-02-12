@@ -1,7 +1,7 @@
-import { retrieveBacktestingResultsByPublicId } from '@api/core/backtesting/db-backtesting-results';
 import { type TRPCContext } from '@api/lib/trpc';
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
 import { fromThrowableAsync, internal } from '@api/utils/error-handling';
+import { retrieveBacktestingResultsByPublicId } from '@shared/worker';
 import { nanoid } from 'nanoid';
 import z from 'zod';
 

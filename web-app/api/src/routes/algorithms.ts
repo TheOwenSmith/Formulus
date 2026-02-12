@@ -1,6 +1,6 @@
-import { userAlgorithmSchema } from '@api/core/algorithms/user-algorithm';
 import { type TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import { userAlgorithmSchema } from '@shared/worker';
 
 // /^[a-zA-Z0-9-()]+$/
 // runner not allowed

@@ -5,7 +5,7 @@
       "@api/*": ["./api/src/*"],
       "@client/*": ["./client/src/*"],
       "@worker/*": ["./worker/src/*"],
-      "@shared/*": ["./api/src/shared/*"]
+      "@shared/*": ["./shared/*"]
     }
   }
 }

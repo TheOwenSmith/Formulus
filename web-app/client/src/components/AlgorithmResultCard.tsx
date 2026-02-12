@@ -8,8 +8,8 @@ import { PerformanceMetrics } from '@client/components/PerformanceMetrics';
 import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/index';
 import { colorSchemes } from '@client/utils/colorSchemes';
 import { withCommasRounded } from '@client/utils/numberUtils';
-import type { DescriptionMetrics, SimplePlot, Ticker, Timestamp } from '@shared/types';
-import { memo, useCallback, useMemo, useEffect, useRef, useState } from 'react';
+import type { DescriptionMetrics, SimplePlot, Ticker, Timestamp } from '@shared/worker';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface AlgorithmResultCardProps {
   algorithmGraph: {
@@ -39,10 +39,7 @@ function AlgorithmResultCardComponent({
   timestamps,
 }: AlgorithmResultCardProps) {
   // Memoize color scheme to avoid recalculation
-  const colorScheme = useMemo(
-    () => colorSchemes[index % colorSchemes.length],
-    [index],
-  );
+  const colorScheme = useMemo(() => colorSchemes[index % colorSchemes.length], [index]);
   const [selectedTicker, setSelectedTicker] = useState<Ticker>(defaultTicker);
   // In side-by-side mode, show graph by default (false). In normal mode, show metrics panel by default (true).
   const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(!isSideBySideMode);

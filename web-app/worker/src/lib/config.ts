@@ -1,0 +1,34 @@
+import { config as dotenvConfig } from 'dotenv';
+import { validateEnvVars } from './validate-env-vars';
+dotenvConfig();
+
+const envVars = [
+  'NODE_ENV',
+  'AWS_REGION',
+  'QUEUE_URL',
+  'AWS_ENDPOINT_URL',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+] as const satisfies string[];
+type EnvVar = (typeof envVars)[number];
+
+class Config {
+  private constructor() {
+    validateEnvVars(envVars);
+  }
+
+  static #instance: Config | null = null;
+  static get instance() {
+    return this.#instance ?? (this.#instance = new Config());
+  }
+
+  getKey(key: EnvVar) {
+    return process.env[key]!;
+  }
+
+  get env(): 'dev' | 'staging' | 'prod' {
+    return this.getKey('NODE_ENV') as 'dev' | 'staging' | 'prod';
+  }
+}
+
+export const config = Config.instance;

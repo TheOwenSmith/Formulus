@@ -3,7 +3,7 @@ import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/
 import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
 import { throttle } from '@client/utils/throttle';
-import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/types';
+import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/worker';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLoaderData } from 'react-router-dom';
 

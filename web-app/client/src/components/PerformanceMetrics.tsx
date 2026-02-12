@@ -1,5 +1,5 @@
 import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/index';
-import type { DescriptionMetrics } from '@shared/types';
+import type { DescriptionMetrics } from '@shared/worker';
 import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { MetricTogglePanel } from './MetricTogglePanel/MetricTogglePanel';
 import {

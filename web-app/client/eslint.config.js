@@ -58,6 +58,10 @@ export default defineConfig([
               group: ['@api/*'],
               message: 'Client code cannot import from @api. Use @shared.',
             },
+            {
+              group: ['@worker/*'],
+              message: 'Client code cannot import from @worker. Use @shared.',
+            },
             // Block ../* imports
             {
               group: ['../*'],

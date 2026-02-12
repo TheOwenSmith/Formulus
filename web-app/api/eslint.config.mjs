@@ -63,6 +63,15 @@ export default defineConfig([
         'error',
         {
           patterns: [
+            // Block TS path alias to api
+            {
+              group: ['@client/*'],
+              message: 'API code cannot import from @client. Use @shared.',
+            },
+            {
+              group: ['@worker/*'],
+              message: 'API code cannot import from @worker. Use @shared.',
+            },
             // Block ../* imports
             {
               group: ['../*'],

@@ -28,8 +28,9 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true,
 
-    "rootDir": "./src",
+    "rootDir": "..",
     "outDir": "./dist",
   },
+  "include": ["./src/**/*", "../api/src/shared/**/*", "../worker/src/lib/docker.ts", "../worker/src/heap.ts", "../worker/src/utils/date-utils.ts", "../worker/src/utils/types.ts", "../worker/src/utils/cleanup.ts", "../worker/src/utils/number-utils.ts", "../worker/src/utils/group-by.ts", "../worker/src/utils/sharpe-ratio-calculator.ts"],
   "exclude": ["node_modules", "dist", "generated", "*.config.ts", "*.config.mjs"]
 }

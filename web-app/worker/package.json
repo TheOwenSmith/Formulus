@@ -3,19 +3,35 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "console": "node ./src/scripts/esbuild-console.config.mjs && node ./dist/console.js",
+    "prettier:write": "prettier \"**/*.{ts,js}\" --write",
+    "prettier:check": "prettier \"**/*.{ts,js}\" --check",
+    "lint": "eslint ."
+  },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "eslint": "^10.0.0",
+    "@eslint/js": "^9.39.2",
+    "@types/dockerode": "^4.0.1",
+    "@types/node": "^25.2.2",
+    "esbuild": "^0.27.3",
+    "esbuild-node-externals": "^1.20.1",
+    "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-sort-keys": "^2.3.5",
+    "source-map-support": "^0.5.21",
     "typescript-eslint": "^8.54.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.985.0"
+    "@aws-sdk/client-sqs": "^3.985.0",
+    "cli-progress": "^3.12.0",
+    "dockerode": "^4.0.9",
+    "dotenv": "^17.2.4",
+    "neverthrow": "^8.2.0",
+    "zod": "^4.3.6"
   }
 }

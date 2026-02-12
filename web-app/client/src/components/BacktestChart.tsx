@@ -1,7 +1,7 @@
 import { TickerSelector } from '@client/components/TickerSelector';
 import '@client/styles/BacktestChart.css';
 import { getTailwindColorHex } from '@client/utils/colorUtils';
-import type { SimplePlot, Ticker } from '@shared/types';
+import type { SimplePlot, Ticker } from '@shared/worker';
 import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -92,7 +92,7 @@ export function BacktestChart({
   const isBrushingRef = useRef(false);
   const tickerSelectorRootRef = useRef<Root | null>(null);
   const tickerSelectorContainerRef = useRef<HTMLDivElement | null>(null);
-  
+
   // Memoize data points to avoid recalculating on every render
   const dataPoints = useMemo<DataPoint[]>(() => {
     return tickerPlot.y.map((y, i) => ({

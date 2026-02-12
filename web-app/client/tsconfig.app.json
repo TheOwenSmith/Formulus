@@ -31,6 +31,6 @@
 
     "rootDir": "..",
   },
-  "include": ["src/**/*", "../api/src/shared/**/*"],
+  "include": ["./src/**/*", "../api/src/shared/**/*"],
   "exclude": ["node_modules", "*.config.ts", "*.config.js", "*.config.mjs", "../api"]
 }
