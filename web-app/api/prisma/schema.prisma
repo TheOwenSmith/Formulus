@@ -159,11 +159,25 @@ model AlgorithmGraph {
   id String @id @default(cuid())
 
   aggregate Timestamp
-  descriptionMetrics DescriptionMetrics @relation("AlgorithmGraphDescriptionMetrics", fields: [descriptionMetricsId], references: [id], onDelete: Cascade)
-  descriptionMetricsId String @unique
-
   name String @db.VarChar(64)
   plotYs Float[]
+
+  // Description metrics
+  algorithmReturn Float
+  averageHoldingDuration Float?
+  contextLength Int
+  expectancyPerTrade Float?
+  growthRate Float
+  maxHoldingPorportion Float
+  positionsClosed Int
+  profitLossRatio Json
+  sharpeRatio Float?
+  tickers String[]
+  timespanStart String
+  timespanEnd String
+  tradesMade Int
+  volatility Float?
+  winRate Float?
 
   backtestingResults BacktestingResults @relation("BacktestingResultsAlgorithmGraph", fields: [backtestingResultsId], references: [id], onDelete: Cascade)
   backtestingResultsId String
@@ -186,31 +200,6 @@ model TickerPlot {
 
   @@index([backtestingResultsId])
   @@map("ticker_plot")
-}
-
-model DescriptionMetrics {
-  id String @id @default(cuid())
-
-  aggregate Timestamp
-  algorithmReturn Float
-  averageHoldingDuration Float?
-  contextLength Int
-  expectancyPerTrade Float?
-  growthRate Float
-  maxHoldingPorportion Float
-  positionsClosed Int
-  profitLossRatio Json
-  sharpeRatio Float?
-  tickers String[]
-  timespanStart String
-  timespanEnd String
-  tradesMade Int
-  volatility Float?
-  winRate Float?
-
-  algorithmGraph AlgorithmGraph? @relation("AlgorithmGraphDescriptionMetrics")
-
-  @@map("description_metrics")
 }
 
 model BacktestingShare {
