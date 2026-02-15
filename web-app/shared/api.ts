@@ -9,3 +9,4 @@ export {
   type Ticker,
   type Timestamp,
 } from '@api/fetch/types';
+export type { AppRouter } from '@api/router';
