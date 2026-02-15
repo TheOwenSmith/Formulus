@@ -12,11 +12,11 @@ import { err, ok, type Result } from 'neverthrow';
 
 export async function uploadBacktestingResults({
   creatorId,
-  algorithmsIds,
+  algorithmIds,
   result,
 }: {
   creatorId: string;
-  algorithmsIds: string[];
+  algorithmIds: string[];
   result: BacktestAlgorithmsResult;
 }): Promise<Result<BacktestingResultsModel, AppError>> {
   const createBacktestingResultsResponse = await fromThrowableAsync(
@@ -46,7 +46,7 @@ export async function uploadBacktestingResults({
             })),
           },
           algorithms: {
-            connect: algorithmsIds.map((id) => ({ id })),
+            connect: algorithmIds.map((id) => ({ id })),
           },
           creatorId,
           publicId: nanoid(12),
