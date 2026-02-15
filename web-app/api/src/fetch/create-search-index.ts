@@ -13,16 +13,16 @@ export async function createSearchIndex(
   timestamp: Timestamp,
 ): Promise<Result<undefined, AppError>> {
   console.log(`Creating search index for '${ticker}' (${timestamp})...`);
-  const readFile = `./data/cleaned/${ticker}_${timestamp}.csv`;
-  const writeToFile = `./data/index/${ticker}_${timestamp}.idx`;
+  const readFile = `../worker/data/cleaned/${ticker}_${timestamp}.csv`;
+  const writeToFile = `../worker/data/index/${ticker}_${timestamp}.idx`;
 
   if (!fs.existsSync(readFile)) {
     return err(internal(`Failed to read from file '${readFile}' because it does not exist`));
   }
 
-  if (!fs.existsSync('./data/index')) {
+  if (!fs.existsSync('../worker/data/index')) {
     const makeDirResponse = fromThrowable(
-      () => fs.mkdirSync('./data/index', { recursive: true }),
+      () => fs.mkdirSync('../worker/data/index', { recursive: true }),
       (e) => internal(e),
     );
     if (makeDirResponse.isErr()) {

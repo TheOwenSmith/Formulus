@@ -42,10 +42,10 @@ export async function fetchAlphaVantageData({
   const apiKey = config.getKey('ALPHA_VANTAGE_API_KEY');
   const apiResponseSchema = apiResponseSchemaFromTimestamp(timestamp);
 
-  const writeToFile = `./data/uncleaned/${ticker}_${timestamp}.csv`;
-  if (!fs.existsSync('./data/uncleaned')) {
+  const writeToFile = `../worker/data/uncleaned/${ticker}_${timestamp}.csv`;
+  if (!fs.existsSync('../worker/data/uncleaned')) {
     const makeDirResponse = fromThrowable(
-      () => fs.mkdirSync('./data/uncleaned', { recursive: true }),
+      () => fs.mkdirSync('../worker/data/uncleaned', { recursive: true }),
       (e) => internal(e),
     );
     if (makeDirResponse.isErr()) {

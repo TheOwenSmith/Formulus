@@ -11,7 +11,7 @@ import sys
 file_to_read = sys.argv[1]
 aggregate_timestamp = sys.argv[2]
 
-df = pd.read_csv(f"./data/uncleaned/{file_to_read}")
+df = pd.read_csv(f"../worker/data/uncleaned/{file_to_read}")
 
 
 df.head()
@@ -166,7 +166,7 @@ df = df.ffill().bfill()
 
 ## Save data to file
 
-output_dir = "./data/cleaned"
+output_dir = "../worker/data/cleaned"
 os.makedirs(output_dir, exist_ok=True)
 
 # Round to 4 decimals and integer volume
