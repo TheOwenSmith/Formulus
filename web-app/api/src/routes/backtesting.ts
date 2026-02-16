@@ -1,6 +1,5 @@
 import { type TRPCContext } from '@api/lib/trpc';
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
-import { fromThrowableAsync, internal } from '@api/utils/error-handling';
 import { retrieveBacktestingResultsByPublicId } from '@shared/worker';
 import { nanoid } from 'nanoid';
 import z from 'zod';
@@ -36,10 +35,8 @@ export function backtestingRouter(
         }),
       )
       .query(async ({ input }) => {
-        const retrievedBacktestingResultsResponse = await fromThrowableAsync(
-          () => retrieveBacktestingResultsByPublicId(input.publicId),
-          (e) =>
-            internal(e, 'An unexpected error occurred while retrieving the backtesting results'),
+        const retrievedBacktestingResultsResponse = await retrieveBacktestingResultsByPublicId(
+          input.publicId,
         );
         if (retrievedBacktestingResultsResponse.isErr()) {
           throw retrievedBacktestingResultsResponse.error;

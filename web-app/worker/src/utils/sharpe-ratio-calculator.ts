@@ -1,4 +1,4 @@
-class OnlineStats {
+export class OnlineStats {
   n = 0;
   mean = 0;
   M2 = 0;
