@@ -260,8 +260,10 @@ model BacktestingSubmission {
   publicId String @unique @db.VarChar(12)
   status BacktestingSubmissionStatus
   progressPct Float @default(0.0)
-  message String?
-  error String?
+  message     String?
+  error       String?
+  errorCode   String?
+  errorDetail String? @db.Text
 
   startTimespan String?
   endTimespan String?

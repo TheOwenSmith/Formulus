@@ -59,6 +59,6 @@ export async function createBacktestingResults({
           timestampsByAggregate: result.timestampsByAggregate,
         },
       }),
-    (e) => internal(e, 'Failed to push backtesting results to dataase'),
+    (e) => internal(e, 'Failed to push backtesting results to database'),
   ).andThen((result) => ok(result.id));
 }

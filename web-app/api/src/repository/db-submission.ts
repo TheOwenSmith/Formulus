@@ -53,7 +53,7 @@ export async function createSubmission({
 
 type SubmissionStatus =
   | { status: 'PENDING' | 'RUNNING'; progressPct: number; message: string | null }
-  | { status: 'ERROR'; error: string | null }
+  | { status: 'ERROR'; error: string | null; errorCode: string | null; errorDetail: string | null }
   | { status: 'FINISHED'; resultId: string };
 
 export async function getSubmissionStatus(
@@ -65,6 +65,8 @@ export async function getSubmissionStatus(
         where: { publicId },
         select: {
           error: true,
+          errorCode: true,
+          errorDetail: true,
           message: true,
           progressPct: true,
           resultId: true,
@@ -92,7 +94,12 @@ export async function getSubmissionStatus(
         message: submission.message,
       });
     case BacktestingSubmissionStatus.ERROR:
-      return ok({ status: 'ERROR', error: submission.error });
+      return ok({
+        status: 'ERROR',
+        error: submission.error,
+        errorCode: submission.errorCode,
+        errorDetail: submission.errorDetail,
+      });
     case BacktestingSubmissionStatus.FINISHED:
       return ok({ status: 'FINISHED', resultId: submission.resultId! });
     default: {
