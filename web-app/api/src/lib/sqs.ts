@@ -1,5 +1,5 @@
 import { SQSClient } from '@aws-sdk/client-sqs';
-import { config } from './lib/config';
+import { config } from './config';
 
 export const sqs = new SQSClient({
   region: config.getKey('AWS_REGION'),

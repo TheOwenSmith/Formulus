@@ -75,7 +75,6 @@ export type BacktestingAlgorithmsConcurrentlyOptions = {
   iteratorStrictParsing?: boolean;
   slippageByTicker?: Partial<Record<Ticker, number>>;
   tickerData?: TickerData[];
-  timespan?: [string | null, string | null];
   trackProgress?: boolean;
   verboseLogging?: boolean;
 };

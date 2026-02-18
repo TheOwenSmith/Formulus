@@ -18,6 +18,27 @@ export enum AlgorithmType {
   TOP_K,
 }
 
+export const userAlgorithmNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .superRefine((name, ctx) => {
+    if (!/^[a-zA-Z0-9-()]+$/.test(name)) {
+      ctx.addIssue({
+        code: 'custom',
+        input: name,
+        message: `Name for algorithm must contain only letters, numbers, dashes, and parentheses`,
+      });
+    }
+    if (name === 'runner' || name === 'utils') {
+      ctx.addIssue({
+        code: 'custom',
+        input: name,
+        message: `Name for algorithm must not contain 'runner' or 'utils'`,
+      });
+    }
+  });
+
 export const userAlgorithmSchema = z
   .object({
     aggregate: timestampSchema,
@@ -29,7 +50,7 @@ export const userAlgorithmSchema = z
     contextLength: z.int().positive(),
     indicators: indicatorSchema.array().optional(),
     language: supportedLanguageSchema,
-    name: z.string().min(1).max(64),
+    name: userAlgorithmNameSchema,
     tickers: tickerSchema.array().min(1),
     type: z.literal(AlgorithmType.NORMAL),
     userAlgorithmImplementationCode: z

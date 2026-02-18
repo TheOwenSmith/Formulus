@@ -6,7 +6,11 @@ import z from 'zod';
 import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from './constants';
 import type { OutputTransformer } from './pipeline';
 import { scoresToActionsTopKAlgorithm } from './top-k-algorithm';
-import { AlgorithmType, type AnyUserAlgorithmType } from './user-algorithm';
+import {
+  AlgorithmType,
+  userAlgorithmNameSchema,
+  type AnyUserAlgorithmType,
+} from './user-algorithm';
 
 export const userTopKAlgorithmSchema = z
   .object({
@@ -20,7 +24,7 @@ export const userTopKAlgorithmSchema = z
     indicators: indicatorSchema.array().optional(),
     k: z.int().positive().min(1),
     language: supportedLanguageSchema,
-    name: z.string().min(1).max(64),
+    name: userAlgorithmNameSchema,
     tickers: tickerSchema.array().min(1),
     type: z.literal(AlgorithmType.TOP_K),
     userAlgorithmImplementationCode: z

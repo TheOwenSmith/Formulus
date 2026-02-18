@@ -1,77 +1,9 @@
 import type { Ticker, Timestamp } from '@api/fetch/types';
-import type { BacktestingResultsModel } from '@api/generated/prisma/models';
 import { prisma } from '@api/lib/prisma';
-import {
-  convertDbTimestampToTimestamp,
-  convertTimestampToDbTimestamp,
-} from '@api/repository/db-algorithm';
 import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
+import { convertDbTimestampToTimestamp } from '@shared/db/timestamp';
 import type { BacktestAlgorithmsResult, ProfitLossRatio, SimplePlot } from '@shared/worker';
-import { nanoid } from 'nanoid';
 import { err, ok, type Result } from 'neverthrow';
-
-export async function uploadBacktestingResults({
-  creatorId,
-  algorithmIds,
-  result,
-}: {
-  creatorId: string;
-  algorithmIds: string[];
-  result: BacktestAlgorithmsResult;
-}): Promise<Result<BacktestingResultsModel, AppError>> {
-  const createBacktestingResultsResponse = await fromThrowableAsync(
-    () =>
-      prisma.backtestingResults.create({
-        data: {
-          algorithmGraphs: {
-            create: result.algorithmGraphs.map((algorithmGraph) => ({
-              aggregate: convertTimestampToDbTimestamp(algorithmGraph.aggregate),
-              algorithmReturn: algorithmGraph.descriptionMetrics.algorithmReturn,
-              averageHoldingDuration: algorithmGraph.descriptionMetrics.averageHoldingDuration,
-              contextLength: algorithmGraph.descriptionMetrics.contextLength,
-              expectancyPerTrade: algorithmGraph.descriptionMetrics.expectancyPerTrade,
-              growthRate: algorithmGraph.descriptionMetrics.growthRate,
-              maxHoldingPorportion: algorithmGraph.descriptionMetrics.maxHoldingPorportion,
-              name: algorithmGraph.algorithmPlot.name,
-              plotYs: algorithmGraph.algorithmPlot.y,
-              positionsClosed: algorithmGraph.descriptionMetrics.positionsClosed,
-              profitLossRatio: algorithmGraph.descriptionMetrics.profitLossRatio,
-              sharpeRatio: algorithmGraph.descriptionMetrics.sharpeRatio,
-              tickers: algorithmGraph.descriptionMetrics.tickers,
-              timespanEnd: algorithmGraph.descriptionMetrics.timespan[1],
-              timespanStart: algorithmGraph.descriptionMetrics.timespan[0],
-              tradesMade: algorithmGraph.descriptionMetrics.tradesMade,
-              volatility: algorithmGraph.descriptionMetrics.volatility,
-              winRate: algorithmGraph.descriptionMetrics.winRate,
-            })),
-          },
-          algorithms: {
-            connect: algorithmIds.map((id) => ({ id })),
-          },
-          creatorId,
-          publicId: nanoid(12),
-          tickerPlots: {
-            create: Object.entries(result.tickerPlotByAggregateByTicker)
-              .map(([aggregate, tickerPlots]) =>
-                Object.entries(tickerPlots).map(([ticker, plot]) => ({
-                  aggregate: convertTimestampToDbTimestamp(aggregate as Timestamp),
-                  ticker: ticker as Ticker,
-                  name: plot.name,
-                  plotYs: plot.y,
-                })),
-              )
-              .flat(),
-          },
-          timestampsByAggregate: result.timestampsByAggregate,
-        },
-      }),
-    (e) => internal(e),
-  );
-  if (createBacktestingResultsResponse.isErr()) {
-    return err(createBacktestingResultsResponse.error);
-  }
-  return ok(createBacktestingResultsResponse.value);
-}
 
 export async function retrieveBacktestingResultsByPublicId(
   publicId: string,

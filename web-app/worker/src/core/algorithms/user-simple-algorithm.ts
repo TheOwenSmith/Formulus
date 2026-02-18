@@ -8,7 +8,11 @@ import { supportedLanguageSchema } from '@worker/core/backtesting/rpc/languages'
 import z from 'zod';
 import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from './constants';
 import type { InputTransformer, OutputTransformer } from './pipeline';
-import { AlgorithmType, type AnyUserAlgorithmType } from './user-algorithm';
+import {
+  AlgorithmType,
+  userAlgorithmNameSchema,
+  type AnyUserAlgorithmType,
+} from './user-algorithm';
 
 export const userSimpleAlgorithmSchema = z
   .object({
@@ -21,7 +25,7 @@ export const userSimpleAlgorithmSchema = z
     contextLength: z.int().positive(),
     indicators: indicatorSchema.array().optional(),
     language: supportedLanguageSchema,
-    name: z.string().min(1).max(64),
+    name: userAlgorithmNameSchema,
     ticker: tickerSchema,
     type: z.literal(AlgorithmType.SIMPLE),
     userAlgorithmImplementationCode: z

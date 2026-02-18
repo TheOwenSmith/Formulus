@@ -4,6 +4,7 @@ dotenvConfig();
 
 const envVars = [
   'NODE_ENV',
+  'DATABASE_URL',
   'AWS_REGION',
   'QUEUE_URL',
   'AWS_ENDPOINT_URL',

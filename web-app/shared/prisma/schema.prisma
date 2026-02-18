@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -29,6 +29,7 @@ model User {
 
   backtestingResults BacktestingResults[] @relation("UserBacktestingResults")
   backtestingShares BacktestingShare[] @relation("UserBacktestingShare")
+  backtestingSubmissions BacktestingSubmission[] @relation("UserBacktestingSubmissions")
 
   @@index([email])
   @@map("user")
@@ -128,10 +129,35 @@ model Algorithm {
   creatorId String
 
   backtestingResults BacktestingResults[] @relation("AlgorithmBacktestingResults")
+  versions AlgorithmVersion[] @relation("AlgorithmVersions")
 
   @@unique([creatorId, name])
   @@index([creatorId])
   @@map("algorithm")
+}
+
+model AlgorithmVersion {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  type AlgorithmType
+  aggregate Timestamp
+  algorithmMaxHoldingProportion Float?
+  contextLength Int
+  indicators String[]
+  name String @db.VarChar(64)
+  tickers String[]
+  userAlgorithmImplementationCode String
+  k Int?
+  language SupportedLanguage
+
+  algorithm Algorithm @relation("AlgorithmVersions", fields: [algorithmId], references: [id], onDelete: Cascade)
+  algorithmId String
+
+  submission BacktestingSubmission @relation("AlgorithmVersionBacktestingSubmissions", fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+
+  @@map("algorithm_version")
 }
 
 model BacktestingResults {
@@ -149,6 +175,8 @@ model BacktestingResults {
   creatorId String
 
   shares BacktestingShare[] @relation("BacktestingResultsShare")
+
+  submissions BacktestingSubmission[] @relation("BacktestingResultsSubmissions")
 
   @@index([creatorId])
   @@index([publicId])
@@ -215,4 +243,38 @@ model BacktestingShare {
   @@index([userId])
   @@index([backtestingResultsId])
   @@map("backtesting_share")
+}
+
+enum BacktestingSubmissionStatus {
+  PENDING
+  RUNNING
+  FINISHED
+  ERROR
+}
+
+model BacktestingSubmission {
+  id String @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  publicId String @unique @db.VarChar(12)
+  status BacktestingSubmissionStatus
+  progressPct Float @default(0.0)
+  message String?
+  error String?
+
+  startTimespan String?
+  endTimespan String?
+
+  creator User @relation("UserBacktestingSubmissions", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId String
+
+  algorithmVersions AlgorithmVersion[] @relation("AlgorithmVersionBacktestingSubmissions")
+
+  result BacktestingResults? @relation("BacktestingResultsSubmissions", fields: [resultId], references: [id], onDelete: Cascade)
+  resultId String?
+
+  @@index([creatorId])
+  @@index([publicId])
+  @@map("backtesting_submission")
 }

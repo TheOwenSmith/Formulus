@@ -11,7 +11,11 @@ const envVars = [
   'BETTER_AUTH_SECRET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'CREATOR_ID',
+  'QUEUE_URL',
+  'AWS_REGION',
+  'AWS_ENDPOINT_URL',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 
