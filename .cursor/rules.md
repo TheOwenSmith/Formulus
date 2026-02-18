@@ -28,23 +28,32 @@
 
 ## Error handling
 
-- Do not use `try/catch`.
-- Use `trySync` and `tryAsync` for error handling.
-- Format errors exactly as defined in `err-snippets.code-snippet`.
+### API & Worker (neverthrow)
+
+- **Never use `try/catch`** — wrap all throwable operations with `fromThrowable` or `fromThrowableAsync` from `@api/utils/error-handling` (or `@worker/utils/error-handling` in worker code).
+- Map errors to either `internal(e, message?)` (unexpected failures → `INTERNAL_SERVER_ERROR`) or `badRequest(message, e?)` (invalid input → `BAD_REQUEST`).
+- Propagate errors with `if (result.isErr()) return err(result.error)` using neverthrow's `err()`.
+- **Throwing is only acceptable at top-level tRPC route handlers.** Route handlers may `throw result.error` or `throw badRequest(...)` — tRPC's `errorFormatter` in `lib/trpc.ts` handles sanitization (strips stack traces and replaces internal messages in production).
+- **Only throw `AppError`-shaped objects** — never `new TRPCError(...)` or `new Error(...)`. The formatter expects `AppError` and maps its `code` field to the HTTP status; throwing anything else bypasses that mapping.
+- Use VSCode snippets (`err`, `errvoid`, `errfrom`, `terr`, `terrvoid`, `terrfrom`) for consistent formatting.
+
+### Client (React)
+
+- Handle mutation errors via the `onError` callback in `mutationOptions`.
+- All user-visible errors must be surfaced via `toast.error()` from `sonner`.
+- Route-level errors are handled by React Router's `errorElement` (see `router.tsx`).
 
 ## User-visible errors
 
-- All user-visible errors must be surfaced via the standard toast system:
-  - Use `toast()` for expected UI-facing errors.
-- Unexpected or internal errors must be:
-  - Logged to the logging system (X)
-  - And mapped to a generic user-safe message.
+- Use `toast.error()` for expected, user-facing errors.
+- Unexpected/internal errors must be logged to the console and mapped to a generic user-safe message (the tRPC `errorFormatter` handles this automatically for API errors in production).
 
 ## Types
 
-- Import shared backend types exclusively from `@shared/types.ts`.
-- Do NOT import types from `@api/shared/...`.
+- Import shared API types from `@shared/api` (re-exports `AppRouter`, tickers, bars, etc.).
+- Import shared worker types from `@shared/worker` (re-exports backtesting result types) — **never import this in worker code** (chains to API-only env vars).
+- Do NOT import types directly from `@api/...` in client code.
 
 ## Name conventions
 
-- All files in `/api` should be in snake-case
+- All files in `/api` must use kebab-case filenames.
