@@ -64,6 +64,8 @@ export type AlgorithmData = {
     bars: Bar[],
     metadata: IndicatorMetadata,
   ) => Result<Partial<IndicatorResultByIndicator>, AppError>;
+  maxDrawdown: number;
+  peakBalance: number;
   positions: Record<Ticker, number>;
   positionsClosed: number;
   sharpeRatioCalculator: SharpeRatioCalculator;
@@ -318,6 +320,8 @@ export async function backtestAlgorithmsConcurrently({
         ),
         entraceTimeByTickerPosition: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
         indicatorResultsFunction,
+        maxDrawdown: 0,
+        peakBalance: 100,
         positions: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
         positionsClosed: 0,
         sharpeRatioCalculator: new SharpeRatioCalculator(),
@@ -558,7 +562,14 @@ export async function backtestAlgorithmsConcurrently({
           priceByTicker,
           algorithmData,
         });
+
+        // Update statistics
         algorithmData.sharpeRatioCalculator.addPrice(portfolioValue);
+        algorithmData.peakBalance = Math.max(algorithmData.peakBalance, portfolioValue);
+        algorithmData.maxDrawdown = Math.max(
+          algorithmData.maxDrawdown,
+          (algorithmData.peakBalance - portfolioValue) / algorithmData.peakBalance,
+        );
 
         // Update plotting variables
         if (ticks % plotSpacing === 0) {

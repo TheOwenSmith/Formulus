@@ -427,9 +427,7 @@ export function BacktestPage() {
 
         // Fallback: check all algorithm cards and see which one the mouse is over
         if (!foundTarget) {
-          if (!cachedCards) {
-            cachedCards = document.querySelectorAll('[data-algorithm-card]');
-          }
+          cachedCards ??= document.querySelectorAll('[data-algorithm-card]');
           for (const card of cachedCards) {
             const rect = card.getBoundingClientRect();
             if (
@@ -455,9 +453,7 @@ export function BacktestPage() {
         }
       } else {
         // Normal mode: find drop zone by checking all drop zones and their bounding boxes
-        if (!cachedDropZones) {
-          cachedDropZones = document.querySelectorAll('[data-drop-zone]');
-        }
+        cachedDropZones ??= document.querySelectorAll('[data-drop-zone]');
         let foundPosition: number | null = null;
 
         for (const dropZone of cachedDropZones) {

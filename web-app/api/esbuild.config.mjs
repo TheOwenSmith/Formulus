@@ -10,7 +10,7 @@ const options = {
   minify: true,
   sourcemap: 'inline',
   outfile: 'dist/index.js',
-  external: ['node:*'],
+  external: ['node:*', '../shared/node_modules/*'],
   plugins: [nodeExternalsPlugin()],
   platform: 'node',
   target: 'node24',

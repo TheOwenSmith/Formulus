@@ -6,7 +6,7 @@ import { createUserAuthenticationProcedure } from '@api/middleware/authenticatio
 import { createSubmission, getSubmissionStatus } from '@api/repository/db-submission';
 import { badRequest, fromThrowableAsync, internal } from '@api/utils/error-handling';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
-import { retrieveBacktestingResultsByPublicId } from '@shared/worker';
+import { retrieveBacktestingResultsByPublicId } from '@api/repository/db-backtesting-results';
 import z from 'zod';
 
 export function backtestingRouter(

@@ -4,6 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "start": "pnpm run build && pnpm run preview",
+    "build": "node ./esbuild.config.mjs",
+    "dev": "concurrently \"node ./esbuild.config.mjs --watch\" \"nodemon --watch ./dist/index.js --exec \\\"node ./dist/index.js\\\"\"",
+    "preview": "node ./dist/index.js",
     "console": "node ./src/scripts/esbuild-console.config.mjs && node ./dist/console.js",
     "prettier:write": "prettier \"**/*.{ts,js}\" --write",
     "prettier:check": "prettier \"**/*.{ts,js}\" --check",

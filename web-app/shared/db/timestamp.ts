@@ -1,4 +1,4 @@
-import { Timestamp } from '@shared/api';
+import { type Timestamp } from '@shared/api';
 import { Timestamp as DbTimestamp } from '@shared/generated/prisma/enums';
 
 export function convertTimestampToDbTimestamp(timestamp: Timestamp): DbTimestamp {

@@ -3,7 +3,12 @@ import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-ver
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import { backtestAlgorithmsConcurrently } from '@worker/core/backtesting/backtest-algorithms-concurrently';
 import { interactiveBrokersSlippageFunction } from '@worker/core/backtesting/slippage-functions';
-import { fromThrowable, fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
+import {
+  fromThrowable,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@worker/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 import z from 'zod';
 import { config } from './lib/config';
@@ -25,11 +30,16 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
 
   const submission = getSubmissionResult.value;
   if (submission == null) {
-    return err(internal(new Error(`Submission not found: ${submissionId}`), 'Submission not found'));
+    return err(
+      internal(new Error(`Submission not found: ${submissionId}`), 'Submission not found'),
+    );
   }
 
   // Mark as running
-  const markRunningResult = await updateSubmissionStatus(submissionId, BacktestingSubmissionStatus.RUNNING);
+  const markRunningResult = await updateSubmissionStatus(
+    submissionId,
+    BacktestingSubmissionStatus.RUNNING,
+  );
   if (markRunningResult.isErr()) return err(markRunningResult.error);
 
   // Convert DB algorithm versions to the worker algorithm types
@@ -51,11 +61,15 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
   if (backtestResult.isErr()) {
     const { code, message, error } = backtestResult.error;
     console.error(`Backtest failed for submission ${submissionId}:`, message, error);
-    const markErrorResult = await updateSubmissionStatus(submissionId, BacktestingSubmissionStatus.ERROR, {
-      error: message ?? 'Unknown error',
-      errorCode: code,
-      errorDetail: serializeErrorDetail(error),
-    });
+    const markErrorResult = await updateSubmissionStatus(
+      submissionId,
+      BacktestingSubmissionStatus.ERROR,
+      {
+        error: message ?? 'Unknown error',
+        errorCode: code,
+        errorDetail: serializeErrorDetail(error),
+      },
+    );
     if (markErrorResult.isErr()) {
       console.error(`Failed to mark submission ${submissionId} as ERROR:`, markErrorResult.error);
     }

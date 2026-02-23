@@ -1,5 +1,5 @@
 import { SupportedLanguage as DbSupportedLanguage } from '@shared/generated/prisma/enums';
-import { SupportedLanguage } from '@shared/worker';
+import { type SupportedLanguage } from '@shared/worker';
 
 export function convertSupportedLanguageToDbSupportedLanguage(
   supportedLanguage: SupportedLanguage,

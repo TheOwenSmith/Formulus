@@ -39,6 +39,7 @@ export async function retrieveBacktestingResultsByPublicId(
         contextLength: algorithmGraph.contextLength,
         expectancyPerTrade: algorithmGraph.expectancyPerTrade,
         growthRate: algorithmGraph.growthRate,
+        maxDrawdown: algorithmGraph.maxDrawdown,
         maxHoldingPorportion: algorithmGraph.maxHoldingPorportion,
         positionsClosed: algorithmGraph.positionsClosed,
         profitLossRatio: algorithmGraph.profitLossRatio as ProfitLossRatio,

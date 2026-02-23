@@ -36,7 +36,14 @@ export async function getSubmissionWithVersions(
 export async function updateSubmissionStatus(
   id: string,
   status: BacktestingSubmissionStatus,
-  extra?: { progressPct?: number; message?: string; error?: string; errorCode?: string; errorDetail?: string; resultId?: string },
+  extra?: {
+    progressPct?: number;
+    message?: string;
+    error?: string;
+    errorCode?: string;
+    errorDetail?: string;
+    resultId?: string;
+  },
 ): Promise<Result<undefined, AppError>> {
   return await fromThrowableAsync(
     () =>

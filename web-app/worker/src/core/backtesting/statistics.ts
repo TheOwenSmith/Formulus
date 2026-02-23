@@ -45,6 +45,7 @@ export type DescriptionMetrics = {
   contextLength: number;
   expectancyPerTrade: number | null;
   growthRate: number;
+  maxDrawdown: number;
   maxHoldingPorportion: number;
   positionsClosed: number;
   profitLossRatio: ProfitLossRatio;
@@ -90,6 +91,7 @@ export async function getAlgorithmGraph({
     sharpeRatioCalculator,
     cumulativeHoldingTime,
     algorithmYs,
+    maxDrawdown,
   } = algorithmData;
 
   const algorithmPlot: SimplePlot = {
@@ -118,6 +120,7 @@ export async function getAlgorithmGraph({
         ? (cumulativeProfitLoss[0] - cumulativeProfitLoss[1]) / positionsClosed
         : null,
     growthRate,
+    maxDrawdown,
     maxHoldingPorportion: algorithmMaxHoldingProportion,
     positionsClosed,
     profitLossRatio,

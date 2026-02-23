@@ -1,4 +1,4 @@
-import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
+import { type AppError } from '@api/utils/error-handling';
 import { getAggregateDataIterator } from '@shared/worker';
 import { err, ok, Result } from 'neverthrow';
 import type { Ticker } from './types';
@@ -81,15 +81,11 @@ export async function estimateSlippageBps(
   ticker: Ticker,
 ): Promise<Result<number | null, AppError>> {
   const filename = `./data/cleaned/${ticker}_1min.csv`;
-  const getIteratorResponse = fromThrowable(
-    () =>
-      getAggregateDataIterator({
-        filename,
-        parseStrictly: false,
-        verboseLogging: false,
-      }),
-    (e) => internal(e),
-  );
+  const getIteratorResponse = getAggregateDataIterator({
+    filename,
+    parseStrictly: false,
+    verboseLogging: false,
+  });
   if (getIteratorResponse.isErr()) {
     return err(getIteratorResponse.error);
   }

@@ -28,6 +28,7 @@ export async function createBacktestingResults({
               contextLength: ag.descriptionMetrics.contextLength,
               expectancyPerTrade: ag.descriptionMetrics.expectancyPerTrade,
               growthRate: ag.descriptionMetrics.growthRate,
+              maxDrawdown: ag.descriptionMetrics.maxDrawdown,
               maxHoldingPorportion: ag.descriptionMetrics.maxHoldingPorportion,
               name: ag.algorithmPlot.name,
               plotYs: ag.algorithmPlot.y,

@@ -196,6 +196,7 @@ model AlgorithmGraph {
   contextLength Int
   expectancyPerTrade Float?
   growthRate Float
+  maxDrawdown Float
   maxHoldingPorportion Float
   positionsClosed Int
   profitLossRatio Json

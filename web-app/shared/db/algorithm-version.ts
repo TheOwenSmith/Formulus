@@ -1,12 +1,12 @@
-import { UserTicker } from '@shared/api';
+import { type UserTicker } from '@shared/api';
 import { AlgorithmType as DbAlgorithmType } from '@shared/generated/prisma/enums';
-import { AlgorithmVersionModel } from '@shared/generated/prisma/models';
+import { type AlgorithmVersionModel } from '@shared/generated/prisma/models';
 import {
   AlgorithmType,
-  AnyUserAlgorithmType,
-  Indicator,
-  UserSimpleAlgorithm,
-  UserTopKAlgorithm,
+  type AnyUserAlgorithmType,
+  type Indicator,
+  type UserSimpleAlgorithm,
+  type UserTopKAlgorithm,
 } from '@shared/worker';
 import { convertSupportedLanguageToDbSupportedLanguage } from './language';
 import { convertDbTimestampToTimestamp } from './timestamp';
