@@ -224,20 +224,6 @@ export async function backtestAlgorithmsConcurrently({
   }
   const batchAlgorithmImplementationsFn = batchAlgorithmImplementationsFnResponse.value;
 
-  // Get ticker iterator bounds
-  const getIteratorBoundsResponse = await getIteratorBounds(
-    indexByAggregateByTicker,
-    userInputtedTimespan,
-  );
-  if (getIteratorBoundsResponse.isErr()) {
-    return err(getIteratorBoundsResponse.error);
-  }
-  const { timespan, iteratorBoundsByAggregateByTicker } = getIteratorBoundsResponse.value;
-
-  console.log(`Testing timespan: ${timespan[0]} to ${timespan[1]}`);
-  const bytesToProcess = countBytesToProcess(iteratorBoundsByAggregateByTicker);
-  console.log(`Bytes to process: ${withCommas(bytesToProcess)}`);
-
   // Output variables
   const algorithmGraphs: {
     aggregate: Timestamp;
@@ -256,374 +242,402 @@ export async function backtestAlgorithmsConcurrently({
     {} as Record<Timestamp, string[]>,
   );
 
-  console.log(
-    `Data successfully prepared (took ${withCommas(Date.now() - startPrepareDataTimestamp)}ms)`,
-  );
-
-  // Backtest algorithms
-  let bytesProcessed = 0;
-  for (const aggregate of aggregateTimestamps) {
-    if (verboseLogging) {
-      console.log(`Processing ${aggregate} aggregate data...`);
+  // try/finally wraps everything from here so the Docker container is always destroyed
+  let endBatchAlgorithmImplementationsResult: Result<undefined, AppError> | undefined;
+  try {
+    // Get ticker iterator bounds
+    const getIteratorBoundsResponse = await getIteratorBounds(
+      indexByAggregateByTicker,
+      userInputtedTimespan,
+    );
+    if (getIteratorBoundsResponse.isErr()) {
+      return err(getIteratorBoundsResponse.error);
     }
+    const { timespan, iteratorBoundsByAggregateByTicker } = getIteratorBoundsResponse.value;
 
-    // Skip if no tickers
-    if (Object.keys(distinctTickersByAggregate[aggregate]).length === 0) {
-      continue;
-    }
+    console.log(`Testing timespan: ${timespan[0]} to ${timespan[1]}`);
+    const bytesToProcess = countBytesToProcess(iteratorBoundsByAggregateByTicker);
+    console.log(`Bytes to process: ${withCommas(bytesToProcess)}`);
 
-    // Fetch ticker iterators for all tickers
-    const getTickerIteratorByTickerResponse = getTickerIteratorsByTicker({
-      distinctTickers: distinctTickersByAggregate[aggregate],
-      filenameByTicker: filenameByAggregateByTicker[aggregate],
-      iteratorBoundsByTicker: iteratorBoundsByAggregateByTicker[aggregate],
-      parseStrictly: iteratorStrictParsing,
-      verboseLogging,
-    });
-    if (getTickerIteratorByTickerResponse.isErr()) {
-      return err(getTickerIteratorByTickerResponse.error);
-    }
-    const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
-      getTickerIteratorByTickerResponse.value;
-
-    // Algorithm tracking variables
-    const currentAlgorithmsByIndex: Map<number, Algorithm | AnyUserAlgorithmType> =
-      algorithmsByIndexByAggregate[aggregate];
-    const algorithmDataByAlgorithmIndex: Record<number, AlgorithmData> = {};
-    for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
-      const indicatorsToIndicatorResultsFunctionResponse = indicatorsToIndicatorResultsFunction(
-        (algorithm.indicators ?? []) as Indicator[],
-      );
-      if (indicatorsToIndicatorResultsFunctionResponse.isErr()) {
-        return err(indicatorsToIndicatorResultsFunctionResponse.error);
-      }
-      const indicatorResultsFunction = indicatorsToIndicatorResultsFunctionResponse.value;
-
-      algorithmDataByAlgorithmIndex[algorithmIndex] = {
-        algorithmYs: [],
-        balance: 100,
-        cumulativeHoldingTime: 0,
-        cumulativeProfitLoss: [0, 0],
-        entracePriceExitPriceByTickerPosition: createIndexByTicker(
-          getTickers(algorithm),
-          (_ticker) => [0, 0],
-        ),
-        entraceTimeByTickerPosition: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
-        indicatorResultsFunction,
-        maxDrawdown: 0,
-        peakBalance: 100,
-        positions: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
-        positionsClosed: 0,
-        sharpeRatioCalculator: new SharpeRatioCalculator(),
-        trades: 0,
-        winsLosses: [0, 0],
-      } satisfies AlgorithmData;
-    }
-
-    // Calculate maximum context length for all algorithms
-    const maxContextLengthByTicker = {} as Record<Ticker, number>;
-    for (const algorithm of currentAlgorithmsByIndex.values()) {
-      for (const ticker of getTickers(algorithm)) {
-        maxContextLengthByTicker[ticker] = Math.max(
-          maxContextLengthByTicker[ticker] ?? 1,
-          algorithm.contextLength,
-        );
-      }
-    }
-
-    // Initialize indicator metadata
-    const distinctTickers = distinctTickersByAggregate[aggregate];
-    const indicatorMetadataByTicker: Record<Ticker, IndicatorMetadata> = createIndexByTicker(
-      distinctTickers,
-      (_ticker) => ({}),
+    console.log(
+      `Data successfully prepared (took ${withCommas(Date.now() - startPrepareDataTimestamp)}ms)`,
     );
 
-    // Plotting variables
-    let ticks = 0;
-    let plotSpacing = 1;
-    const tickerYsByTicker: Record<Ticker, number[]> = distinctTickersByAggregate[aggregate].reduce(
-      (acc, ticker) => {
-        acc[ticker] = [];
-        return acc;
-      },
-      {} as Record<Ticker, number[]>,
-    );
+    // Signal 0% progress: preparation is done, actual backtesting is starting.
+    // This fires before any bytes are processed so the client transitions from "Preparing..."
+    // to "Running..." and can begin showing accurate ETA from this moment.
+    if (onProgress != null) {
+      await onProgress(0);
+    }
 
-    // Tracking variables
-    const contextByTicker: Record<Ticker, Bar[]> = createIndexByTicker(
-      distinctTickers,
-      (_ticker) => [],
-    );
-    const firstPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
-      distinctTickers,
-      (_ticker) => null,
-    );
-    const lastPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
-      distinctTickers,
-      (_ticker) => null,
-    );
-
-    let hasNextBar = true;
-    let nextBarByTicker: Record<Ticker, Bar> | null = null;
-    let currentTimestamp: string | null = null;
-    while (hasNextBar) {
-      const currentBarByTicker: Record<Ticker, Bar> | null =
-        nextBarByTicker != null ? { ...nextBarByTicker } : null;
-
-      // Get next bars from iterators
-      nextBarByTicker = {} as Record<Ticker, Bar>;
-      let nextTimestamp: string | null = null;
-      let deltaBytesProcessed = 0;
-      for (const ticker in tickerIteratorByTicker) {
-        const iteratorResult = await tickerIteratorByTicker[ticker as Ticker].next();
-        if (iteratorResult.done) {
-          // Iterator is finished; end of timespan reached
-          hasNextBar = false;
-          break;
-        }
-
-        deltaBytesProcessed += iteratorResult.value.bytesProcessed;
-        const nextBar = iteratorResult.value.bar;
-
-        if (nextTimestamp == null) {
-          nextTimestamp = nextBar[0];
-        } else if (nextBar[0] !== nextTimestamp) {
-          return err(
-            internal(
-              undefined,
-              `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextTimestamp}' but got '${nextBar[0]}'`,
-            ),
-          );
-        }
-
-        nextBarByTicker[ticker] = nextBar;
+    // Backtest algorithms
+    let bytesProcessed = 0;
+    for (const aggregate of aggregateTimestamps) {
+      if (verboseLogging) {
+        console.log(`Processing ${aggregate} aggregate data...`);
       }
 
-      const shouldUpdateProgress =
-        Math.floor((bytesProcessed + deltaBytesProcessed) / BYTES_PROGRESS_UPDATE_INTERVAL) >
-        Math.floor(bytesProcessed / BYTES_PROGRESS_UPDATE_INTERVAL);
-      bytesProcessed += deltaBytesProcessed;
-      if (shouldUpdateProgress) {
-        if (onProgress != null && bytesToProcess > 0) {
-          await onProgress(Math.min(99, (bytesProcessed / bytesToProcess) * 100));
-        }
-      }
-
-      if (currentBarByTicker == null) {
-        for (const ticker in tickerIteratorByTicker) {
-          firstPriceByTicker[ticker] = nextBarByTicker[ticker][4];
-        }
-        currentTimestamp = nextTimestamp!;
+      // Skip if no tickers
+      if (Object.keys(distinctTickersByAggregate[aggregate]).length === 0) {
         continue;
       }
 
-      let updatePlotSpacing = false;
-      for (const ticker in tickerIteratorByTicker) {
-        // Update tracking variable
-        lastPriceByTicker[ticker] = currentBarByTicker[ticker][4];
-
-        // Update context
-        if (contextByTicker[ticker].length < maxContextLengthByTicker[ticker]) {
-          contextByTicker[ticker].push(currentBarByTicker[ticker]);
-        } else {
-          contextByTicker[ticker].shift();
-          contextByTicker[ticker].push(currentBarByTicker[ticker]);
-        }
-
-        // Update plotting variables
-        if (ticks % plotSpacing === 0) {
-          const tickerPortfolioValue =
-            (currentBarByTicker[ticker][4] / firstPriceByTicker[ticker]!) * 100;
-          updatePlotSpacing = updateGraph({
-            graphIndex: ticker,
-            graphObject: tickerYsByTicker,
-            newPoint: roundToDecimal(tickerPortfolioValue, 2),
-          });
-        }
+      // Fetch ticker iterators for all tickers
+      const getTickerIteratorByTickerResponse = getTickerIteratorsByTicker({
+        distinctTickers: distinctTickersByAggregate[aggregate],
+        filenameByTicker: filenameByAggregateByTicker[aggregate],
+        iteratorBoundsByTicker: iteratorBoundsByAggregateByTicker[aggregate],
+        parseStrictly: iteratorStrictParsing,
+        verboseLogging,
+      });
+      if (getTickerIteratorByTickerResponse.isErr()) {
+        return err(getTickerIteratorByTickerResponse.error);
       }
+      const tickerIteratorByTicker: Record<Ticker, AggregateDataIterator> =
+        getTickerIteratorByTickerResponse.value;
 
-      // Get latest prices and ticker
-      const priceByTicker: Record<Ticker, number> = distinctTickers.reduce(
-        (acc, ticker) => {
-          acc[ticker] = contextByTicker[ticker].at(-1)![4];
-          return acc;
-        },
-        {} as Record<Ticker, number>,
-      );
-
-      const slippageByTicker: Record<Ticker, number> = distinctTickers.reduce(
-        (acc, ticker) => {
-          const price = priceByTicker[ticker];
-          const marketSlippage = marketSlippageByTicker[ticker];
-          acc[ticker] = slippageMapFn?.(marketSlippage, price) ?? marketSlippage;
-          return acc;
-        },
-        {} as Record<Ticker, number>,
-      );
-
-      // Compile implementation arguments for all algorithms
-      const implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex =
-        new Map();
+      // Algorithm tracking variables
+      const currentAlgorithmsByIndex: Map<number, Algorithm | AnyUserAlgorithmType> =
+        algorithmsByIndexByAggregate[aggregate];
+      const algorithmDataByAlgorithmIndex: Record<number, AlgorithmData> = {};
       for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
-        const { contextLength } = algorithm;
+        const indicatorsToIndicatorResultsFunctionResponse = indicatorsToIndicatorResultsFunction(
+          (algorithm.indicators ?? []) as Indicator[],
+        );
+        if (indicatorsToIndicatorResultsFunctionResponse.isErr()) {
+          return err(indicatorsToIndicatorResultsFunctionResponse.error);
+        }
+        const indicatorResultsFunction = indicatorsToIndicatorResultsFunctionResponse.value;
 
-        // Ensure enough context to execute algorithm
-        if (hasNextBar && ticks + 1 >= contextLength) {
-          // Get context
-          const context = getTickers(algorithm).reduce(
-            (acc, ticker) => {
-              acc[ticker] = contextByTicker[ticker].slice(-contextLength);
-              return acc;
-            },
-            {} as Record<Ticker, Bar[]>,
-          );
-
-          // Get positions and calculate indicators
-          const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
-          const positions = algorithmDataByAlgorithmIndex[algorithmIndex].positions;
-
-          const getIndicatorsResult = safeReduce(
+        algorithmDataByAlgorithmIndex[algorithmIndex] = {
+          algorithmYs: [],
+          balance: 100,
+          cumulativeHoldingTime: 0,
+          cumulativeProfitLoss: [0, 0],
+          entracePriceExitPriceByTickerPosition: createIndexByTicker(
             getTickers(algorithm),
-            (acc: Record<Ticker, Partial<IndicatorResultByIndicator>>, ticker: Ticker) => {
-              const getIndicatorResultsResponse = algorithmData.indicatorResultsFunction(
-                context[ticker],
-                indicatorMetadataByTicker[ticker],
-              );
-              return getIndicatorResultsResponse.map((indicatorResults) => {
-                acc[ticker] = indicatorResults;
-                return acc;
-              });
-            },
-            {} as Record<Ticker, Partial<IndicatorResultByIndicator>>,
+            (_ticker) => [0, 0],
+          ),
+          entraceTimeByTickerPosition: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
+          indicatorResultsFunction,
+          maxDrawdown: 0,
+          peakBalance: 100,
+          positions: createIndexByTicker(getTickers(algorithm), (_ticker) => 0),
+          positionsClosed: 0,
+          sharpeRatioCalculator: new SharpeRatioCalculator(),
+          trades: 0,
+          winsLosses: [0, 0],
+        } satisfies AlgorithmData;
+      }
+
+      // Calculate maximum context length for all algorithms
+      const maxContextLengthByTicker = {} as Record<Ticker, number>;
+      for (const algorithm of currentAlgorithmsByIndex.values()) {
+        for (const ticker of getTickers(algorithm)) {
+          maxContextLengthByTicker[ticker] = Math.max(
+            maxContextLengthByTicker[ticker] ?? 1,
+            algorithm.contextLength,
           );
-          if (getIndicatorsResult.isErr()) {
-            return err(getIndicatorsResult.error);
-          }
-          const indicators = getIndicatorsResult.value;
-
-          implementationArgumentsByAlgorithmIndex.set(algorithmIndex, [
-            context,
-            positions,
-            indicators,
-          ]);
-        } else if (!hasNextBar) {
-          implementationArgumentsByAlgorithmIndex.set(algorithmIndex, null);
         }
       }
 
-      // Execute algorithm implementations concurrently
-      const getAlgorithmActionsResponse = await batchAlgorithmImplementationsFn(
-        implementationArgumentsByAlgorithmIndex,
+      // Initialize indicator metadata
+      const distinctTickers = distinctTickersByAggregate[aggregate];
+      const indicatorMetadataByTicker: Record<Ticker, IndicatorMetadata> = createIndexByTicker(
+        distinctTickers,
+        (_ticker) => ({}),
       );
-      if (getAlgorithmActionsResponse.isErr()) {
-        return err(getAlgorithmActionsResponse.error);
-      }
-      const actionsByAlgorithmIndex = getAlgorithmActionsResponse.value;
 
-      // Update positions and graph variables
-      for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
-        const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } =
-          algorithm;
-        const tickers = getTickers(algorithm);
-        const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
-        const actions = actionsByAlgorithmIndex.get(algorithmIndex)!;
+      // Plotting variables
+      let ticks = 0;
+      let plotSpacing = 1;
+      const tickerYsByTicker: Record<Ticker, number[]> = distinctTickersByAggregate[
+        aggregate
+      ].reduce(
+        (acc, ticker) => {
+          acc[ticker] = [];
+          return acc;
+        },
+        {} as Record<Ticker, number[]>,
+      );
 
-        if (actions != null) {
-          const updatePositionResult = updatePosition({
-            actions,
-            algorithmData,
-            algorithmMaxHoldingProportion,
-            algorithmTickers: tickers,
-            priceByTicker,
-            slippageByTicker,
-            ticks,
-          });
-          if (updatePositionResult.isErr()) {
-            return err(updatePositionResult.error);
+      // Tracking variables
+      const contextByTicker: Record<Ticker, Bar[]> = createIndexByTicker(
+        distinctTickers,
+        (_ticker) => [],
+      );
+      const firstPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
+        distinctTickers,
+        (_ticker) => null,
+      );
+      const lastPriceByTicker: Record<Ticker, number | null> = createIndexByTicker(
+        distinctTickers,
+        (_ticker) => null,
+      );
+
+      let hasNextBar = true;
+      let nextBarByTicker: Record<Ticker, Bar> | null = null;
+      let currentTimestamp: string | null = null;
+      while (hasNextBar) {
+        const currentBarByTicker: Record<Ticker, Bar> | null =
+          nextBarByTicker != null ? { ...nextBarByTicker } : null;
+
+        // Get next bars from iterators
+        nextBarByTicker = {} as Record<Ticker, Bar>;
+        let nextTimestamp: string | null = null;
+        let deltaBytesProcessed = 0;
+        for (const ticker in tickerIteratorByTicker) {
+          const iteratorResult = await tickerIteratorByTicker[ticker as Ticker].next();
+          if (iteratorResult.done) {
+            // Iterator is finished; end of timespan reached
+            hasNextBar = false;
+            break;
           }
-        } else {
-          closeAllPositions({
-            algorithmData,
-            priceByTicker,
-            slippageByTicker,
-            ticks,
-          });
+
+          deltaBytesProcessed += iteratorResult.value.bytesProcessed;
+          const nextBar = iteratorResult.value.bar;
+
+          if (nextTimestamp == null) {
+            nextTimestamp = nextBar[0];
+          } else if (nextBar[0] !== nextTimestamp) {
+            return err(
+              internal(
+                undefined,
+                `Iterator timestamp mismatch for ticker '${ticker}' (${aggregate}); expected '${nextTimestamp}' but got '${nextBar[0]}'`,
+              ),
+            );
+          }
+
+          nextBarByTicker[ticker] = nextBar;
         }
 
-        const portfolioValue = getPortfolioValue({
-          priceByTicker,
-          algorithmData,
-        });
+        const shouldUpdateProgress =
+          Math.floor((bytesProcessed + deltaBytesProcessed) / BYTES_PROGRESS_UPDATE_INTERVAL) >
+          Math.floor(bytesProcessed / BYTES_PROGRESS_UPDATE_INTERVAL);
+        bytesProcessed += deltaBytesProcessed;
+        if (shouldUpdateProgress) {
+          if (onProgress != null && bytesToProcess > 0) {
+            await onProgress(Math.min(99, (bytesProcessed / bytesToProcess) * 100));
+          }
+        }
 
-        // Update statistics
-        algorithmData.sharpeRatioCalculator.addPrice(portfolioValue);
-        algorithmData.peakBalance = Math.max(algorithmData.peakBalance, portfolioValue);
-        algorithmData.maxDrawdown = Math.max(
-          algorithmData.maxDrawdown,
-          (algorithmData.peakBalance - portfolioValue) / algorithmData.peakBalance,
+        if (currentBarByTicker == null) {
+          for (const ticker in tickerIteratorByTicker) {
+            firstPriceByTicker[ticker] = nextBarByTicker[ticker][4];
+          }
+          currentTimestamp = nextTimestamp!;
+          continue;
+        }
+
+        let updatePlotSpacing = false;
+        for (const ticker in tickerIteratorByTicker) {
+          // Update tracking variable
+          lastPriceByTicker[ticker] = currentBarByTicker[ticker][4];
+
+          // Update context
+          if (contextByTicker[ticker].length < maxContextLengthByTicker[ticker]) {
+            contextByTicker[ticker].push(currentBarByTicker[ticker]);
+          } else {
+            contextByTicker[ticker].shift();
+            contextByTicker[ticker].push(currentBarByTicker[ticker]);
+          }
+
+          // Update plotting variables
+          if (ticks % plotSpacing === 0) {
+            const tickerPortfolioValue =
+              (currentBarByTicker[ticker][4] / firstPriceByTicker[ticker]!) * 100;
+            updatePlotSpacing = updateGraph({
+              graphIndex: ticker,
+              graphObject: tickerYsByTicker,
+              newPoint: roundToDecimal(tickerPortfolioValue, 2),
+            });
+          }
+        }
+
+        // Get latest prices and ticker
+        const priceByTicker: Record<Ticker, number> = distinctTickers.reduce(
+          (acc, ticker) => {
+            acc[ticker] = contextByTicker[ticker].at(-1)![4];
+            return acc;
+          },
+          {} as Record<Ticker, number>,
         );
 
+        const slippageByTicker: Record<Ticker, number> = distinctTickers.reduce(
+          (acc, ticker) => {
+            const price = priceByTicker[ticker];
+            const marketSlippage = marketSlippageByTicker[ticker];
+            acc[ticker] = slippageMapFn?.(marketSlippage, price) ?? marketSlippage;
+            return acc;
+          },
+          {} as Record<Ticker, number>,
+        );
+
+        // Compile implementation arguments for all algorithms
+        const implementationArgumentsByAlgorithmIndex: ImplementationArgumentsByAlgorithmIndex =
+          new Map();
+        for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+          const { contextLength } = algorithm;
+
+          // Ensure enough context to execute algorithm
+          if (hasNextBar && ticks + 1 >= contextLength) {
+            // Get context
+            const context = getTickers(algorithm).reduce(
+              (acc, ticker) => {
+                acc[ticker] = contextByTicker[ticker].slice(-contextLength);
+                return acc;
+              },
+              {} as Record<Ticker, Bar[]>,
+            );
+
+            // Get positions and calculate indicators
+            const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
+            const positions = algorithmDataByAlgorithmIndex[algorithmIndex].positions;
+
+            const getIndicatorsResult = safeReduce(
+              getTickers(algorithm),
+              (acc: Record<Ticker, Partial<IndicatorResultByIndicator>>, ticker: Ticker) => {
+                const getIndicatorResultsResponse = algorithmData.indicatorResultsFunction(
+                  context[ticker],
+                  indicatorMetadataByTicker[ticker],
+                );
+                return getIndicatorResultsResponse.map((indicatorResults) => {
+                  acc[ticker] = indicatorResults;
+                  return acc;
+                });
+              },
+              {} as Record<Ticker, Partial<IndicatorResultByIndicator>>,
+            );
+            if (getIndicatorsResult.isErr()) {
+              return err(getIndicatorsResult.error);
+            }
+            const indicators = getIndicatorsResult.value;
+
+            implementationArgumentsByAlgorithmIndex.set(algorithmIndex, [
+              context,
+              positions,
+              indicators,
+            ]);
+          } else if (!hasNextBar) {
+            implementationArgumentsByAlgorithmIndex.set(algorithmIndex, null);
+          }
+        }
+
+        // Execute algorithm implementations concurrently
+        const getAlgorithmActionsResponse = await batchAlgorithmImplementationsFn(
+          implementationArgumentsByAlgorithmIndex,
+        );
+        if (getAlgorithmActionsResponse.isErr()) {
+          return err(getAlgorithmActionsResponse.error);
+        }
+        const actionsByAlgorithmIndex = getAlgorithmActionsResponse.value;
+
+        // Update positions and graph variables
+        for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+          const { algorithmMaxHoldingProportion = DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } =
+            algorithm;
+          const tickers = getTickers(algorithm);
+          const algorithmData = algorithmDataByAlgorithmIndex[algorithmIndex];
+          const actions = actionsByAlgorithmIndex.get(algorithmIndex)!;
+
+          if (actions != null) {
+            const updatePositionResult = updatePosition({
+              actions,
+              algorithmData,
+              algorithmMaxHoldingProportion,
+              algorithmTickers: tickers,
+              priceByTicker,
+              slippageByTicker,
+              ticks,
+            });
+            if (updatePositionResult.isErr()) {
+              return err(updatePositionResult.error);
+            }
+          } else {
+            closeAllPositions({
+              algorithmData,
+              priceByTicker,
+              slippageByTicker,
+              ticks,
+            });
+          }
+
+          const portfolioValue = getPortfolioValue({
+            priceByTicker,
+            algorithmData,
+          });
+
+          // Update statistics
+          algorithmData.sharpeRatioCalculator.addPrice(portfolioValue);
+          algorithmData.peakBalance = Math.max(algorithmData.peakBalance, portfolioValue);
+          algorithmData.maxDrawdown = Math.max(
+            algorithmData.maxDrawdown,
+            (algorithmData.peakBalance - portfolioValue) / algorithmData.peakBalance,
+          );
+
+          // Update plotting variables
+          if (ticks % plotSpacing === 0) {
+            updatePlotSpacing = updateGraph({
+              graphIndex: 'algorithmYs',
+              graphObject: algorithmData,
+              newPoint: roundToDecimal(portfolioValue, 2),
+            });
+          }
+        }
+
         // Update plotting variables
         if (ticks % plotSpacing === 0) {
           updatePlotSpacing = updateGraph({
-            graphIndex: 'algorithmYs',
-            graphObject: algorithmData,
-            newPoint: roundToDecimal(portfolioValue, 2),
+            graphIndex: aggregate,
+            graphObject: timestampsByAggregate,
+            newPoint: currentTimestamp!,
           });
         }
+
+        if (updatePlotSpacing) {
+          plotSpacing *= 2;
+        }
+        currentTimestamp = nextTimestamp!;
+        ticks++;
       }
 
-      // Update plotting variables
-      if (ticks % plotSpacing === 0) {
-        updatePlotSpacing = updateGraph({
-          graphIndex: aggregate,
-          graphObject: timestampsByAggregate,
-          newPoint: currentTimestamp!,
+      for (const ticker in tickerIteratorByTicker) {
+        const closeTickerIteratorResponse = await tickerIteratorByTicker[ticker].close();
+        if (closeTickerIteratorResponse.isErr()) {
+          return err(closeTickerIteratorResponse.error);
+        }
+      }
+      if (verboseLogging) {
+        console.log(`Finished processing ${aggregate} aggregate data`);
+      }
+
+      // Compile ticker plots
+      for (const ticker in tickerYsByTicker) {
+        const tickerGraph: SimplePlot = {
+          name: ticker,
+          y: tickerYsByTicker[ticker],
+        };
+        tickerPlotByAggregateByTicker[aggregate][ticker] = tickerGraph;
+      }
+
+      // Compile algorithm plots
+      const yearsBetweenStartAndEnd = yearsBetween(timespan[1], timespan[0]);
+      for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
+        const algorithmGraph = await getAlgorithmGraph({
+          aggregate,
+          algorithm,
+          algorithmData: algorithmDataByAlgorithmIndex[algorithmIndex],
+          timespan,
+          yearsBetweenStartAndEnd,
         });
-      }
-
-      if (updatePlotSpacing) {
-        plotSpacing *= 2;
-      }
-      currentTimestamp = nextTimestamp!;
-      ticks++;
-    }
-
-    for (const ticker in tickerIteratorByTicker) {
-      const closeTickerIteratorResponse = await tickerIteratorByTicker[ticker].close();
-      if (closeTickerIteratorResponse.isErr()) {
-        return err(closeTickerIteratorResponse.error);
+        algorithmGraphs.push(algorithmGraph);
       }
     }
-    if (verboseLogging) {
-      console.log(`Finished processing ${aggregate} aggregate data`);
-    }
-
-    // Compile ticker plots
-    for (const ticker in tickerYsByTicker) {
-      const tickerGraph: SimplePlot = {
-        name: ticker,
-        y: tickerYsByTicker[ticker],
-      };
-      tickerPlotByAggregateByTicker[aggregate][ticker] = tickerGraph;
-    }
-
-    // Compile algorithm plots
-    const yearsBetweenStartAndEnd = yearsBetween(timespan[1], timespan[0]);
-    for (const [algorithmIndex, algorithm] of currentAlgorithmsByIndex.entries()) {
-      const algorithmGraph = await getAlgorithmGraph({
-        aggregate,
-        algorithm,
-        algorithmData: algorithmDataByAlgorithmIndex[algorithmIndex],
-        timespan,
-        yearsBetweenStartAndEnd,
-      });
-      algorithmGraphs.push(algorithmGraph);
-    }
+  } finally {
+    // End RPC function
+    endBatchAlgorithmImplementationsResult = await batchAlgorithmImplementationsFn.end?.();
   }
 
-  // End RPC function
-  const endBatchAlgorithmImplementationsResult = await batchAlgorithmImplementationsFn.end?.();
   if (
     // eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- Typescript throws another error if we use optional chaining
     endBatchAlgorithmImplementationsResult != null &&

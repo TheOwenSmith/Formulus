@@ -1,7 +1,6 @@
 import { docker } from '@worker/lib/docker';
 import { cleanup } from '@worker/utils/cleanup';
 import {
-  badRequest,
   fromThrowable,
   fromThrowableAsync,
   internal,
@@ -64,7 +63,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
   // Validate filenames
   for (const filename in files) {
     if (!/^[a-zA-Z0-9-_()]+\.[a-z]+$/.test(filename)) {
-      return err(badRequest(`Invalid filename '${filename}'`));
+      return err(userCodeError(`Invalid filename '${filename}'`));
     }
   }
 
@@ -200,12 +199,8 @@ export async function createRpcFunction<In extends unknown[], Out>({
   stream = createStreamResponse.value;
 
   stdout.on('data', async (data: Buffer) => {
-    console.log('stdout data', data.toString('utf-8'));
     if (data.length > MAX_OUT_BYTES) {
-      await end({
-        code: 'PAYLOAD_TOO_LARGE',
-        message: 'Output exceeded stream limit of 1MB',
-      });
+      await end(userCodeError('Output exceeded stream limit of 1MB'));
       return;
     }
 
@@ -221,7 +216,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
 
     const jsonParseResponse = fromThrowable(
       () => JSON.parse(data.toString('utf-8')),
-      (e) => badRequest('Failed to parse JSON', e),
+      (e) => userCodeError('Failed to parse JSON', e),
     );
     if (jsonParseResponse.isErr()) {
       await end(jsonParseResponse.error);
@@ -232,7 +227,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
     // Should follow { ok: true, result: Out } | { ok: false, error: Error } structure
     const zodResultSchemaParseResponse = fromThrowable(
       () => resultSchema.parse(parsedJson),
-      (e) => badRequest('Failed to parse result', e),
+      (e) => userCodeError('Failed to parse result', e),
     );
     if (zodResultSchemaParseResponse.isErr()) {
       await end(zodResultSchemaParseResponse.error);
@@ -271,10 +266,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
 
   stderr.on('data', async (data: Buffer) => {
     if (data.length > MAX_OUT_BYTES) {
-      await end({
-        code: 'PAYLOAD_TOO_LARGE',
-        message: 'Output exceeded stream limit of 1MB',
-      });
+      await end(userCodeError('Output exceeded stream limit of 1MB'));
       return;
     }
 
@@ -378,12 +370,12 @@ export async function createBatchRpcFunctionFromUserCode<
   function userCodePostValidiation(args: [In], userCodeResult: Out): Result<undefined, AppError> {
     for (const index in args[0]) {
       if (!(index in userCodeResult)) {
-        return err(badRequest(`Expected data from index '${index}' but received none`));
+        return err(userCodeError(`Expected data from index '${index}' but received none`));
       }
     }
     for (const index in userCodeResult) {
       if (!(index in args[0])) {
-        return err(badRequest(`Recieved unexpected data from index '${index}'`));
+        return err(userCodeError(`Received unexpected data from index '${index}'`));
       }
     }
     return ok(undefined);

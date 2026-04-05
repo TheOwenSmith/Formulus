@@ -41,7 +41,10 @@ export function BacktestPoller() {
           } else if (status.status === 'ERROR') {
             if (useBacktestStore.getState().pendingPublicId !== publicId) return;
             clearPending();
-            toast.error(status.error ?? 'Backtest failed');
+            toast.error(`Backtest failed: ${status.error ?? 'Unknown error'}`);
+          } else if (status.status === 'CANCELLED') {
+            if (useBacktestStore.getState().pendingPublicId !== publicId) return;
+            clearPending();
           } else {
             schedulePoll(publicId);
           }

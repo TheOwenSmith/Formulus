@@ -108,6 +108,17 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
     );
   }
 
+  // Check for cancellation that happened after the last onProgress tick but before completion.
+  // Without this, a backtest that finishes between progress checks would overwrite CANCELLED with FINISHED.
+  const postBacktestStatusResult = await getSubmissionCurrentStatus(submissionId);
+  if (
+    postBacktestStatusResult.isOk() &&
+    postBacktestStatusResult.value === BacktestingSubmissionStatus.CANCELLED
+  ) {
+    console.log(`Submission ${submissionId} was cancelled just before completion`);
+    return ok(undefined);
+  }
+
   if (backtestResult.isErr()) {
     const { code, message, error, isUserCode } = backtestResult.error;
     console.error(`Backtest failed for submission ${submissionId}:`, message, error);

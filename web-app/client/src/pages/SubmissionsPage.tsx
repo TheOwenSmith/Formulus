@@ -79,24 +79,43 @@ function formatDuration(ms: number): string {
 }
 
 function RunningETA({ createdAt, pct }: { createdAt: string; pct: number }) {
-  // Ticks every second — only used for "Running for X" display
+  // Ticks every second — drives "Running for X" display and ETA countdown
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // ETA is snapshotted at each pct update, not recalculated every second
-  const [etaMs, setEtaMs] = useState<number | null>(null);
+  // Record the wall-clock time when pct first becomes > 0. The worker emits pct=0 the moment
+  // preparation (Docker startup, compilation) is done and actual backtesting begins. Using this
+  // timestamp — rather than createdAt — means preparation time is excluded from ETA estimates.
+  const backtestStartRef = useRef<number | null>(null);
+  if (pct > 0 && backtestStartRef.current == null) {
+    backtestStartRef.current = Date.now();
+  }
+
+  // snapshotAt: wall-clock time when this ETA estimate was calculated
+  // etaAtSnapshot: the estimated ms remaining at that moment
+  // Both are set together on each pct update; the per-second tick then counts down from there.
+  const [etaSnapshot, setEtaSnapshot] = useState<{ snapshotAt: number; etaAtSnapshot: number } | null>(null);
   useEffect(() => {
-    if (pct < 5) {
-      setEtaMs(null);
+    if (pct < 5 || backtestStartRef.current == null) {
+      setEtaSnapshot(null);
       return;
     }
-    const elapsed = Date.now() - new Date(createdAt).getTime();
+    const elapsed = Date.now() - backtestStartRef.current;
     const remaining = (elapsed * (100 - pct)) / pct;
-    setEtaMs(remaining > 0 ? remaining : null);
-  }, [pct, createdAt]);
+    if (remaining > 0) {
+      setEtaSnapshot({ snapshotAt: Date.now(), etaAtSnapshot: remaining });
+    } else {
+      setEtaSnapshot(null);
+    }
+  }, [pct]);
+
+  // Count down from the snapshot by 1s per second; floor at 1s so it never reads "0s left"
+  const etaMs = etaSnapshot != null
+    ? Math.max(1000, etaSnapshot.etaAtSnapshot - (now - etaSnapshot.snapshotAt))
+    : null;
 
   const elapsed = now - new Date(createdAt).getTime();
 
