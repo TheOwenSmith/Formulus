@@ -3,10 +3,15 @@ import { prisma } from '@api/lib/prisma';
 import { sqs } from '@api/lib/sqs';
 import { type TRPCContext } from '@api/lib/trpc';
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
-import { createSubmission, getSubmissionStatus } from '@api/repository/db-submission';
+import { retrieveBacktestingResultsByPublicId } from '@api/repository/db-backtesting-results';
+import {
+  cancelSubmission,
+  createSubmission,
+  getSubmissionsByCreatorId,
+  getSubmissionStatus,
+} from '@api/repository/db-submission';
 import { badRequest, fromThrowableAsync, internal } from '@api/utils/error-handling';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
-import { retrieveBacktestingResultsByPublicId } from '@api/repository/db-backtesting-results';
 import z from 'zod';
 
 export function backtestingRouter(
@@ -44,6 +49,28 @@ export function backtestingRouter(
           throw badRequest('One or more algorithms not found');
         }
 
+        // Throttle: one submission per 20 seconds (global, across all algorithms)
+        const throttleWindowMs = 10_000;
+        const recentSubmissionResult = await fromThrowableAsync(
+          () =>
+            prisma.backtestingSubmission.findFirst({
+              where: {
+                creatorId: user.id,
+                createdAt: { gte: new Date(Date.now() - throttleWindowMs) },
+              },
+              select: { createdAt: true },
+              orderBy: { createdAt: 'desc' },
+            }),
+          (e) => internal(e, 'Failed to check submission throttle'),
+        );
+        if (recentSubmissionResult.isErr()) throw recentSubmissionResult.error;
+        if (recentSubmissionResult.value != null) {
+          const secondsLeft = Math.ceil(
+            (recentSubmissionResult.value.createdAt.getTime() + throttleWindowMs - Date.now()) / 1000,
+          );
+          throw badRequest(`Please wait ${secondsLeft}s before submitting another backtest`);
+        }
+
         // Create submission with snapshotted algorithm versions
         const submissionResult = await createSubmission({
           algorithms,
@@ -66,6 +93,12 @@ export function backtestingRouter(
         return { publicId: submission.publicId };
       }),
 
+    getSubmissions: authProcedure.query(async ({ ctx }) => {
+      const result = await getSubmissionsByCreatorId(ctx.user.id);
+      if (result.isErr()) throw result.error;
+      return result.value;
+    }),
+
     getSubmissionStatus: authProcedure
       .input(z.object({ publicId: z.string() }))
       .query(async ({ input }) => {
@@ -77,6 +110,15 @@ export function backtestingRouter(
           throw badRequest('Submission not found');
         }
         return statusResult.value;
+      }),
+
+    cancelSubmission: authProcedure
+      .input(z.object({ publicId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await cancelSubmission(input.publicId, ctx.user.id);
+        if (result.isErr()) throw result.error;
+        if (!result.value) throw badRequest('Submission not found or already started');
+        return { cancelled: true };
       }),
 
     getBacktestingResults: authProcedure

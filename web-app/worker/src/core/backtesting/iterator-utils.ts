@@ -1,4 +1,5 @@
-import { aggregateTimestamps, DATE_LENGTH, LINE_LENGTH, type Ticker } from '@shared/api';
+import { DATE_LENGTH, LINE_LENGTH, type Ticker } from '@shared/api';
+import { aggregateTimestamps } from '@shared/trading-constants';
 import { toValidTimespan } from '@worker/utils/date-utils';
 import {
   fromThrowableAsync,

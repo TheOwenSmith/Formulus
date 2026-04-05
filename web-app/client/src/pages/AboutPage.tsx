@@ -118,7 +118,7 @@ export function AboutPage() {
             </p>
             <p className="text-white/90 leading-relaxed mb-4">
               The{' '}
-              <ExternalLink href="/api/docs/Phoenix_Trader_Position_Management_System.pdf">
+              <ExternalLink href="/docs/Phoenix_Trader_Position_Management_System.pdf">
                 Phoenix Trader Position Management System
               </ExternalLink>{' '}
               solves this by finding how much to put in each stock while accounting for transaction

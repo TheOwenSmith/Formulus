@@ -2,12 +2,13 @@ import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import type { AlgorithmVersionModel } from '@shared/generated/prisma/models';
 import { prisma } from '@worker/lib/prisma';
 import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
-import { ok, Result } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 
 export type SubmissionWithVersions = {
   id: string;
   publicId: string;
   creatorId: string;
+  status: BacktestingSubmissionStatus;
   startTimespan: string | null;
   endTimespan: string | null;
   algorithmVersions: AlgorithmVersionModel[];
@@ -27,10 +28,26 @@ export async function getSubmissionWithVersions(
           id: true,
           publicId: true,
           startTimespan: true,
+          status: true,
         },
       }),
     (e) => internal(e, 'Failed to get submission from the database'),
   );
+}
+
+export async function getSubmissionCurrentStatus(
+  id: string,
+): Promise<Result<BacktestingSubmissionStatus | null, AppError>> {
+  const result = await fromThrowableAsync(
+    () =>
+      prisma.backtestingSubmission.findUnique({
+        where: { id },
+        select: { status: true },
+      }),
+    (e) => internal(e, 'Failed to get submission status'),
+  );
+  if (result.isErr()) return err(result.error);
+  return ok(result.value?.status ?? null);
 }
 
 export async function updateSubmissionStatus(

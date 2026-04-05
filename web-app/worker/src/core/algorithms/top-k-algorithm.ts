@@ -1,6 +1,8 @@
-import type { Bar, Ticker, Timestamp } from '@shared/api';
+import type { Bar, Ticker } from '@shared/api';
+import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } from '@shared/constants';
+import type { Timestamp } from '@shared/trading-constants';
 import { Heap } from '@worker/utils/heap';
-import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
+import { Action, type Algorithm } from './algorithm';
 import type { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
 
 export type TopKAlgorithmImplementation = (

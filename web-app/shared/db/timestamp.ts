@@ -1,5 +1,5 @@
-import { type Timestamp } from '@shared/api';
 import { Timestamp as DbTimestamp } from '@shared/generated/prisma/enums';
+import { type Timestamp } from '@shared/trading-constants';
 
 export function convertTimestampToDbTimestamp(timestamp: Timestamp): DbTimestamp {
   switch (timestamp) {

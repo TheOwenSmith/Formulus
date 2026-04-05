@@ -37,7 +37,7 @@
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.985.0",
     "@prisma/adapter-pg": "^7.2.0",
-    "cli-progress": "^3.12.0",
+    "@prisma/client": "^7.4.2",
     "dockerode": "^4.0.9",
     "dotenv": "^17.2.4",
     "neverthrow": "^8.2.0",

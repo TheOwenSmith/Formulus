@@ -1,16 +1,20 @@
 import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
+import { DATE_LENGTH, NUMBER_LENGTH } from '@shared/search-index-constants';
+import type { Timestamp } from '@shared/trading-constants';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';
 import { finished } from 'node:stream/promises';
-import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
+import { tickDataCsvHeader, type Ticker } from './types';
 
-export const DATE_LENGTH = 10; // YYYY-MM-DD
-export const NUMBER_LENGTH = 10; // 10 digits (works for up to 10GB files)
-export const LINE_LENGTH = DATE_LENGTH + NUMBER_LENGTH;
+export const enum SearchIndexType {
+  START_OF_DAY,
+  END_OF_DAY,
+}
 
 export async function createSearchIndex(
   ticker: Ticker,
   timestamp: Timestamp,
+  type: SearchIndexType,
 ): Promise<Result<undefined, AppError>> {
   console.log(`Creating search index for '${ticker}' (${timestamp})...`);
   const readFile = `../worker/data/cleaned/${ticker}_${timestamp}.csv`;

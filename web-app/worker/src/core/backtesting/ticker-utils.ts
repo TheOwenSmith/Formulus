@@ -1,4 +1,6 @@
-import { aggregateTimestamps, tickerSchema, type Ticker, type Timestamp } from '@shared/api';
+import { tickerSchema, type Ticker } from '@shared/api';
+import type { Timestamp } from '@shared/trading-constants';
+import { aggregateTimestamps } from '@shared/trading-constants';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
 import {

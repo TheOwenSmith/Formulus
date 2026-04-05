@@ -1,4 +1,5 @@
-import type { Bar, Ticker, Timestamp } from '@shared/api';
+import type { Bar, Ticker } from '@shared/api';
+import { type Timestamp } from '@shared/trading-constants';
 import z from 'zod';
 import { type Indicator, type IndicatorResultByIndicator } from './indicators/indicator';
 
@@ -19,8 +20,6 @@ export type AlgorithmImplementation = (
   indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
 ) => Promise<Record<Ticker, Action>>;
 
-export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;
-export const ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT = 0.99;
 export type Algorithm = {
   aggregate: Timestamp;
   algorithmMaxHoldingProportion?: number;

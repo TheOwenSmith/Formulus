@@ -1,8 +1,7 @@
-import type { Ticker, Timestamp } from '@shared/api';
-import {
-  DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-  type Algorithm,
-} from '@worker/core/algorithms/algorithm';
+import type { Ticker } from '@shared/api';
+import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } from '@shared/constants';
+import type { Timestamp } from '@shared/trading-constants';
+import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
 import { type AlgorithmData, type SimplePlot } from './backtest-algorithms-concurrently';
 import { MAX_POINTS_PER_PLOT } from './constants';

@@ -1,8 +1,9 @@
 import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
+import type { Timestamp } from '@shared/trading-constants';
 import { spawnSync } from 'child_process';
 import { err, ok, type Result } from 'neverthrow';
 import path from 'path';
-import type { Ticker, Timestamp } from './types';
+import type { Ticker } from './types';
 
 export function cleanData(ticker: Ticker, timestamp: Timestamp): Result<undefined, AppError> {
   console.log(`Cleaning data for '${ticker}' (${timestamp})...`);

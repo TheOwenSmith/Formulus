@@ -5,6 +5,7 @@ import {
   fromThrowable,
   fromThrowableAsync,
   internal,
+  userCodeError,
   type AppError,
 } from '@worker/utils/error-handling';
 import { randomUUID } from 'crypto';
@@ -209,7 +210,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
 
     if (compilation != null) {
       if (data.toString('utf-8') !== 'compiled\n') {
-        await end(badRequest('Compilation failed', data.toString('utf-8')));
+        await end(userCodeError('Compilation failed', data.toString('utf-8')));
         return;
       }
       compilation.resolve();
@@ -239,14 +240,14 @@ export async function createRpcFunction<In extends unknown[], Out>({
     const rpcOutput = zodResultSchemaParseResponse.value;
 
     if (!rpcOutput.ok) {
-      await end(badRequest('Invalid result', rpcOutput.error));
+      await end(userCodeError('Runtime error', rpcOutput.error));
       return;
     }
 
     // Should follow Out structure
     const zodUserResponseSchemaResponse = fromThrowable(
       () => userResponseSchema.parse(rpcOutput.result),
-      (e) => badRequest('Invalid user response', e),
+      (e) => userCodeError('Invalid return value', e),
     );
     if (zodUserResponseSchemaResponse.isErr()) {
       await end(zodUserResponseSchemaResponse.error);
@@ -276,7 +277,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
       return;
     }
 
-    await end(badRequest('Code execution error', data.toString('utf-8')));
+    await end(userCodeError('Code execution error', data.toString('utf-8')));
   });
 
   // Demux Docker's multiplexed stream into stdout/stderr
@@ -291,7 +292,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
 
   const compilationResponse = await new Promise<Result<undefined, AppError>>((resolve) => {
     const timer = setTimeout(
-      () => resolve(err(badRequest('Compilation timed out'))),
+      () => resolve(err(userCodeError('Compilation timed out'))),
       COMPILING_TIMEOUT_MS,
     );
     compilation = {
@@ -314,7 +315,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
   function call(...args: In): Promise<Result<Out, AppError>> {
     const p = new Promise<Result<Out, AppError>>((resolve) => {
       const timer = setTimeout(() => {
-        void end(badRequest('User code timed out'));
+        void end(userCodeError('User code timed out'));
       }, RPC_TIMEOUT_MS);
       inflight = {
         args,

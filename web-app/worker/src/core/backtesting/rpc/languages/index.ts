@@ -1,19 +1,21 @@
+import {
+  LANGUAGES,
+  SUPPORTED_LANGUAGE_VALUES,
+  type SupportedLanguage,
+} from '@shared/trading-constants';
 import z from 'zod';
 import { RUNNER_CPP_BATCHED_FROM_FILENAMES, UTILS_CPP_CODE, UTILS_CPP_HEADER } from './cpp';
 import { RUNNER_JS_BATCHED_FROM_FILENAMES, UTILS_JS_CODE } from './javascript';
 import { RUNNER_PY_BATCHED_FROM_FILENAMES, UTILS_PY_CODE } from './python';
 import { RUNNER_TS_BATCHED_FROM_FILENAMES, UTILS_TS_CODE } from './typescript';
 
-export const supportedLanguages = ['cpp', 'javascript', 'python', 'typescript'] as const;
+export const supportedLanguages = SUPPORTED_LANGUAGE_VALUES;
 export const supportedLanguageSchema = z.enum(supportedLanguages);
-export type SupportedLanguage = (typeof supportedLanguages)[number];
+export type { SupportedLanguage };
 
-export const EXTENSION_BY_LANGUAGE: Record<SupportedLanguage, string> = {
-  cpp: 'cpp',
-  javascript: 'js',
-  python: 'py',
-  typescript: 'ts',
-};
+export const EXTENSION_BY_LANGUAGE: Record<SupportedLanguage, string> = Object.fromEntries(
+  LANGUAGES.map((l) => [l.value, l.ext.replace(/^\./, '')]),
+) as Record<SupportedLanguage, string>;
 
 export const IMAGE_BY_LANGUAGE: Record<SupportedLanguage, string> = {
   cpp: 'formulus:cpp',

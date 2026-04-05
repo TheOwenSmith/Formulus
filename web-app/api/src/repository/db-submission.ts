@@ -5,6 +5,64 @@ import type { AlgorithmModel, BacktestingSubmissionModel } from '@shared/generat
 import { nanoid } from 'nanoid';
 import { err, ok, type Result } from 'neverthrow';
 
+export type SubmissionSummary = {
+  publicId: string;
+  status: BacktestingSubmissionStatus;
+  progressPct: number;
+  message: string | null;
+  error: string | null;
+  errorCode: string | null;
+  errorDetail: string | null;
+  createdAt: Date;
+  startTimespan: string | null;
+  endTimespan: string | null;
+  algorithmNames: string[];
+  algorithmIds: string[];
+};
+
+export async function getSubmissionsByCreatorId(
+  creatorId: string,
+): Promise<Result<SubmissionSummary[], AppError>> {
+  const result = await fromThrowableAsync(
+    () =>
+      prisma.backtestingSubmission.findMany({
+        where: { creatorId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          algorithmVersions: { select: { name: true, algorithmId: true } },
+          createdAt: true,
+          endTimespan: true,
+          error: true,
+          errorCode: true,
+          errorDetail: true,
+          message: true,
+          progressPct: true,
+          publicId: true,
+          startTimespan: true,
+          status: true,
+        },
+      }),
+    (e) => internal(e, 'Failed to load submissions'),
+  );
+  if (result.isErr()) return err(result.error);
+  return ok(
+    result.value.map((s) => ({
+      algorithmIds: s.algorithmVersions.map((v) => v.algorithmId),
+      algorithmNames: s.algorithmVersions.map((v) => v.name),
+      createdAt: s.createdAt,
+      endTimespan: s.endTimespan,
+      error: s.error,
+      errorCode: s.errorCode,
+      errorDetail: s.errorDetail,
+      message: s.message,
+      progressPct: s.progressPct,
+      publicId: s.publicId,
+      startTimespan: s.startTimespan,
+      status: s.status,
+    })),
+  );
+}
+
 export async function createSubmission({
   algorithms,
   creatorId,
@@ -54,7 +112,8 @@ export async function createSubmission({
 type SubmissionStatus =
   | { status: 'PENDING' | 'RUNNING'; progressPct: number; message: string | null }
   | { status: 'ERROR'; error: string | null; errorCode: string | null; errorDetail: string | null }
-  | { status: 'FINISHED'; resultId: string };
+  | { status: 'FINISHED'; resultId: string }
+  | { status: 'CANCELLED' };
 
 export async function getSubmissionStatus(
   publicId: string,
@@ -102,9 +161,31 @@ export async function getSubmissionStatus(
       });
     case BacktestingSubmissionStatus.FINISHED:
       return ok({ status: 'FINISHED', resultId: submission.resultId! });
+    case BacktestingSubmissionStatus.CANCELLED:
+      return ok({ status: 'CANCELLED' });
     default: {
       const _exhaustive: never = submission.status;
       return _exhaustive;
     }
   }
+}
+
+export async function cancelSubmission(
+  publicId: string,
+  creatorId: string,
+): Promise<Result<boolean, AppError>> {
+  const result = await fromThrowableAsync(
+    () =>
+      prisma.backtestingSubmission.updateMany({
+        where: {
+          publicId,
+          creatorId,
+          status: { in: [BacktestingSubmissionStatus.PENDING, BacktestingSubmissionStatus.RUNNING] },
+        },
+        data: { status: BacktestingSubmissionStatus.CANCELLED },
+      }),
+    (e) => internal(e, 'Failed to cancel submission'),
+  );
+  if (result.isErr()) return err(result.error);
+  return ok(result.value.count > 0);
 }

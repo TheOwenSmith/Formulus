@@ -2,11 +2,12 @@ import { config } from '@api/lib/config';
 import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
 import { retryWithBackoff } from '@api/utils/retry';
 import { zodSafeFetch } from '@api/utils/zod-safe-fetch';
+import type { Timestamp } from '@shared/trading-constants';
 import fs from 'fs';
 import { err, ok, Result } from 'neverthrow';
 import z from 'zod';
 import type { Bar } from './types';
-import { tickDataCsvHeader, type Ticker, type Timestamp } from './types';
+import { tickDataCsvHeader, type Ticker } from './types';
 
 const apiResponseSchemaFromTimestamp = (timestamp: Timestamp) =>
   z.union([

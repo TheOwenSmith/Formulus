@@ -10,7 +10,7 @@ const options = {
   minify: true,
   sourcemap: 'inline',
   outfile: 'dist/index.js',
-  external: ['node:*', '../shared/node_modules/*'],
+  external: ['node:*', '../shared/node_modules/*', '@prisma/client'],
   plugins: [nodeExternalsPlugin()],
   platform: 'node',
   target: 'node24',

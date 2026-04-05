@@ -1,5 +1,7 @@
-import { type Bar, type Ticker, type Timestamp } from '@shared/api';
-import { Action, DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Algorithm } from './algorithm';
+import { type Bar, type Ticker } from '@shared/api';
+import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } from '@shared/constants';
+import type { Timestamp } from '@shared/trading-constants';
+import { Action, type Algorithm } from './algorithm';
 import { type Indicator, type IndicatorResultByIndicator } from './indicators/indicator';
 
 export type SimpleAlgorithmImplementation = (

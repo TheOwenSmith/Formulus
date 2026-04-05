@@ -1,4 +1,5 @@
-import type { Bar, Ticker, Timestamp } from '@shared/api';
+import type { Bar, Ticker } from '@shared/api';
+import type { Timestamp } from '@shared/trading-constants';
 import type { Algorithm } from '@worker/core/algorithms/algorithm';
 import { createTopKAlgorithmFromContextMaps } from '@worker/core/algorithms/context-maps/context-map';
 import { createAlgorithmFromTopKAlgorithm } from '@worker/core/algorithms/top-k-algorithm';

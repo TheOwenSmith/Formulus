@@ -1,13 +1,20 @@
 export type { TRPC_ERROR_CODE_KEY } from '@api/export';
-export { DATE_LENGTH, LINE_LENGTH } from '@api/fetch/create-search-index';
 export {
-  aggregateTimestamps,
   stringifiedBarSchema,
   tickerSchema,
   timestampSchema,
   type Bar,
   type Ticker,
-  type Timestamp,
   type UserTicker,
 } from '@api/fetch/types';
 export type { AppRouter } from '@api/lib/trpc';
+export { DATE_LENGTH, LINE_LENGTH } from './search-index-constants';
+export {
+  AlgorithmType,
+  LANGUAGES,
+  TICKER_COMPANY_NAMES,
+  TIMEFRAMES_WITH_LABELS,
+  type AlgorithmTypeValue,
+  type SupportedLanguage,
+  type TickerValue,
+} from './trading-constants';

@@ -1,30 +1,18 @@
-import { tickerSchema, timestampSchema, type Ticker } from '@shared/api';
-import { Action, ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@worker/core/algorithms/algorithm';
-import { indicatorSchema } from '@worker/core/algorithms/indicators/indicator';
-import { supportedLanguageSchema } from '@worker/core/backtesting/rpc/languages';
+import { tickerSchema, type Ticker } from '@shared/api';
+import { Action } from '@worker/core/algorithms/algorithm';
 import z from 'zod';
 import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from './constants';
 import type { OutputTransformer } from './pipeline';
 import { scoresToActionsTopKAlgorithm } from './top-k-algorithm';
 import {
   AlgorithmType,
-  userAlgorithmNameSchema,
+  userAlgorithmSchemaBase,
   type AnyUserAlgorithmType,
 } from './user-algorithm';
 
-export const userTopKAlgorithmSchema = z
-  .object({
-    aggregate: timestampSchema,
-    algorithmMaxHoldingProportion: z
-      .number()
-      .min(0)
-      .max(ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT)
-      .optional(),
-    contextLength: z.int().positive(),
-    indicators: indicatorSchema.array().optional(),
+export const userTopKAlgorithmSchema = userAlgorithmSchemaBase
+  .extend({
     k: z.int().positive().min(1),
-    language: supportedLanguageSchema,
-    name: userAlgorithmNameSchema,
     tickers: tickerSchema.array().min(1),
     type: z.literal(AlgorithmType.TOP_K),
     userAlgorithmImplementationCode: z

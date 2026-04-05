@@ -4,6 +4,7 @@
     "ms-python.black-formatter",
     "dbaeumer.vscode-eslint",
     "pkief.material-icon-theme",
-    "orta.vscode-twoslash-queries"
+    "orta.vscode-twoslash-queries",
+    "prisma.prisma"
   ]
 }

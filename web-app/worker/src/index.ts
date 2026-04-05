@@ -14,7 +14,17 @@ import z from 'zod';
 import { config } from './lib/config';
 import { sqs } from './lib/sqs';
 import { createBacktestingResults } from './repository/db-backtesting-results';
-import { getSubmissionWithVersions, updateSubmissionStatus } from './repository/db-submission';
+import {
+  getSubmissionCurrentStatus,
+  getSubmissionWithVersions,
+  updateSubmissionStatus,
+} from './repository/db-submission';
+
+// Thrown from onProgress to abort the backtest loop when a cancellation is detected.
+// Caught immediately in processSubmission — never escapes to the SQS loop.
+class BacktestCancelled {
+  readonly _tag = 'BacktestCancelled' as const;
+}
 
 function serializeErrorDetail(error: unknown): string | undefined {
   if (error == null) return undefined;
@@ -35,10 +45,16 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
     );
   }
 
-  // Mark as running
+  if (submission.status === BacktestingSubmissionStatus.CANCELLED) {
+    console.log(`Submission ${submissionId} was cancelled`);
+    return ok(undefined);
+  }
+
+  // Mark as running — "Preparing" phase (Docker setup + compilation)
   const markRunningResult = await updateSubmissionStatus(
     submissionId,
     BacktestingSubmissionStatus.RUNNING,
+    { message: 'Preparing...' },
   );
   if (markRunningResult.isErr()) return err(markRunningResult.error);
 
@@ -46,27 +62,61 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
   const algorithms = submission.algorithmVersions.map(convertAlgorithmVersionToUserAlgorithm);
   const algorithmIds = submission.algorithmVersions.map((v) => v.algorithmId);
 
+  // Track first progress tick to transition message from "Preparing..." to "Running..."
+  let isFirstProgress = true;
+
   // Run the backtest
   // TODO: populate tickerData with paths to market data files (e.g. from S3 or a local DATA_DIR)
-  const backtestResult = await backtestAlgorithmsConcurrently({
-    algorithms,
-    options: { trackProgress: false },
-    slippageMapFn: interactiveBrokersSlippageFunction,
-    timespan:
-      submission.startTimespan != null || submission.endTimespan != null
-        ? [submission.startTimespan, submission.endTimespan]
-        : undefined,
-  });
+  let backtestResult: Awaited<ReturnType<typeof backtestAlgorithmsConcurrently>>;
+  try {
+    backtestResult = await backtestAlgorithmsConcurrently({
+      algorithms,
+      options: {
+        onProgress: async (pct) => {
+          // Check if the submission was cancelled externally before writing progress.
+          const statusResult = await getSubmissionCurrentStatus(submissionId);
+          if (statusResult.isOk() && statusResult.value === BacktestingSubmissionStatus.CANCELLED) {
+            throw new BacktestCancelled();
+          }
+
+          const extra: { progressPct: number; message?: string } = { progressPct: pct };
+          if (isFirstProgress) {
+            isFirstProgress = false;
+            extra.message = 'Running...';
+          }
+          const r = await updateSubmissionStatus(
+            submissionId,
+            BacktestingSubmissionStatus.RUNNING,
+            extra,
+          );
+          if (r.isErr()) console.warn(`Failed to write progress for ${submissionId}:`, r.error);
+        },
+      },
+      slippageMapFn: interactiveBrokersSlippageFunction,
+      timespan:
+        submission.startTimespan != null || submission.endTimespan != null
+          ? [submission.startTimespan, submission.endTimespan]
+          : undefined,
+    });
+  } catch (e) {
+    if (e instanceof BacktestCancelled) {
+      console.log(`Submission ${submissionId} was cancelled mid-backtest`);
+      return ok(undefined);
+    }
+    return err(
+      internal(e instanceof Error ? e : new Error(String(e)), 'Backtest threw unexpectedly'),
+    );
+  }
 
   if (backtestResult.isErr()) {
-    const { code, message, error } = backtestResult.error;
+    const { code, message, error, isUserCode } = backtestResult.error;
     console.error(`Backtest failed for submission ${submissionId}:`, message, error);
     const markErrorResult = await updateSubmissionStatus(
       submissionId,
       BacktestingSubmissionStatus.ERROR,
       {
         error: message ?? 'Unknown error',
-        errorCode: code,
+        errorCode: isUserCode ? 'USER_CODE' : code,
         errorDetail: serializeErrorDetail(error),
       },
     );
@@ -76,6 +126,12 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
     // Backtest failures are terminal (user code errors, timeouts, etc.) — ack the message.
     return ok(undefined);
   }
+
+  // Transition to "Finishing" phase — saving results to DB
+  await updateSubmissionStatus(submissionId, BacktestingSubmissionStatus.RUNNING, {
+    message: 'Finishing...',
+    progressPct: 100,
+  });
 
   // Persist results and link to submission
   const createResultsResult = await createBacktestingResults({
@@ -113,7 +169,7 @@ async function main() {
             QueueUrl,
             MaxNumberOfMessages: 1,
             WaitTimeSeconds: 5,
-            VisibilityTimeout: 60,
+            VisibilityTimeout: 3600,
           }),
         ),
       (e) => internal(e, 'Failed to receive SQS message'),

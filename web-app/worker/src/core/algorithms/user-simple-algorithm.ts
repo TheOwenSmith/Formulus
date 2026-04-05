@@ -1,31 +1,17 @@
-import { tickerSchema, timestampSchema, type Bar, type Ticker } from '@shared/api';
-import { Action, ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@worker/core/algorithms/algorithm';
-import {
-  indicatorSchema,
-  type IndicatorResultByIndicator,
-} from '@worker/core/algorithms/indicators/indicator';
-import { supportedLanguageSchema } from '@worker/core/backtesting/rpc/languages';
+import { tickerSchema, type Bar, type Ticker } from '@shared/api';
+import { Action } from '@worker/core/algorithms/algorithm';
+import { type IndicatorResultByIndicator } from '@worker/core/algorithms/indicators/indicator';
 import z from 'zod';
 import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from './constants';
 import type { InputTransformer, OutputTransformer } from './pipeline';
 import {
   AlgorithmType,
-  userAlgorithmNameSchema,
+  userAlgorithmSchemaBase,
   type AnyUserAlgorithmType,
 } from './user-algorithm';
 
-export const userSimpleAlgorithmSchema = z
-  .object({
-    aggregate: timestampSchema,
-    algorithmMaxHoldingProportion: z
-      .number()
-      .min(0)
-      .max(ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT)
-      .optional(),
-    contextLength: z.int().positive(),
-    indicators: indicatorSchema.array().optional(),
-    language: supportedLanguageSchema,
-    name: userAlgorithmNameSchema,
+export const userSimpleAlgorithmSchema = userAlgorithmSchemaBase
+  .extend({
     ticker: tickerSchema,
     type: z.literal(AlgorithmType.SIMPLE),
     userAlgorithmImplementationCode: z

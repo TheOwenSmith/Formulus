@@ -1,9 +1,11 @@
-import { aggregateTimestamps, type Bar, type Ticker, type Timestamp } from '@shared/api';
+import { type Bar, type Ticker } from '@shared/api';
 import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-  type Algorithm,
-} from '@worker/core/algorithms/algorithm';
+} from '@shared/constants';
+import type { Timestamp } from '@shared/trading-constants';
+import { aggregateTimestamps } from '@shared/trading-constants';
+import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import {
   indicatorsToIndicatorResultsFunction,
   type Indicator,
@@ -17,7 +19,6 @@ import { groupBy } from '@worker/utils/group-by';
 import { roundToDecimal, withCommas } from '@worker/utils/number-utils';
 import { SharpeRatioCalculator } from '@worker/utils/sharpe-ratio-calculator';
 import type { AtLeastOne } from '@worker/utils/types';
-import cliProgress, { Presets } from 'cli-progress';
 import { err, ok, type Result } from 'neverthrow';
 import { BYTES_PROGRESS_UPDATE_INTERVAL } from './constants';
 import {
@@ -75,9 +76,9 @@ export type AlgorithmData = {
 
 export type BacktestingAlgorithmsConcurrentlyOptions = {
   iteratorStrictParsing?: boolean;
+  onProgress?: (pct: number) => void | Promise<void>;
   slippageByTicker?: Partial<Record<Ticker, number>>;
   tickerData?: TickerData[];
-  trackProgress?: boolean;
   verboseLogging?: boolean;
 };
 
@@ -122,16 +123,11 @@ export async function backtestAlgorithmsConcurrently({
 }): Promise<Result<BacktestAlgorithmsResult, AppError>> {
   const {
     iteratorStrictParsing = false,
+    onProgress,
     slippageByTicker: userInuttedSlippageByTicker,
     tickerData = [],
     verboseLogging = false,
   } = options;
-  const trackProgress = options.trackProgress ?? !verboseLogging;
-
-  if (verboseLogging && trackProgress) {
-    return err(badRequest('Verbose logging and tracking progress cannot be used together'));
-  }
-
   if (algorithms.length === 0) {
     return err(badRequest('No algorithms provided to backtest'));
   }
@@ -260,15 +256,9 @@ export async function backtestAlgorithmsConcurrently({
     {} as Record<Timestamp, string[]>,
   );
 
-  // Initialize progress bar
   console.log(
     `Data successfully prepared (took ${withCommas(Date.now() - startPrepareDataTimestamp)}ms)`,
   );
-  const progressBar = new cliProgress.SingleBar({}, Presets.shades_grey);
-  const progressStartTimestamp = Date.now();
-  if (trackProgress) {
-    progressBar.start(bytesToProcess, 0);
-  }
 
   // Backtest algorithms
   let bytesProcessed = 0;
@@ -414,7 +404,9 @@ export async function backtestAlgorithmsConcurrently({
         Math.floor(bytesProcessed / BYTES_PROGRESS_UPDATE_INTERVAL);
       bytesProcessed += deltaBytesProcessed;
       if (shouldUpdateProgress) {
-        progressBar.update(bytesProcessed);
+        if (onProgress != null && bytesToProcess > 0) {
+          await onProgress(Math.min(99, (bytesProcessed / bytesToProcess) * 100));
+        }
       }
 
       if (currentBarByTicker == null) {
@@ -640,10 +632,5 @@ export async function backtestAlgorithmsConcurrently({
     return err(endBatchAlgorithmImplementationsResult.error);
   }
 
-  if (trackProgress) {
-    progressBar.update(bytesToProcess);
-    progressBar.stop();
-    console.log(`Time taken: ${withCommas(Date.now() - progressStartTimestamp)}ms`);
-  }
   return ok({ algorithmGraphs, tickerPlotByAggregateByTicker, timestampsByAggregate });
 }

@@ -251,6 +251,7 @@ enum BacktestingSubmissionStatus {
   RUNNING
   FINISHED
   ERROR
+  CANCELLED
 }
 
 model BacktestingSubmission {

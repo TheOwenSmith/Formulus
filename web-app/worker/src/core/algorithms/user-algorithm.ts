@@ -1,8 +1,6 @@
 import { tickerSchema, timestampSchema, type Ticker } from '@shared/api';
-import {
-  actionSchema,
-  ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
-} from '@worker/core/algorithms/algorithm';
+import { ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@shared/constants';
+import { actionSchema } from '@worker/core/algorithms/algorithm';
 import { indicatorSchema } from '@worker/core/algorithms/indicators/indicator';
 import { supportedLanguageSchema } from '@worker/core/backtesting/rpc/languages';
 import z from 'zod';
@@ -23,11 +21,11 @@ export const userAlgorithmNameSchema = z
   .min(1)
   .max(64)
   .superRefine((name, ctx) => {
-    if (!/^[a-zA-Z0-9-()]+$/.test(name)) {
+    if (!/^[a-zA-Z0-9\-() ]+$/.test(name)) {
       ctx.addIssue({
         code: 'custom',
         input: name,
-        message: `Name for algorithm must contain only letters, numbers, dashes, and parentheses`,
+        message: `Name for algorithm must contain only letters, numbers, dashes, parentheses, and spaces`,
       });
     }
     if (name === 'runner' || name === 'utils') {
@@ -39,18 +37,30 @@ export const userAlgorithmNameSchema = z
     }
   });
 
-export const userAlgorithmSchema = z
-  .object({
-    aggregate: timestampSchema,
-    algorithmMaxHoldingProportion: z
-      .number()
-      .min(0)
-      .max(ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT)
-      .optional(),
-    contextLength: z.int().positive(),
-    indicators: indicatorSchema.array().optional(),
-    language: supportedLanguageSchema,
-    name: userAlgorithmNameSchema,
+export const userAlgorithmSchemaBase = z.object({
+  aggregate: timestampSchema,
+  algorithmMaxHoldingProportion: z
+    .number()
+    .min(0)
+    .max(ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT)
+    .superRefine((n, ctx) => {
+      if (n.toString().length > 6) {
+        ctx.addIssue({
+          code: 'custom',
+          input: n,
+          message: `Algorithm max holding proportion cannot be more than 6 digits`,
+        });
+      }
+    })
+    .optional(),
+  contextLength: z.int().positive(),
+  indicators: indicatorSchema.array().optional(),
+  language: supportedLanguageSchema,
+  name: userAlgorithmNameSchema,
+});
+
+export const userAlgorithmSchema = userAlgorithmSchemaBase
+  .extend({
     tickers: tickerSchema.array().min(1),
     type: z.literal(AlgorithmType.NORMAL),
     userAlgorithmImplementationCode: z

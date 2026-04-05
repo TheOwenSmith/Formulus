@@ -23,7 +23,7 @@ export const t = initTRPC.context<Context>().create({
         stack: config.env === 'dev' ? shape.data.stack : undefined,
       },
       message:
-        config.env === 'dev' || error.code !== 'INTERNAL_SERVER_ERROR'
+        shape.message !== '' && (config.env === 'dev' || error.code !== 'INTERNAL_SERVER_ERROR')
           ? shape.message
           : "An unexpected error occurred (it's not you, it's us)",
     };

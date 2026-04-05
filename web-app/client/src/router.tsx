@@ -1,12 +1,19 @@
 import { createBrowserRouter, Navigate, Outlet, redirect } from 'react-router-dom';
 import { AuthenticatedLayout, RootLayout } from './layout';
 import { getSession } from './lib/auth-client';
+import { algorithmEditorLoader } from './loaders/algorithmEditorLoader';
+import { algorithmsLoader } from './loaders/algorithmsLoader';
 import { backtestLoader } from './loaders/backtestLoader';
 import { AboutPage } from './pages/AboutPage';
+import { AlgorithmEditorPage } from './pages/AlgorithmEditorPage';
+import { AlgorithmsPage } from './pages/AlgorithmsPage';
 import { BacktestPage } from './pages/BacktestPage';
+import { CreateAlgorithmPage } from './pages/CreateAlgorithmPage';
 import { ErrorPage } from './pages/ErrorPage';
 import { LoginPage } from './pages/LoginPage';
+import { PhoenixPositionManagementPdfRedirect } from './pages/PhoenixPositionManagementPdfRedirect';
 import { ProfilePage } from './pages/ProfilePage';
+import { SubmissionsPage } from './pages/SubmissionsPage';
 
 export const router = createBrowserRouter([
   {
@@ -14,8 +21,34 @@ export const router = createBrowserRouter([
     children: [
       {
         loader: requireAuthLoader,
+        shouldRevalidate: () => false,
         element: <AuthenticatedLayout />,
         children: [
+          {
+            path: '/algorithms',
+            element: <AlgorithmsPage />,
+            loader: algorithmsLoader,
+          },
+          {
+            path: '/algorithms/new',
+            element: <CreateAlgorithmPage />,
+          },
+          {
+            path: '/algorithms/:id',
+            element: <AlgorithmEditorPage />,
+            loader: algorithmEditorLoader,
+            errorElement: (
+              <ErrorPage
+                title="Algorithm Not Found"
+                message="This algorithm could not be found. It may have been deleted."
+                actionText="Go Back"
+              />
+            ),
+          },
+          {
+            path: '/backtests',
+            element: <SubmissionsPage />,
+          },
           {
             path: '/backtest/:publicId',
             element: <BacktestPage />,
@@ -33,12 +66,16 @@ export const router = createBrowserRouter([
             element: <AboutPage />,
           },
           {
+            path: '/docs/Phoenix_Trader_Position_Management_System.pdf',
+            element: <PhoenixPositionManagementPdfRedirect />,
+          },
+          {
             path: '/profile',
             element: <ProfilePage />,
           },
           {
             path: '*',
-            element: <Navigate to="/about" replace />,
+            element: <Navigate to="/algorithms" replace />,
           },
         ],
       },
@@ -61,18 +98,12 @@ export const router = createBrowserRouter([
 
 async function requireAuthLoader() {
   const { data: session } = await getSession();
-
-  if (!session) {
-    throw redirect('/login');
-  }
+  if (!session) throw redirect('/login');
   return <Outlet />;
 }
 
 async function requireGuestLoader() {
   const { data: session } = await getSession();
-
-  if (session) {
-    throw redirect('/about');
-  }
+  if (session) throw redirect('/algorithms');
   return <Outlet />;
 }

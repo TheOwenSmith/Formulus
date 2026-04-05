@@ -17,3 +17,9 @@ export * from './social';
 
 // Common SVG attributes
 export * from './common';
+
+// Algorithm type icons (onboarding workflow)
+export { NormalIcon, SimpleIcon, TopKIcon } from './algorithm-types';
+
+// Status icon components (check, spinner)
+export { CheckIcon, Spinner } from './status-components';

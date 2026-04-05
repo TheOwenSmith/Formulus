@@ -81,3 +81,32 @@ body {
   color: white !important;
   background: rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Shake feedback for bounded number inputs when value would exceed limit */
+@keyframes shimmerSweep {
+  0%   { background-position: -150% 0; }
+  100% { background-position: 150% 0; }
+}
+
+@keyframes input-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+.input-shake {
+  animation: input-shake 0.4s ease-in-out;
+}
+
+/* Prevent browser-default range/slider track or validation bar under bounded inputs */
+input[inputmode="numeric"],
+input[inputmode="decimal"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[inputmode="numeric"]::-webkit-slider-runnable-track,
+input[inputmode="numeric"]::-webkit-slider-thumb,
+input[inputmode="decimal"]::-webkit-slider-runnable-track,
+input[inputmode="decimal"]::-webkit-slider-thumb {
+  display: none !important;
+}
