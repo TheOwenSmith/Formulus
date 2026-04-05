@@ -21,6 +21,7 @@ interface AlgorithmResultCardProps {
   index: number; // Index for color scheme selection
   isDragging?: boolean;
   isSideBySideMode?: boolean;
+  onCopyVersion?: () => void;
   onDragEnd?: () => void;
   onDragStart?: () => void;
   tickerPlotByTicker: Record<Ticker, SimplePlot>;
@@ -33,6 +34,7 @@ function AlgorithmResultCardComponent({
   index,
   isDragging,
   isSideBySideMode,
+  onCopyVersion,
   onDragEnd,
   onDragStart,
   tickerPlotByTicker,
@@ -156,11 +158,26 @@ function AlgorithmResultCardComponent({
       <div className="relative z-10">
         {/* Algorithm Header */}
         <div className="mb-4">
-          <h2
-            className={`text-xl font-bold mb-1 bg-gradient-to-r ${colorScheme.gradientFrom} ${colorScheme.gradientTo} bg-clip-text text-transparent`}
-          >
-            {algorithmGraph.algorithmPlot.name}
-          </h2>
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h2
+              className={`text-xl font-bold bg-gradient-to-r ${colorScheme.gradientFrom} ${colorScheme.gradientTo} bg-clip-text text-transparent`}
+            >
+              {algorithmGraph.algorithmPlot.name}
+            </h2>
+            {onCopyVersion && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCopyVersion(); }}
+                title="Copy this algorithm version to your library"
+                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-white/10 bg-white/[0.04] text-white/40 hover:text-white/80 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy
+              </button>
+            )}
+          </div>
           <div className="text-xs text-white/60">
             Algorithm Return: {algorithmGraph.descriptionMetrics.algorithmReturn >= 0 ? '+' : ''}
             {withCommasRounded(algorithmGraph.descriptionMetrics.algorithmReturn * 100)}% | Growth

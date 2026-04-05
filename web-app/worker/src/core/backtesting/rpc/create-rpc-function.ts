@@ -200,6 +200,7 @@ export async function createRpcFunction<In extends unknown[], Out>({
   stream = createStreamResponse.value;
 
   stdout.on('data', async (data: Buffer) => {
+    console.log('stdout data', data.toString('utf-8'));
     if (data.length > MAX_OUT_BYTES) {
       await end({
         code: 'PAYLOAD_TOO_LARGE',

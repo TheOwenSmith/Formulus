@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { trpcCredentials } from '@client/lib/trpc';
+import { useMutation } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
 type Timespan = [string | null, string | null];
 
@@ -64,21 +66,49 @@ const PRESETS = [
 ];
 
 export function RunBacktestModal({
-  algorithmName,
+  algorithms,
   onConfirm,
   onClose,
 }: {
-  algorithmName: string;
-  onConfirm: (timespan?: Timespan, name?: string) => void;
+  algorithms: { id: string; name: string }[];
+  onConfirm: (algorithmIds: string[], timespan?: Timespan, name?: string) => void;
   onClose: () => void;
 }) {
-  const defaultName = `${algorithmName} (${new Date().toISOString().split('T')[0]})`;
-  const [name, setName] = useState(() => (defaultName.length <= 64 ? defaultName : ''));
+  const [name, setName] = useState(() =>
+    algorithms.length === 1 ? `${algorithms[0].name} (${new Date().toISOString().split('T')[0]})` : '',
+  );
+  const [nameGenerating, setNameGenerating] = useState(false);
   const [startDate, setStartDate] = useState(() => subtractYears(2));
   const [endDate, setEndDate] = useState(() => today());
   const [activePreset, setActivePreset] = useState<string>('2Y');
 
   const todayStr = today();
+
+  const { mutateAsync: generateBacktestName } = useMutation(
+    trpcCredentials.backtesting.generateBacktestName.mutationOptions(),
+  );
+
+  // Generate LLM name on mount (multiple algorithms only)
+  useEffect(() => {
+    if (algorithms.length <= 1) return;
+    const algorithmNames = algorithms.map((a) => a.name);
+    setNameGenerating(true);
+    generateBacktestName({ algorithmNames })
+      .then(({ name: generated }) => {
+        setName(generated);
+      })
+      .catch(() => {
+        const base =
+          algorithmNames.slice(0, 2).join(' vs ') +
+          (algorithmNames.length > 2 ? ` +${algorithmNames.length - 2}` : '');
+        const fallback = `${base} (${new Date().toISOString().split('T')[0]})`;
+        setName(fallback.length <= 64 ? fallback : fallback.slice(0, 64));
+      })
+      .finally(() => {
+        setNameGenerating(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function applyPreset(preset: (typeof PRESETS)[number]) {
     if (preset.years === null) {
@@ -102,8 +132,17 @@ export function RunBacktestModal({
     const hasEnd = endDate !== '';
     const timespan: Timespan | undefined =
       hasStart || hasEnd ? [hasStart ? startDate : null, hasEnd ? endDate : null] : undefined;
-    onConfirm(timespan, name.trim() || undefined);
+    onConfirm(
+      algorithms.map((a) => a.id),
+      timespan,
+      name.trim() || undefined,
+    );
   }
+
+  const isSingleAlgorithm = algorithms.length === 1;
+  const headerSubtitle = isSingleAlgorithm
+    ? algorithms[0].name
+    : `${algorithms.length} algorithms`;
 
   return (
     <div
@@ -134,30 +173,77 @@ export function RunBacktestModal({
               />
             </svg>
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <h2
               id="run-backtest-title"
               className="text-base font-semibold text-white leading-tight"
             >
               Configure Backtest
             </h2>
-            <p className="text-xs text-white/40 mt-0.5 truncate max-w-[280px]">{algorithmName}</p>
+            <p className="text-xs text-white/40 mt-0.5 truncate">{headerSubtitle}</p>
           </div>
         </div>
+
+        {/* Algorithm list (when multiple) */}
+        {!isSingleAlgorithm && (
+          <div className="mb-5">
+            <label className="block text-xs text-white/40 uppercase tracking-wider mb-1.5">
+              Algorithms
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {algorithms.map((algo) => (
+                <span
+                  key={algo.id}
+                  className="text-xs px-2 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-white/70 font-medium"
+                >
+                  {algo.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Run name */}
         <div className="mb-5">
           <label className="block text-xs text-white/40 uppercase tracking-wider mb-1.5">
-            Run Name <span className="text-white/20 normal-case tracking-normal">(optional)</span>
+            Run Name{' '}
+            <span className="text-white/20 normal-case tracking-normal">(optional)</span>
           </label>
-          <input
-            type="text"
-            value={name}
-            maxLength={64}
-            placeholder={`${algorithmName} (${new Date().toISOString().split('T')[0]})`}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 focus:bg-white/[0.08] transition-all"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={name}
+              maxLength={64}
+              placeholder={nameGenerating ? 'Generating name…' : 'Enter a name for this run'}
+              disabled={nameGenerating}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 focus:bg-white/[0.08] transition-all disabled:opacity-60"
+            />
+            {nameGenerating && (
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                <svg
+                  className="animate-spin w-3.5 h-3.5 text-white/30"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Historical window label */}

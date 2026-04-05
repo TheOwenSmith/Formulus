@@ -313,7 +313,7 @@ export function AlgorithmEditorPage() {
   const { algorithm } = useLoaderData() as { algorithm: AlgorithmWithId };
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isPendingId, cooldownSecondsLeft, runBacktest } = useRunBacktest();
+  const { isPendingIds, cooldownSecondsLeft, runBacktest } = useRunBacktest();
 
   const [code, setCode] = useState(algorithm.userAlgorithmImplementationCode);
   const [savedCode, setSavedCode] = useState(algorithm.userAlgorithmImplementationCode);
@@ -360,7 +360,7 @@ export function AlgorithmEditorPage() {
 
   const [showRunModal, setShowRunModal] = useState(false);
 
-  const isRunning = isPendingId === algorithm.id;
+  const isRunning = isPendingIds.has(algorithm.id) && cooldownSecondsLeft > 0;
   const isBacktestDisabled = isRunning || cooldownSecondsLeft > 0;
 
   useEffect(() => {
@@ -528,9 +528,9 @@ export function AlgorithmEditorPage() {
 
     {showRunModal && (
       <RunBacktestModal
-        algorithmName={algorithm.name}
-        onConfirm={(timespan, name) => {
-          void runBacktest(algorithm.id, timespan, name);
+        algorithms={[{ id: algorithm.id, name: algorithm.name }]}
+        onConfirm={(algorithmIds, timespan, name) => {
+          void runBacktest(algorithmIds, timespan, name);
           setShowRunModal(false);
         }}
         onClose={() => setShowRunModal(false)}

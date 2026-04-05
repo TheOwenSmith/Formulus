@@ -16,6 +16,8 @@ const envVars = [
   'AWS_ENDPOINT_URL',
   'AWS_ACCESS_KEY_ID',
   'AWS_SECRET_ACCESS_KEY',
+  'COHERE_API_KEY',
+  'COHERE_MODEL',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 

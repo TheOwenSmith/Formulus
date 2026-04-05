@@ -12,6 +12,7 @@ export { DATE_LENGTH, LINE_LENGTH } from './search-index-constants';
 export {
   AlgorithmType,
   LANGUAGES,
+  MAX_ALGORITHMS_TO_COMPARE,
   TICKER_COMPANY_NAMES,
   TIMEFRAMES_WITH_LABELS,
   type AlgorithmTypeValue,

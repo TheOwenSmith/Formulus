@@ -7,8 +7,12 @@ import { toast } from 'sonner';
 function TrashIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+      />
     </svg>
   );
 }
@@ -85,9 +89,12 @@ function RunningETA({ createdAt, pct }: { createdAt: string; pct: number }) {
   // ETA is snapshotted at each pct update, not recalculated every second
   const [etaMs, setEtaMs] = useState<number | null>(null);
   useEffect(() => {
-    if (pct < 5) { setEtaMs(null); return; }
+    if (pct < 5) {
+      setEtaMs(null);
+      return;
+    }
     const elapsed = Date.now() - new Date(createdAt).getTime();
-    const remaining = elapsed * (100 - pct) / pct;
+    const remaining = (elapsed * (100 - pct)) / pct;
     setEtaMs(remaining > 0 ? remaining : null);
   }, [pct, createdAt]);
 
@@ -96,14 +103,22 @@ function RunningETA({ createdAt, pct }: { createdAt: string; pct: number }) {
   return (
     <div className="flex items-center gap-1.5 text-xs text-white/35">
       <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
       </svg>
-      <span>Running for <span className="text-white/55 font-medium">{formatDuration(elapsed)}</span></span>
+      <span>
+        Running for <span className="text-white/55 font-medium">{formatDuration(elapsed)}</span>
+      </span>
       {etaMs != null && (
         <>
           <span className="text-white/20">·</span>
-          <span>~<span className="text-white/55 font-medium">{formatDuration(etaMs)}</span> left</span>
+          <span>
+            ~<span className="text-white/55 font-medium">{formatDuration(etaMs)}</span> left
+          </span>
         </>
       )}
     </div>
@@ -210,12 +225,11 @@ function ProgressBar({
 
   const isPreparing = sub === 'preparing';
   const fill = isPreparing ? 100 : sub === 'finishing' ? 100 : Math.min(98, pct);
-  const color =
-    isPreparing
-      ? ''
-      : sub === 'finishing'
-        ? 'bg-gradient-to-r from-violet-500 to-purple-400'
-        : 'bg-gradient-to-r from-blue-500 to-cyan-400';
+  const color = isPreparing
+    ? ''
+    : sub === 'finishing'
+      ? 'bg-gradient-to-r from-violet-500 to-purple-400'
+      : 'bg-gradient-to-r from-blue-500 to-cyan-400';
 
   return (
     <div className="w-full h-2 rounded-full bg-white/6 overflow-hidden">
@@ -223,7 +237,8 @@ function ProgressBar({
         <div
           className="h-full w-full rounded-full"
           style={{
-            background: 'linear-gradient(90deg, rgba(251,191,36,0.08) 0%, rgba(251,191,36,0.22) 30%, rgba(253,224,71,0.72) 50%, rgba(251,191,36,0.22) 70%, rgba(251,191,36,0.08) 100%)',
+            background:
+              'linear-gradient(90deg, rgba(251,191,36,0.08) 0%, rgba(251,191,36,0.22) 30%, rgba(253,224,71,0.72) 50%, rgba(251,191,36,0.22) 70%, rgba(251,191,36,0.08) 100%)',
             backgroundSize: '200% 100%',
             animation: 'shimmerSweep 1.6s ease-in-out infinite',
           }}
@@ -336,7 +351,8 @@ function SubmissionCard({
   onRequestDelete: () => void;
   onClearError: () => void;
 }) {
-  const { algorithmNames, createdAt, error, errorCode, message, name, progressPct, status } = submission;
+  const { algorithmNames, createdAt, error, errorCode, message, name, progressPct, status } =
+    submission;
   const sub = getSubState(status, message);
   const canView = sub === 'finished';
   const isUserErr = status === 'ERROR' && errorCode === 'USER_CODE';
@@ -374,12 +390,13 @@ function SubmissionCard({
           <div className="flex flex-col gap-2 min-w-0 flex-1">
             {/* Primary title: explicit name or derived from algorithm names + date */}
             <p className="text-base font-semibold text-white/90 truncate leading-snug">
-              {name ?? (() => {
-                const base = algorithmNames.slice(0, 2).join(', ');
-                const suffix = algorithmNames.length > 2 ? ` +${algorithmNames.length - 2}` : '';
-                const date = new Date(createdAt).toISOString().split('T')[0];
-                return `${base}${suffix} (${date})`;
-              })()}
+              {name ??
+                (() => {
+                  const base = algorithmNames.slice(0, 2).join(', ');
+                  const suffix = algorithmNames.length > 2 ? ` +${algorithmNames.length - 2}` : '';
+                  const date = new Date(createdAt).toISOString().split('T')[0];
+                  return `${base}${suffix} (${date})`;
+                })()}
             </p>
             {/* Algorithm chips — always shown as secondary context */}
             <div className="flex flex-wrap gap-1.5">
@@ -405,9 +422,7 @@ function SubmissionCard({
         {isActive(status) && <ProgressBar pct={progressPct} status={status} message={message} />}
 
         {/* ETA row (running only) */}
-        {status === 'RUNNING' && (
-          <RunningETA createdAt={createdAt} pct={progressPct} />
-        )}
+        {status === 'RUNNING' && <RunningETA createdAt={createdAt} pct={progressPct} />}
 
         {/* Error summary (non-user-code system errors) */}
         {status === 'ERROR' && !isUserErr && (
@@ -754,7 +769,7 @@ export function SubmissionsPage() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="min-w-0 pb-0.5">
                 <h1
-                  className="text-3xl font-bold m-0 bg-clip-text text-transparent tracking-tight leading-relaxed"
+                  className="text-3xl font-bold bg-clip-text text-transparent w-full py-1"
                   style={{
                     backgroundImage: 'linear-gradient(to right, #34d399, #3b82f6, #a855f7)',
                   }}

@@ -7,7 +7,9 @@ import {
   updateAlgorithmCode,
   uploadAlgorithm,
 } from '@api/repository/db-algorithm';
+import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
 import { badRequest } from '@api/utils/error-handling';
+import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import {
   userAlgorithmSchema,
   userSimpleAlgorithmSchema,
@@ -26,6 +28,39 @@ export function algorithmsRouter(
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
 ) {
   return router({
+    copyAlgorithmVersion: authProcedure
+      .input(
+        z.object({
+          name: z
+            .string()
+            .min(1)
+            .max(64)
+            .regex(/^[a-zA-Z0-9\-() ]+$/),
+          resultPublicId: z.string(),
+          versionId: z.string(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { user } = ctx;
+        const { name, resultPublicId, versionId } = input;
+
+        // Get algorithm version
+        const versionsResult = await getAlgorithmVersionsByResultPublicId(resultPublicId);
+        if (versionsResult.isErr()) throw versionsResult.error;
+        const version = versionsResult.value.find((v) => v.id === versionId);
+        if (version == null) throw badRequest('Algorithm version not found');
+
+        // Convert algorithm version to user algorithm and upload it
+        const userAlgorithm = convertAlgorithmVersionToUserAlgorithm(version);
+        userAlgorithm.name = name;
+        const uploadResult = await uploadAlgorithm({
+          algorithm: userAlgorithm,
+          creatorId: user.id,
+        });
+        if (uploadResult.isErr()) throw uploadResult.error;
+        return { id: uploadResult.value.id };
+      }),
+
     createAlgorithm: authProcedure.input(anyAlgorithmSchema).mutation(async ({ ctx, input }) => {
       const { user } = ctx;
       const result = await uploadAlgorithm({ algorithm: input, creatorId: user.id });

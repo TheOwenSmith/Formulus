@@ -1,10 +1,10 @@
 import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { Tooltip } from '@client/components/Tooltip';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
-import { AlgorithmType } from '@shared/api';
+import { AlgorithmType, MAX_ALGORITHMS_TO_COMPARE } from '@shared/api';
 import { trpcCredentials } from '@client/lib/trpc';
 import type { AnyUserAlgorithmType } from '@shared/worker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLoaderData, useNavigate, useRevalidator } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -69,17 +69,23 @@ function AlgorithmCard({
   algorithm,
   onRunBacktest,
   onRequestDelete,
+  isCompareMode,
+  onToggleSelect,
   isRunning,
   cooldownSecondsLeft,
   isDeleting,
+  isSelected,
   onClick,
 }: {
   algorithm: AlgorithmWithId;
   onRunBacktest: () => void;
   onRequestDelete: (algorithm: AlgorithmWithId) => void;
+  isCompareMode: boolean;
+  onToggleSelect: (id: string) => void;
   isRunning: boolean;
   cooldownSecondsLeft: number;
   isDeleting: boolean;
+  isSelected: boolean;
   onClick: () => void;
 }) {
   const tickers = getTickers(algorithm);
@@ -110,17 +116,42 @@ function AlgorithmCard({
     onRequestDelete(algorithm);
   }
 
+  const handleCardClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (isCompareMode) onToggleSelect(algorithm.id);
+    else onClick();
+  };
+
   return (
     <Tooltip content={tooltipContent} className="w-full">
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
-      className="relative bg-slate-900/60 rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] flex flex-col gap-3.5 cursor-pointer hover:shadow-[0_20px_60px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 transition-all duration-300 group"
+      onClick={handleCardClick}
+      onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(e); }}
+      className={`relative bg-slate-900/60 rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] flex flex-col gap-3.5 cursor-pointer transition-all duration-300 group ${
+        isSelected
+          ? 'shadow-[0_20px_60px_rgba(0,0,0,0.4),0_0_0_2px_rgba(59,130,246,0.5)] -translate-y-0.5 bg-blue-950/30'
+          : isCompareMode
+          ? 'hover:shadow-[0_20px_60px_rgba(0,0,0,0.4),0_0_0_1px_rgba(59,130,246,0.2)] hover:-translate-y-0.5'
+          : 'hover:shadow-[0_20px_60px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.1)] hover:-translate-y-0.5'
+      }`}
     >
+      {/* Selection indicator overlay in compare mode */}
+      {isCompareMode && (
+        <div className={`absolute top-3 right-3 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+          isSelected ? 'bg-blue-500 border-blue-400' : 'border-white/30 bg-white/5'
+        }`}>
+          {isSelected && (
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+      )}
+
       {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
+      <div className={`flex items-start justify-between gap-2 ${isCompareMode ? 'pr-7' : ''}`}>
         <h3 className="text-base font-bold text-white group-hover:text-blue-200 transition-colors duration-200 truncate min-w-0">
           {algorithm.name}
         </h3>
@@ -182,8 +213,14 @@ function AlgorithmCard({
       <div className="flex gap-2 mt-auto pt-1">
         {/* Open editor */}
         <button
-          onClick={(e) => { e.stopPropagation(); onClick(); }}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200 cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); if (!isCompareMode) onClick(); }}
+          disabled={isCompareMode}
+          title={isCompareMode ? 'Exit compare mode to open the editor' : undefined}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
+            isCompareMode
+              ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed opacity-50'
+              : 'border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 cursor-pointer'
+          }`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -194,12 +231,14 @@ function AlgorithmCard({
         {/* Run backtest */}
         <button
           onClick={(e) => { e.stopPropagation(); onRunBacktest(); }}
-          disabled={isRunning || cooldownSecondsLeft > 0}
-          title={cooldownSecondsLeft > 0 && !isRunning ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest` : undefined}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer ${
-            isRunning || cooldownSecondsLeft > 0
+          disabled={isCompareMode || isRunning || cooldownSecondsLeft > 0}
+          title={isCompareMode ? 'Exit compare mode to run individual algorithms' : cooldownSecondsLeft > 0 && !isRunning ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest` : undefined}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
+            isCompareMode
+              ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed opacity-50'
+              : isRunning || cooldownSecondsLeft > 0
               ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-              : 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border-emerald-500/25 hover:border-emerald-500/40 text-emerald-300'
+              : 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border-emerald-500/25 hover:border-emerald-500/40 text-emerald-300 cursor-pointer'
           }`}
         >
           {isRunning ? (
@@ -240,11 +279,44 @@ export function AlgorithmsPage() {
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const queryClient = useQueryClient();
-  const { isPendingId, cooldownSecondsLeft, runBacktest } = useRunBacktest();
+  const { isPendingIds, cooldownSecondsLeft, runBacktest } = useRunBacktest();
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
-  const [runModalAlgorithm, setRunModalAlgorithm] = useState<AlgorithmWithId | null>(null);
+  const [runModalAlgorithms, setRunModalAlgorithms] = useState<{ id: string; name: string }[] | null>(null);
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      if (!prev.has(id) && prev.size >= MAX_ALGORITHMS_TO_COMPARE) {
+        toast.error(`You can compare at most ${MAX_ALGORITHMS_TO_COMPARE} algorithms at once`);
+        return prev;
+      }
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitCompareMode() {
+    setIsCompareMode(false);
+    setSelectedIds(new Set());
+  }
+
+  useEffect(() => {
+    if (!isCompareMode) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') exitCompareMode();
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCompareMode]);
+
+  function openRunModal(algos: { id: string; name: string }[]) {
+    setRunModalAlgorithms(algos);
+  }
 
   const { mutateAsync: deleteAlgorithm } = useMutation(
     trpcCredentials.algorithms.deleteAlgorithm.mutationOptions({
@@ -274,8 +346,11 @@ export function AlgorithmsPage() {
       className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 font-sans text-white overflow-hidden flex flex-col"
       style={{ position: 'fixed', top: HEADER_OFFSET, left: 0, right: 0, bottom: 0 }}
     >
-      <div className="max-w-[1400px] w-full mx-auto px-8 pt-6 pb-12 flex-1 min-h-0 overflow-auto animate-[fadeInUp_0.8s_ease-out]">
-        <div className="flex items-center justify-between gap-6 mb-8">
+      <div
+        className="max-w-[1400px] w-full mx-auto px-8 pt-6 pb-12 flex-1 min-h-0 overflow-auto animate-[fadeInUp_0.8s_ease-out]"
+        onClick={isCompareMode ? exitCompareMode : undefined}
+      >
+        <div className="flex items-center justify-between gap-6 mb-8" onClick={(e) => e.stopPropagation()}>
           <div className="min-w-0 flex-1">
             <h1
               className="text-3xl font-bold bg-clip-text text-transparent w-full pb-1"
@@ -287,15 +362,73 @@ export function AlgorithmsPage() {
               <p className="text-white/40 text-sm mt-1">{algorithms.length} algorithm{algorithms.length !== 1 ? 's' : ''}</p>
             )}
           </div>
-          <button
-            onClick={() => navigate('/algorithms/new')}
-            className="shrink-0 px-5 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border hover:-translate-y-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border-blue-500/30 hover:border-blue-500/50 text-white"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Algorithm
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {isCompareMode ? (
+              <>
+                {/* Run Selected */}
+                <button
+                  onClick={() => {
+                    const selected = algorithms.filter((a) => selectedIds.has(a.id));
+                    openRunModal(selected.map((a) => ({ id: a.id, name: a.name })));
+                  }}
+                  disabled={selectedIds.size === 0}
+                  title={selectedIds.size === 0 ? 'Select at least one algorithm' : undefined}
+                  className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border hover:-translate-y-0.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border-emerald-500/30 hover:border-emerald-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {selectedIds.size > 0 ? `Run (${selectedIds.size})` : 'Run Selected'}
+                </button>
+                {/* Select All / Clear All */}
+                <button
+                  onClick={() => {
+                    if (selectedIds.size === Math.min(algorithms.length, MAX_ALGORITHMS_TO_COMPARE)) {
+                      setSelectedIds(new Set());
+                    } else {
+                      setSelectedIds(new Set(algorithms.slice(0, MAX_ALGORITHMS_TO_COMPARE).map((a) => a.id)));
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white"
+                >
+                  {selectedIds.size === algorithms.length ? 'Deselect All' : 'Select All'}
+                </button>
+                {/* Exit compare mode */}
+                <button
+                  onClick={exitCompareMode}
+                  className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {algorithms.length > 1 && (
+                  <button
+                    onClick={() => setIsCompareMode(true)}
+                    disabled={cooldownSecondsLeft > 0}
+                    title={cooldownSecondsLeft > 0 ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest` : undefined}
+                    className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+                    </svg>
+                    Compare
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate('/algorithms/new')}
+                  className="px-5 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border hover:-translate-y-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border-blue-500/30 hover:border-blue-500/50 text-white"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  New Algorithm
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {algorithms.length === 0 ? (
@@ -322,11 +455,14 @@ export function AlgorithmsPage() {
               <AlgorithmCard
                 key={algorithm.id}
                 algorithm={algorithm}
-                onRunBacktest={() => setRunModalAlgorithm(algorithm)}
+                onRunBacktest={() => openRunModal([{ id: algorithm.id, name: algorithm.name }])}
                 onRequestDelete={(algo) => setConfirmDelete({ id: algo.id, name: algo.name })}
-                isRunning={isPendingId === algorithm.id}
+                isCompareMode={isCompareMode}
+                onToggleSelect={toggleSelect}
+                isRunning={isPendingIds.has(algorithm.id) && cooldownSecondsLeft > 0}
                 cooldownSecondsLeft={cooldownSecondsLeft}
                 isDeleting={deletingId === algorithm.id}
+                isSelected={selectedIds.has(algorithm.id)}
                 onClick={() => navigate(`/algorithms/${algorithm.id}`)}
               />
             ))}
@@ -336,14 +472,15 @@ export function AlgorithmsPage() {
     </div>
 
     {/* Run backtest modal */}
-    {runModalAlgorithm && (
+    {runModalAlgorithms && (
       <RunBacktestModal
-        algorithmName={runModalAlgorithm.name}
-        onConfirm={(timespan, name) => {
-          void runBacktest(runModalAlgorithm.id, timespan, name);
-          setRunModalAlgorithm(null);
+        algorithms={runModalAlgorithms}
+        onConfirm={(algorithmIds, timespan, name) => {
+          void runBacktest(algorithmIds, timespan, name);
+          setRunModalAlgorithms(null);
+          exitCompareMode();
         }}
-        onClose={() => setRunModalAlgorithm(null)}
+        onClose={() => setRunModalAlgorithms(null)}
       />
     )}
 

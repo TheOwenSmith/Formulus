@@ -1,7 +1,7 @@
-import { trpcCredentials, trpcCredentialsClient } from '@client/lib/trpc';
+import { trpcCredentials } from '@client/lib/trpc';
+import { useBacktestStore } from '@client/store/backtestStore';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const COOLDOWN_MS = 10_000;
@@ -15,10 +15,8 @@ function getCooldownSecondsLeft(): number {
 }
 
 export function useRunBacktest() {
-  const navigate = useNavigate();
-  const [isPendingId, setIsPendingId] = useState<string | null>(null);
+  const { pendingAlgorithmIds, setPending } = useBacktestStore();
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(getCooldownSecondsLeft);
-  const cancelledRef = useRef(false);
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -36,7 +34,6 @@ export function useRunBacktest() {
       }, 1000);
     }
     return () => {
-      cancelledRef.current = true;
       if (cooldownIntervalRef.current != null) clearInterval(cooldownIntervalRef.current);
     };
   }, []);
@@ -61,46 +58,17 @@ export function useRunBacktest() {
     trpcCredentials.backtesting.backtestAlgorithms.mutationOptions(),
   );
 
-  function schedulePoll(publicId: string) {
-    if (cancelledRef.current) return;
-
-    setTimeout(async () => {
-      if (cancelledRef.current) return;
-      try {
-        const status = await trpcCredentialsClient.backtesting.getSubmissionStatus.query({
-          publicId,
-        });
-        if (cancelledRef.current) return;
-
-        if (status.status === 'FINISHED') {
-          setIsPendingId(null);
-          navigate(`/backtest/${publicId}`);
-        } else if (status.status === 'ERROR') {
-          setIsPendingId(null);
-          toast.error(status.error ?? 'Backtest failed');
-        } else {
-          schedulePoll(publicId);
-        }
-      } catch (e) {
-        if (cancelledRef.current) return;
-        setIsPendingId(null);
-        toast.error(e instanceof Error ? e.message : 'Failed to get backtest status');
-      }
-    }, 2000);
-  }
-
-  async function runBacktest(algorithmId: string, timespan?: [string | null, string | null], name?: string) {
-    cancelledRef.current = false;
-    setIsPendingId(algorithmId);
+  async function runBacktest(algorithmIds: string | string[], timespan?: [string | null, string | null], name?: string) {
+    const ids = Array.isArray(algorithmIds) ? algorithmIds : [algorithmIds];
     try {
-      const { publicId } = await backtestAlgorithms({ algorithms: [{ id: algorithmId }], timespan, name });
+      const { publicId } = await backtestAlgorithms({ algorithms: ids.map((id) => ({ id })), timespan, name });
+      setPending(ids, publicId);
       startCooldown();
-      schedulePoll(publicId);
     } catch (e) {
-      setIsPendingId(null);
       toast.error(e instanceof Error ? e.message : 'Failed to start backtest');
     }
   }
 
-  return { isPendingId, cooldownSecondsLeft, runBacktest };
+  const pendingAlgorithmIdsSet = new Set(pendingAlgorithmIds);
+  return { isPendingIds: pendingAlgorithmIdsSet, cooldownSecondsLeft, runBacktest };
 }

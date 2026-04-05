@@ -5,9 +5,10 @@ import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
 import { throttle } from '@client/utils/throttle';
 import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/worker';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLoaderData } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Color schemes for drag preview and drop indicators (matching AlgorithmResultCard)
 const colorSchemes = [
@@ -109,10 +110,118 @@ function DragPreview({ algorithmName, colorIndex }: DragPreviewProps) {
   );
 }
 
+type AlgorithmVersionSnapshot = {
+  id: string;
+  name: string;
+  type: string;
+  aggregate: string;
+  language: string;
+  tickers: string[];
+  k: number | null;
+  contextLength: number;
+  indicators: string[];
+  algorithmMaxHoldingProportion: number | null;
+  userAlgorithmImplementationCode: string;
+  algorithmId: string;
+};
+
+function CopyAlgorithmModal({
+  version,
+  resultPublicId,
+  onClose,
+}: {
+  version: AlgorithmVersionSnapshot;
+  resultPublicId: string;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [copyName, setCopyName] = useState(() => `Copy of ${version.name}`.slice(0, 64));
+
+  const { mutateAsync: copyAlgorithmVersion, isPending } = useMutation(
+    trpcCredentials.algorithms.copyAlgorithmVersion.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to copy algorithm');
+      },
+    }),
+  );
+
+  async function handleCopy() {
+    const trimmed = copyName.trim();
+    if (!trimmed) return;
+    await copyAlgorithmVersion({
+      name: trimmed,
+      resultPublicId,
+      versionId: version.id,
+    });
+    await queryClient.invalidateQueries({ queryKey: trpcCredentials.algorithms.getAlgorithms.queryKey() });
+    toast.success('Algorithm copied to your library');
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] bg-slate-900/95 backdrop-blur-[10px] border border-white/10 p-6 animate-[fadeInUp_0.2s_ease-out]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-white mb-1">Copy algorithm version?</h2>
+        <p className="text-white/50 text-sm mb-5">
+          This will add a copy of{' '}
+          <span className="text-white/80 font-medium">&quot;{version.name}&quot;</span> to your
+          algorithms at the exact state it was in when this backtest was run.
+        </p>
+        <div className="mb-5">
+          <label className="block text-xs text-white/40 uppercase tracking-wider mb-1.5">
+            Algorithm Name
+          </label>
+          <input
+            type="text"
+            value={copyName}
+            maxLength={64}
+            onChange={(e) => setCopyName(e.target.value)}
+            className="w-full rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+          />
+        </div>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            disabled={isPending || !copyName.trim()}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium border border-blue-500/40 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPending ? 'Copying…' : 'Copy to My Algorithms'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BacktestPage() {
   const { data, publicId } = useLoaderData<{ data: BacktestAlgorithmsResult; publicId: string }>();
   const { data: nameResult } = useQuery(trpcCredentials.backtesting.getSubmissionName.queryOptions({ publicId }));
   const name = nameResult?.name ?? null;
+  const { data: algorithmVersions } = useQuery(
+    trpcCredentials.backtesting.getAlgorithmVersionsForResult.queryOptions({ publicId }),
+  );
+  const versionByName = useMemo(() => {
+    const map = new Map<string, AlgorithmVersionSnapshot>();
+    for (const v of algorithmVersions ?? []) map.set(v.name, v);
+    return map;
+  }, [algorithmVersions]);
+  const [copyModalVersion, setCopyModalVersion] = useState<AlgorithmVersionSnapshot | null>(null);
 
   // Get default ticker by aggregate
   const defaultTickerByAggregate = useMemo<Record<Timestamp, Ticker>>(() => {
@@ -597,6 +706,7 @@ export function BacktestPage() {
   ]);
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 pt-4 pb-8 font-sans text-white">
       {/* Drag Preview */}
       {draggedAlgorithmInfo && dragPreviewPos && (
@@ -909,6 +1019,7 @@ export function BacktestPage() {
                       index={originalIndex}
                       isDragging={draggedAlgorithm === algorithmName}
                       isSideBySideMode={isSideBySideMode}
+                      onCopyVersion={versionByName.has(algorithmName) ? () => setCopyModalVersion(versionByName.get(algorithmName)!) : undefined}
                       onDragEnd={handleDragEnd}
                       onDragStart={() => handleDragStart(algorithmName)}
                       tickerPlotByTicker={data.tickerPlotByAggregateByTicker[aggregate]}
@@ -975,5 +1086,14 @@ export function BacktestPage() {
         </div>
       </div>
     </div>
+
+    {copyModalVersion && (
+      <CopyAlgorithmModal
+        version={copyModalVersion}
+        resultPublicId={publicId}
+        onClose={() => setCopyModalVersion(null)}
+      />
+    )}
+    </>
   );
 }

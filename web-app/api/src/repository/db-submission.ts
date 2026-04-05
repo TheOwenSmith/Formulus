@@ -1,7 +1,11 @@
 import { prisma } from '@api/lib/prisma';
 import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
-import type { AlgorithmModel, BacktestingSubmissionModel } from '@shared/generated/prisma/models';
+import type {
+  AlgorithmModel,
+  AlgorithmVersionModel,
+  BacktestingSubmissionModel,
+} from '@shared/generated/prisma/models';
 import { nanoid } from 'nanoid';
 import { err, ok, type Result } from 'neverthrow';
 
@@ -186,7 +190,9 @@ export async function cancelSubmission(
         where: {
           publicId,
           creatorId,
-          status: { in: [BacktestingSubmissionStatus.PENDING, BacktestingSubmissionStatus.RUNNING] },
+          status: {
+            in: [BacktestingSubmissionStatus.PENDING, BacktestingSubmissionStatus.RUNNING],
+          },
         },
         data: { status: BacktestingSubmissionStatus.CANCELLED },
       }),
@@ -244,6 +250,29 @@ export async function deleteSubmission(
   return ok(true);
 }
 
+export async function getAlgorithmVersionsByResultPublicId(
+  resultPublicId: string,
+): Promise<Result<AlgorithmVersionModel[], AppError>> {
+  const result = await fromThrowableAsync(
+    () =>
+      prisma.backtestingResults.findUnique({
+        where: { publicId: resultPublicId },
+        select: {
+          submissions: {
+            take: 1,
+            select: {
+              algorithmVersions: true,
+            },
+          },
+        },
+      }),
+    (e) => internal(e, 'Failed to load algorithm versions'),
+  );
+  if (result.isErr()) return err(result.error);
+  const versions = result.value?.submissions[0]?.algorithmVersions ?? [];
+  return ok(versions);
+}
+
 export async function clearSubmissionError(
   publicId: string,
   creatorId: string,
@@ -254,7 +283,9 @@ export async function clearSubmissionError(
         where: {
           publicId,
           creatorId,
-          status: { in: [BacktestingSubmissionStatus.ERROR, BacktestingSubmissionStatus.CANCELLED] },
+          status: {
+            in: [BacktestingSubmissionStatus.ERROR, BacktestingSubmissionStatus.CANCELLED],
+          },
         },
       }),
     (e) => internal(e, 'Failed to clear submission'),

@@ -83,3 +83,5 @@ export const AlgorithmType = {
   TOP_K: 2,
 } as const;
 export type AlgorithmTypeValue = (typeof AlgorithmType)[keyof typeof AlgorithmType];
+
+export const MAX_ALGORITHMS_TO_COMPARE = 25;
