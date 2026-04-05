@@ -529,8 +529,8 @@ export function AlgorithmEditorPage() {
     {showRunModal && (
       <RunBacktestModal
         algorithmName={algorithm.name}
-        onConfirm={(timespan) => {
-          void runBacktest(algorithm.id, timespan);
+        onConfirm={(timespan, name) => {
+          void runBacktest(algorithm.id, timespan, name);
           setShowRunModal(false);
         }}
         onClose={() => setShowRunModal(false)}

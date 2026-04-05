@@ -4,12 +4,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+function TrashIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type SubmissionStatus = 'PENDING' | 'RUNNING' | 'FINISHED' | 'ERROR' | 'CANCELLED';
 
 type Submission = {
   publicId: string;
+  name: string | null;
   status: SubmissionStatus;
   progressPct: number;
   message: string | null;
@@ -316,17 +326,22 @@ function SubmissionCard({
   onNavigateResults,
   onOpenTerminal,
   onCancel,
+  onRequestDelete,
+  onClearError,
 }: {
   submission: Submission;
   onNavigateResults: () => void;
   onOpenTerminal: () => void;
   onCancel: () => void;
+  onRequestDelete: () => void;
+  onClearError: () => void;
 }) {
-  const { algorithmNames, createdAt, error, errorCode, message, progressPct, status } = submission;
+  const { algorithmNames, createdAt, error, errorCode, message, name, progressPct, status } = submission;
   const sub = getSubState(status, message);
   const canView = sub === 'finished';
   const isUserErr = status === 'ERROR' && errorCode === 'USER_CODE';
   const isCancellable = isActive(status);
+  const isClearable = status === 'ERROR' || status === 'CANCELLED';
   const isInteractive = canView || isUserErr;
 
   function handleClick() {
@@ -356,21 +371,32 @@ function SubmissionCard({
       <div className="p-6 flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
-          {/* Algorithm names */}
-          <div className="flex flex-wrap gap-1.5 min-w-0">
-            {algorithmNames.slice(0, 6).map((name) => (
-              <span
-                key={name}
-                className="text-sm font-medium px-2.5 py-0.5 rounded-md bg-white/8 border border-white/10 text-white/85 truncate max-w-[180px]"
-              >
-                {name}
-              </span>
-            ))}
-            {algorithmNames.length > 6 && (
-              <span className="text-sm px-2.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-white/40">
-                +{algorithmNames.length - 6}
-              </span>
-            )}
+          <div className="flex flex-col gap-2 min-w-0 flex-1">
+            {/* Primary title: explicit name or derived from algorithm names + date */}
+            <p className="text-base font-semibold text-white/90 truncate leading-snug">
+              {name ?? (() => {
+                const base = algorithmNames.slice(0, 2).join(', ');
+                const suffix = algorithmNames.length > 2 ? ` +${algorithmNames.length - 2}` : '';
+                const date = new Date(createdAt).toISOString().split('T')[0];
+                return `${base}${suffix} (${date})`;
+              })()}
+            </p>
+            {/* Algorithm chips — always shown as secondary context */}
+            <div className="flex flex-wrap gap-1.5">
+              {algorithmNames.slice(0, 6).map((algName) => (
+                <span
+                  key={algName}
+                  className="text-xs px-2 py-0.5 rounded-md bg-white/5 border border-white/8 text-white/45 truncate max-w-[180px]"
+                >
+                  {algName}
+                </span>
+              ))}
+              {algorithmNames.length > 6 && (
+                <span className="text-xs px-2 py-0.5 rounded-md bg-white/5 border border-white/8 text-white/30">
+                  +{algorithmNames.length - 6}
+                </span>
+              )}
+            </div>
           </div>
           <StatusBadge status={status} message={message} pct={progressPct} />
         </div>
@@ -448,6 +474,32 @@ function SubmissionCard({
                   />
                 </svg>
                 Cancel
+              </button>
+            )}
+            {isClearable && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClearError();
+                }}
+                className="flex items-center gap-1 text-white/25 hover:text-red-400/80 transition-colors font-medium cursor-pointer"
+              >
+                <TrashIcon />
+                Clear
+              </button>
+            )}
+            {canView && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRequestDelete();
+                }}
+                className="flex items-center gap-1 text-white/20 hover:text-red-400/70 transition-colors cursor-pointer"
+              >
+                <TrashIcon />
+                Delete
               </button>
             )}
             {canView && (
@@ -614,6 +666,7 @@ export function SubmissionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const algorithmFilter = searchParams.get('algorithm');
   const [terminalSubmission, setTerminalSubmission] = useState<Submission | null>(null);
+  const [confirmDeleteSubmission, setConfirmDeleteSubmission] = useState<Submission | null>(null);
 
   const { mutate: cancelBacktest } = useMutation(
     trpcCredentials.backtesting.cancelSubmission.mutationOptions({
@@ -622,6 +675,32 @@ export function SubmissionsPage() {
       },
       onSuccess: () => {
         toast.success('Backtest cancelled');
+        void queryClient.invalidateQueries({
+          queryKey: trpcCredentials.backtesting.getSubmissions.queryKey(),
+        });
+      },
+    }),
+  );
+
+  const { mutate: deleteBacktestResult } = useMutation(
+    trpcCredentials.backtesting.deleteBacktestResult.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete backtest');
+      },
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpcCredentials.backtesting.getSubmissions.queryKey(),
+        });
+      },
+    }),
+  );
+
+  const { mutate: clearBacktestError } = useMutation(
+    trpcCredentials.backtesting.clearBacktestError.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to clear backtest');
+      },
+      onSuccess: () => {
         void queryClient.invalidateQueries({
           queryKey: trpcCredentials.backtesting.getSubmissions.queryKey(),
         });
@@ -730,6 +809,8 @@ export function SubmissionsPage() {
                   onNavigateResults={() => navigate(`/backtest/${submission.publicId}`)}
                   onOpenTerminal={() => setTerminalSubmission(submission)}
                   onCancel={() => cancelBacktest({ publicId: submission.publicId })}
+                  onRequestDelete={() => setConfirmDeleteSubmission(submission)}
+                  onClearError={() => clearBacktestError({ publicId: submission.publicId })}
                 />
               ))}
             </div>
@@ -743,6 +824,52 @@ export function SubmissionsPage() {
           submission={terminalSubmission}
           onClose={() => setTerminalSubmission(null)}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteSubmission && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmDeleteSubmission(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] bg-slate-900/95 backdrop-blur-[10px] border border-white/10 p-6 animate-[fadeInUp_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-white mb-1">Delete backtest results?</h2>
+            <p className="text-white/60 text-sm mb-6">
+              Results for{' '}
+              <span className="font-medium text-white/80">
+                {confirmDeleteSubmission.algorithmNames.slice(0, 2).join(', ')}
+                {confirmDeleteSubmission.algorithmNames.length > 2
+                  ? ` +${confirmDeleteSubmission.algorithmNames.length - 2} more`
+                  : ''}
+              </span>{' '}
+              will be permanently deleted. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteSubmission(null)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteBacktestResult({ publicId: confirmDeleteSubmission.publicId });
+                  setConfirmDeleteSubmission(null);
+                }}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium border border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:border-red-500/50 transition-colors cursor-pointer"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

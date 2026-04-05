@@ -1,9 +1,11 @@
 import { AlgorithmResultCard } from '@client/components/AlgorithmResultCard';
 import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/index';
+import { trpcCredentials } from '@client/lib/trpc';
 import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
 import { throttle } from '@client/utils/throttle';
 import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/worker';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLoaderData } from 'react-router-dom';
 
@@ -108,7 +110,9 @@ function DragPreview({ algorithmName, colorIndex }: DragPreviewProps) {
 }
 
 export function BacktestPage() {
-  const { data } = useLoaderData<{ data: BacktestAlgorithmsResult }>();
+  const { data, publicId } = useLoaderData<{ data: BacktestAlgorithmsResult; publicId: string }>();
+  const { data: nameResult } = useQuery(trpcCredentials.backtesting.getSubmissionName.queryOptions({ publicId }));
+  const name = nameResult?.name ?? null;
 
   // Get default ticker by aggregate
   const defaultTickerByAggregate = useMemo<Record<Timestamp, Ticker>>(() => {
@@ -624,6 +628,9 @@ export function BacktestPage() {
         >
           Backtesting Performance Analysis
         </h1>
+        {name && (
+          <p className="text-white/50 text-base mt-1">{name}</p>
+        )}
       </div>
 
       {/* Fixed position toggle button - only show when there are 2+ algorithms */}

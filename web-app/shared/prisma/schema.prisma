@@ -260,6 +260,7 @@ model BacktestingSubmission {
   updatedAt DateTime @updatedAt
 
   publicId String @unique @db.VarChar(12)
+  name String? @db.VarChar(64)
   status BacktestingSubmissionStatus
   progressPct Float @default(0.0)
   message     String?

@@ -11,6 +11,7 @@ export const DESCRIPTION_METRICS_ORDER = exhaustiveArray<DescriptionMetrics>()([
   'growthRate',
   'sharpeRatio',
   'winRate',
+  'maxDrawdown',
   'profitLossRatio',
   'expectancyPerTrade',
   'averageHoldingDuration',
@@ -30,6 +31,7 @@ export const DEFAULT_DESCRIPTION_METRIC_VISBILITY: DescriptionMetricVisbility = 
   contextLength: false,
   expectancyPerTrade: false,
   growthRate: true,
+  maxDrawdown: true,
   maxHoldingPorportion: false,
   positionsClosed: true,
   profitLossRatio: false,
@@ -55,6 +57,7 @@ export const DESCRIPTION_METRIC_LABELS: Record<MetricKey, string> = {
   contextLength: 'Context Length',
   expectancyPerTrade: 'Expectancy Per Trade',
   growthRate: 'Growth Rate',
+  maxDrawdown: 'Max Drawdown',
   maxHoldingPorportion: 'Max Holding Percentage',
   positionsClosed: 'Positions Closed',
   profitLossRatio: 'Profit/Loss Ratio',
@@ -77,6 +80,7 @@ export const DESCRIPTION_METRIC_TO_STRING: {
   expectancyPerTrade: (expectancyPerTrade: number | null) =>
     `${expectancyPerTrade != null ? withCommasRounded(expectancyPerTrade * 100) + '%' : 'unknown'}`,
   growthRate: (growthRate: number) => withCommasRounded(growthRate * 100) + '%',
+  maxDrawdown: (maxDrawdown: number) => withCommasRounded(maxDrawdown * 100) + '%',
   maxHoldingPorportion: (maxHoldingPorportion: number) =>
     withCommasRounded(maxHoldingPorportion * 100) + '%',
   positionsClosed: (positionsClosed: number) => withCommas(positionsClosed),

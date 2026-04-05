@@ -89,11 +89,11 @@ export function useRunBacktest() {
     }, 2000);
   }
 
-  async function runBacktest(algorithmId: string, timespan?: [string | null, string | null]) {
+  async function runBacktest(algorithmId: string, timespan?: [string | null, string | null], name?: string) {
     cancelledRef.current = false;
     setIsPendingId(algorithmId);
     try {
-      const { publicId } = await backtestAlgorithms({ algorithms: [{ id: algorithmId }], timespan });
+      const { publicId } = await backtestAlgorithms({ algorithms: [{ id: algorithmId }], timespan, name });
       startCooldown();
       schedulePoll(publicId);
     } catch (e) {

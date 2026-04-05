@@ -6,7 +6,10 @@ import { createUserAuthenticationProcedure } from '@api/middleware/authenticatio
 import { retrieveBacktestingResultsByPublicId } from '@api/repository/db-backtesting-results';
 import {
   cancelSubmission,
+  clearSubmissionError,
   createSubmission,
+  deleteSubmission,
+  getSubmissionNameByResultPublicId,
   getSubmissionsByCreatorId,
   getSubmissionStatus,
 } from '@api/repository/db-submission';
@@ -23,12 +26,13 @@ export function backtestingRouter(
       .input(
         z.object({
           algorithms: z.object({ id: z.string() }).array().min(1),
+          name: z.string().max(64).optional(),
           timespan: z.tuple([z.string().nullable(), z.string().nullable()]).optional(),
         }),
       )
       .mutation(async ({ ctx, input }) => {
         const { user } = ctx;
-        const { algorithms: algorithmRefs, timespan } = input;
+        const { algorithms: algorithmRefs, name, timespan } = input;
 
         const algorithmIds = algorithmRefs.map((a) => a.id);
 
@@ -75,6 +79,7 @@ export function backtestingRouter(
         const submissionResult = await createSubmission({
           algorithms,
           creatorId: user.id,
+          name,
           timespan,
         });
         if (submissionResult.isErr()) {
@@ -119,6 +124,32 @@ export function backtestingRouter(
         if (result.isErr()) throw result.error;
         if (!result.value) throw badRequest('Submission not found or already started');
         return { cancelled: true };
+      }),
+
+    deleteBacktestResult: authProcedure
+      .input(z.object({ publicId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await deleteSubmission(input.publicId, ctx.user.id);
+        if (result.isErr()) throw result.error;
+        if (!result.value) throw badRequest('Submission not found or not deletable');
+        return { deleted: true };
+      }),
+
+    clearBacktestError: authProcedure
+      .input(z.object({ publicId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await clearSubmissionError(input.publicId, ctx.user.id);
+        if (result.isErr()) throw result.error;
+        if (!result.value) throw badRequest('Submission not found or not clearable');
+        return { cleared: true };
+      }),
+
+    getSubmissionName: authProcedure
+      .input(z.object({ publicId: z.string() }))
+      .query(async ({ input }) => {
+        const result = await getSubmissionNameByResultPublicId(input.publicId);
+        if (result.isErr()) throw result.error;
+        return { name: result.value };
       }),
 
     getBacktestingResults: authProcedure

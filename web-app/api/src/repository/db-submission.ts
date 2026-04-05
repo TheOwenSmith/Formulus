@@ -7,6 +7,7 @@ import { err, ok, type Result } from 'neverthrow';
 
 export type SubmissionSummary = {
   publicId: string;
+  name: string | null;
   status: BacktestingSubmissionStatus;
   progressPct: number;
   message: string | null;
@@ -36,6 +37,7 @@ export async function getSubmissionsByCreatorId(
           errorCode: true,
           errorDetail: true,
           message: true,
+          name: true,
           progressPct: true,
           publicId: true,
           startTimespan: true,
@@ -55,6 +57,7 @@ export async function getSubmissionsByCreatorId(
       errorCode: s.errorCode,
       errorDetail: s.errorDetail,
       message: s.message,
+      name: s.name,
       progressPct: s.progressPct,
       publicId: s.publicId,
       startTimespan: s.startTimespan,
@@ -66,10 +69,12 @@ export async function getSubmissionsByCreatorId(
 export async function createSubmission({
   algorithms,
   creatorId,
+  name,
   timespan,
 }: {
   algorithms: AlgorithmModel[];
   creatorId: string;
+  name?: string;
   timespan?: [string | null, string | null];
 }): Promise<Result<BacktestingSubmissionModel, AppError>> {
   const publicId = nanoid(12);
@@ -95,6 +100,7 @@ export async function createSubmission({
           },
           creatorId,
           endTimespan: timespan?.[1] ?? null,
+          name: name ?? null,
           publicId,
           startTimespan: timespan?.[0] ?? null,
           status: BacktestingSubmissionStatus.PENDING,
@@ -185,6 +191,73 @@ export async function cancelSubmission(
         data: { status: BacktestingSubmissionStatus.CANCELLED },
       }),
     (e) => internal(e, 'Failed to cancel submission'),
+  );
+  if (result.isErr()) return err(result.error);
+  return ok(result.value.count > 0);
+}
+
+export async function getSubmissionNameByResultPublicId(
+  resultPublicId: string,
+): Promise<Result<string | null, AppError>> {
+  const result = await fromThrowableAsync(
+    () =>
+      prisma.backtestingResults.findUnique({
+        where: { publicId: resultPublicId },
+        select: { submissions: { select: { name: true }, take: 1 } },
+      }),
+    (e) => internal(e, 'Failed to load submission name'),
+  );
+  if (result.isErr()) return err(result.error);
+  return ok(result.value?.submissions[0]?.name ?? null);
+}
+
+export async function deleteSubmission(
+  publicId: string,
+  creatorId: string,
+): Promise<Result<boolean, AppError>> {
+  const findResult = await fromThrowableAsync(
+    () =>
+      prisma.backtestingSubmission.findFirst({
+        where: { publicId, creatorId, status: BacktestingSubmissionStatus.FINISHED },
+        select: { id: true, resultId: true },
+      }),
+    (e) => internal(e, 'Failed to find submission'),
+  );
+  if (findResult.isErr()) return err(findResult.error);
+  const submission = findResult.value;
+  if (submission == null) return ok(false);
+
+  if (submission.resultId != null) {
+    // Deleting BacktestingResults cascades to submission + algorithm versions + graphs + plots
+    const deleteResult = await fromThrowableAsync(
+      () => prisma.backtestingResults.delete({ where: { id: submission.resultId! } }),
+      (e) => internal(e, 'Failed to delete backtesting results'),
+    );
+    if (deleteResult.isErr()) return err(deleteResult.error);
+  } else {
+    const deleteResult = await fromThrowableAsync(
+      () => prisma.backtestingSubmission.delete({ where: { id: submission.id } }),
+      (e) => internal(e, 'Failed to delete submission'),
+    );
+    if (deleteResult.isErr()) return err(deleteResult.error);
+  }
+  return ok(true);
+}
+
+export async function clearSubmissionError(
+  publicId: string,
+  creatorId: string,
+): Promise<Result<boolean, AppError>> {
+  const result = await fromThrowableAsync(
+    () =>
+      prisma.backtestingSubmission.deleteMany({
+        where: {
+          publicId,
+          creatorId,
+          status: { in: [BacktestingSubmissionStatus.ERROR, BacktestingSubmissionStatus.CANCELLED] },
+        },
+      }),
+    (e) => internal(e, 'Failed to clear submission'),
   );
   if (result.isErr()) return err(result.error);
   return ok(result.value.count > 0);
