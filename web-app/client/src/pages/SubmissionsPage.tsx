@@ -4,9 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-function TrashIcon() {
+function TrashIcon({ className }: { className?: string } = {}) {
   return (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg
+      className={className ?? 'w-3.5 h-3.5'}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -588,10 +593,10 @@ function AlgorithmFilterDropdown({
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/8 hover:border-white/20 transition-all duration-200 cursor-pointer focus:outline-none"
+        className="group flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 transition-all duration-200 hover:border-blue-500/25 hover:bg-blue-500/10 focus:outline-none cursor-pointer"
       >
         <svg
-          className="w-3.5 h-3.5 text-white/40 shrink-0"
+          className="h-3.5 w-3.5 shrink-0 text-white/40 transition-colors duration-200 group-hover:text-blue-400/85"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -603,11 +608,17 @@ function AlgorithmFilterDropdown({
             d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
           />
         </svg>
-        <span className={`text-sm font-medium ${selectedName ? 'text-white' : 'text-white/50'}`}>
+        <span
+          className={`text-sm font-medium transition-colors duration-200 ${
+            selectedName
+              ? 'text-white group-hover:text-cyan-100/95'
+              : 'text-white/50 group-hover:text-blue-200/90'
+          }`}
+        >
           {selectedName ?? 'All algorithms'}
         </span>
         <svg
-          className={`w-3.5 h-3.5 text-white/40 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-3.5 w-3.5 shrink-0 text-white/40 transition-all duration-200 group-hover:text-blue-400/85 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -756,6 +767,13 @@ export function SubmissionsPage() {
     ? allSubmissions.filter((s) => s.algorithmIds.includes(algorithmFilter))
     : allSubmissions;
   const activeCount = list.filter((s) => isActive(s.status)).length;
+  const clearableCount = list.filter((s) => s.status === 'ERROR' || s.status === 'CANCELLED').length;
+
+  function handleClearAllErrors() {
+    list
+      .filter((s) => s.status === 'ERROR' || s.status === 'CANCELLED')
+      .forEach((s) => clearBacktestError({ publicId: s.publicId }));
+  }
 
   // Build unique algorithm list from all submissions (preserves first-seen order)
   const uniqueAlgorithms = (() => {
@@ -783,38 +801,48 @@ export function SubmissionsPage() {
           className="w-full mx-auto px-8 pt-8 pb-12 flex-1 min-h-0 overflow-y-auto"
           style={{ maxWidth: '760px' }}
         >
-          {/* Page header */}
+          {/* Page header — title row shares baseline with actions; subtitle below */}
           <div className="mb-8">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="min-w-0 pb-0.5">
-                <h1
-                  className="text-3xl font-bold bg-clip-text text-transparent w-full py-1"
-                  style={{
-                    backgroundImage: 'linear-gradient(to right, #34d399, #3b82f6, #a855f7)',
-                  }}
-                >
-                  My Backtests
-                </h1>
-                {allSubmissions.length > 0 && (
-                  <p className="text-white/40 text-sm mt-1 leading-normal pb-0.5">
-                    {algorithmFilter
-                      ? `${list.length} of ${allSubmissions.length}`
-                      : `${allSubmissions.length}`}{' '}
-                    backtest{allSubmissions.length !== 1 ? 's' : ''}
-                    {activeCount > 0 && (
-                      <span className="ml-2 text-blue-400/70">· {activeCount} active</span>
-                    )}
-                  </p>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+              <h1
+                className="text-3xl font-bold bg-clip-text text-transparent min-w-0 m-0 leading-tight"
+                style={{
+                  backgroundImage: 'linear-gradient(to right, #34d399, #3b82f6, #a855f7)',
+                }}
+              >
+                My Backtests
+              </h1>
+              <div className="flex items-center gap-2 shrink-0">
+                {clearableCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllErrors}
+                    className="group flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-white/55 transition-all duration-200 hover:border-red-500/25 hover:bg-red-500/10 hover:text-red-200/90 focus:outline-none cursor-pointer"
+                  >
+                    <TrashIcon className="h-3.5 w-3.5 shrink-0 text-white/40 transition-colors group-hover:text-red-400/85" />
+                    Clear errors ({clearableCount})
+                  </button>
+                )}
+                {uniqueAlgorithms.length > 0 && (
+                  <AlgorithmFilterDropdown
+                    algorithms={uniqueAlgorithms}
+                    value={algorithmFilter}
+                    onChange={setFilter}
+                  />
                 )}
               </div>
-              {uniqueAlgorithms.length > 0 && (
-                <AlgorithmFilterDropdown
-                  algorithms={uniqueAlgorithms}
-                  value={algorithmFilter}
-                  onChange={setFilter}
-                />
-              )}
             </div>
+            {allSubmissions.length > 0 && (
+              <p className="mt-2 text-sm leading-normal text-white/40">
+                {algorithmFilter
+                  ? `${list.length} of ${allSubmissions.length}`
+                  : `${allSubmissions.length}`}{' '}
+                backtest{allSubmissions.length !== 1 ? 's' : ''}
+                {activeCount > 0 && (
+                  <span className="ml-2 text-blue-400/70">· {activeCount} active</span>
+                )}
+              </p>
+            )}
           </div>
 
           {isLoading ? (

@@ -169,6 +169,7 @@ Import shared backend types exclusively from `@shared/api` (re-exports from the 
 - **SVG paths**: live in `client/src/icons/` — do not inline large path data elsewhere
 - **Styling**: Tailwind utility classes only, no custom CSS unless unavoidable
 - **Modularity**: keep components/hooks small and focused; split into new files as features grow
+- **Em dashes**: never use `—` in code or comments; use `:`, `,`, or restructure the sentence
 
 ## Client UI Design System
 
