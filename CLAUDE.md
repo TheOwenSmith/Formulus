@@ -57,6 +57,30 @@ Schema lives at `shared/prisma/schema.prisma`. Generated client outputs to `shar
 
 **Never import from `@shared/worker` or `@api/repository/*` in worker code.** These chain to `@api/lib/config`, which validates API-only environment variables and crashes the worker at runtime. The worker has its own standalone Prisma client at `worker/src/lib/prisma.ts`.
 
+## Environment Variables
+
+**Never read `process.env` directly.** All env access goes through the typed `Config` singleton:
+
+```ts
+import { config } from '@api/lib/config';   // in API code
+import { config } from '@worker/lib/config'; // in worker code
+
+const value = config.getKey('MY_KEY');
+```
+
+`config.getKey()` only accepts keys declared in `envVars`, giving compile-time safety. The singleton validates all declared keys are present on startup — the process fails fast if any are missing.
+
+### Adding a new environment variable
+
+Both steps are required:
+
+1. **Add the key to `envVars`** in `api/src/lib/config.ts` and/or `worker/src/lib/config.ts`.
+2. **Append it to `.env.sample`** in the same package directory: `MY_ENV_VAR=`
+
+If parsing or casting is needed, add a getter to `Config` (e.g. `config.port`) rather than doing it at call sites.
+
+> The worker has its own `envVars` list — do not import `@api/lib/config` from worker code (see Critical Import Rule).
+
 ## Error Handling
 
 ### API & Worker (neverthrow)
@@ -196,8 +220,10 @@ When suggesting architecture, always call out the cost implication explicitly an
 | `api/src/routes/algorithms.ts` | `createAlgorithm` |
 | `api/src/repository/db-submission.ts` | `createSubmission`, `getSubmissionStatus` |
 | `api/src/lib/sqs.ts` | SQS client |
+| `api/src/lib/config.ts` | API `Config` singleton, typed env access |
 | `worker/src/worker.ts` | Main SQS processing loop |
 | `worker/src/lib/prisma.ts` | Worker's standalone PrismaClient |
+| `worker/src/lib/config.ts` | Worker `Config` singleton, typed env access |
 | `worker/src/repository/db-submission.ts` | Load/update submissions, AlgorithmVersion→UserAlgorithm conversion |
 | `worker/src/repository/db-results.ts` | `createBacktestingResults` |
 | `shared/prisma/schema.prisma` | Canonical Prisma schema |
