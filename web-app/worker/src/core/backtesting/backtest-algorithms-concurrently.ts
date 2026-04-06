@@ -126,7 +126,7 @@ export async function backtestAlgorithmsConcurrently({
     iteratorStrictParsing = false,
     onProgress,
     sharePrecisionNumberOfDecimals = 8,
-    slippageByTicker: userInuttedSlippageByTicker,
+    slippageByTicker: userInputtedSlippageByTicker,
     tickerData = [],
     verboseLogging = false,
   } = options;
@@ -205,7 +205,7 @@ export async function backtestAlgorithmsConcurrently({
     getFilenameAndIndexByAggregateByTickerResponse.value;
   const marketSlippageByTickerResponse = getMarketSlippageByTicker(
     allTickers,
-    userInuttedSlippageByTicker,
+    userInputtedSlippageByTicker,
   );
   if (marketSlippageByTickerResponse.isErr()) {
     return err(marketSlippageByTickerResponse.error);
