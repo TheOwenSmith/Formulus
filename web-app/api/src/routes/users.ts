@@ -2,27 +2,35 @@ import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
 import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
-import { z } from 'zod';
+import z from 'zod';
 
 export function usersRouter(
   router: TRPCContext['router'],
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
 ) {
   return router({
-    deleteAccount: authProcedure.mutation(async ({ ctx }) => {
-      // Delete user (cascade will delete sessions, accounts, etc.)
-      const deleteUserResponse = await fromThrowableAsync(
-        () =>
-          prisma.user.delete({
-            where: { id: ctx.user.id },
-          }),
-        (e) => internal(e, 'An unexpected error occurred while deleting the user'),
-      );
-      if (deleteUserResponse.isErr()) {
-        throw deleteUserResponse.error;
-      }
-      return { success: true };
-    }),
+    deleteAccount: authProcedure
+      .input(z.object({ deleteBacktests: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.deleteBacktests) {
+          // Explicitly delete backtesting results before removing the user.
+          // Without this, SetNull on creatorId would orphan them instead.
+          const deleteResultsResponse = await fromThrowableAsync(
+            () => prisma.backtestingResults.deleteMany({ where: { creatorId: ctx.user.id } }),
+            (e) => internal(e, 'An unexpected error occurred while deleting backtesting results'),
+          );
+          if (deleteResultsResponse.isErr()) throw deleteResultsResponse.error;
+        }
+
+        // Delete user — cascade handles sessions, accounts, algorithms, and submissions.
+        // BacktestingResults rows whose creatorId was NOT deleted above become orphaned (SetNull).
+        const deleteUserResponse = await fromThrowableAsync(
+          () => prisma.user.delete({ where: { id: ctx.user.id } }),
+          (e) => internal(e, 'An unexpected error occurred while deleting the user'),
+        );
+        if (deleteUserResponse.isErr()) throw deleteUserResponse.error;
+        return { success: true };
+      }),
     getCurrentUser: authProcedure.query(async ({ ctx }) => {
       const getUserResponse = await fromThrowableAsync(
         () =>
@@ -57,19 +65,23 @@ export function usersRouter(
             prisma.backtestingShare.count({
               where: { userId: ctx.user.id },
             }),
+            prisma.backtestingShare.count({
+              where: { backtestingResults: { creatorId: ctx.user.id } },
+            }),
           ]),
         (e) => internal(e, 'An unexpected error occurred while retrieving profile statistics'),
       );
       if (getProfileStatsResponse.isErr()) {
         throw getProfileStatsResponse.error;
       }
-      const [numberOfAlgorithms, numberOfBacktestingResults, numberOfBacktestingShares] =
+      const [numberOfAlgorithms, numberOfBacktestingResults, numberOfBacktestingShares, numberOfBacktestingSharesSent] =
         getProfileStatsResponse.value;
 
       return {
         numberOfAlgorithms,
         numberOfBacktestingResults,
         numberOfBacktestingShares,
+        numberOfBacktestingSharesSent,
       };
     }),
     updateProfile: authProcedure

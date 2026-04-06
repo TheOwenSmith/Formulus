@@ -60,7 +60,11 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
 
   // Convert DB algorithm versions to the worker algorithm types
   const algorithms = submission.algorithmVersions.map(convertAlgorithmVersionToUserAlgorithm);
-  const algorithmIds = submission.algorithmVersions.map((v) => v.algorithmId);
+  // algorithmId may be null if the source algorithm was deleted after submission;
+  // filter to only IDs that still exist so the results can still be stored.
+  const algorithmIds = submission.algorithmVersions
+    .map((v) => v.algorithmId)
+    .filter((id): id is string => id != null);
 
   // Track first progress tick to transition message from "Preparing..." to "Running..."
   let isFirstProgress = true;

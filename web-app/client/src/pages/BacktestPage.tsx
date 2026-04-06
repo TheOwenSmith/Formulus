@@ -1,4 +1,5 @@
 import { AlgorithmResultCard } from '@client/components/AlgorithmResultCard';
+import { ShareModal } from '@client/components/ShareModal';
 import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/index';
 import { trpcCredentials } from '@client/lib/trpc';
 import '@client/styles/BacktestPage.css';
@@ -222,6 +223,11 @@ export function BacktestPage() {
     return map;
   }, [algorithmVersions]);
   const [copyModalVersion, setCopyModalVersion] = useState<AlgorithmVersionSnapshot | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+
+  const { data: access } = useQuery(
+    trpcCredentials.sharing.getResultAccess.queryOptions({ publicId }),
+  );
 
   // Get default ticker by aggregate
   const defaultTickerByAggregate = useMemo<Record<Timestamp, Ticker>>(() => {
@@ -738,9 +744,29 @@ export function BacktestPage() {
         >
           Backtesting Performance Analysis
         </h1>
-        {name && (
-          <p className="text-white/50 text-base mt-1">{name}</p>
-        )}
+        <div className="mt-2 flex items-center justify-center gap-3">
+          {name && <p className="text-white/50 text-base">{name}</p>}
+          <button
+            type="button"
+            onClick={() => setShareModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] hover:border-white/25 text-white/55 hover:text-white/85 transition-all duration-200 cursor-pointer shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+              />
+            </svg>
+            {access?.isOwner === false ? 'Sharing info' : 'Share'}
+            {access?.isPublic && (
+              <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/8 border border-white/10 text-white/35">
+                Public
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Fixed position toggle button - only show when there are 2+ algorithms */}
@@ -1019,7 +1045,7 @@ export function BacktestPage() {
                       index={originalIndex}
                       isDragging={draggedAlgorithm === algorithmName}
                       isSideBySideMode={isSideBySideMode}
-                      onCopyVersion={versionByName.has(algorithmName) ? () => setCopyModalVersion(versionByName.get(algorithmName)!) : undefined}
+                      onCopyVersion={versionByName.has(algorithmName) && (access?.canCopy ?? false) ? () => setCopyModalVersion(versionByName.get(algorithmName)!) : undefined}
                       onDragEnd={handleDragEnd}
                       onDragStart={() => handleDragStart(algorithmName)}
                       tickerPlotByTicker={data.tickerPlotByAggregateByTicker[aggregate]}
@@ -1092,6 +1118,13 @@ export function BacktestPage() {
         version={copyModalVersion}
         resultPublicId={publicId}
         onClose={() => setCopyModalVersion(null)}
+      />
+    )}
+    {shareModalOpen && (
+      <ShareModal
+        publicId={publicId}
+        isOwner={access?.isOwner ?? false}
+        onClose={() => setShareModalOpen(false)}
       />
     )}
     </>

@@ -5,6 +5,7 @@ import { sqs } from '@api/lib/sqs';
 import { type TRPCContext } from '@api/lib/trpc';
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
 import { retrieveBacktestingResultsByPublicId } from '@api/repository/db-backtesting-results';
+import { getResultAccessInfo } from '@api/repository/db-sharing';
 import {
   cancelSubmission,
   clearSubmissionError,
@@ -163,7 +164,10 @@ export function backtestingRouter(
 
     getAlgorithmVersionsForResult: authProcedure
       .input(z.object({ publicId: z.string() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        const accessResult = await getResultAccessInfo(input.publicId, ctx.user.id);
+        if (accessResult.isErr()) throw accessResult.error;
+        if (accessResult.value == null || !accessResult.value.canCopy) return [];
         const result = await getAlgorithmVersionsByResultPublicId(input.publicId);
         if (result.isErr()) throw result.error;
         return result.value;
@@ -175,9 +179,10 @@ export function backtestingRouter(
           publicId: z.string(),
         }),
       )
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const retrievedBacktestingResultsResponse = await retrieveBacktestingResultsByPublicId(
           input.publicId,
+          ctx.user.id,
         );
         if (retrievedBacktestingResultsResponse.isErr()) {
           throw retrievedBacktestingResultsResponse.error;

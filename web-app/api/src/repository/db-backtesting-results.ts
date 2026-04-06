@@ -8,6 +8,7 @@ import { err, ok, type Result } from 'neverthrow';
 
 export async function retrieveBacktestingResultsByPublicId(
   publicId: string,
+  userId: string,
 ): Promise<Result<BacktestAlgorithmsResult | null, AppError>> {
   const getBacktestingResultsResponse = await fromThrowableAsync(
     () =>
@@ -18,6 +19,7 @@ export async function retrieveBacktestingResultsByPublicId(
         include: {
           algorithmGraphs: true,
           tickerPlots: true,
+          shares: { where: { userId }, select: { userId: true } },
         },
       }),
     (e) => internal(e),
@@ -27,6 +29,13 @@ export async function retrieveBacktestingResultsByPublicId(
   }
   const dbBacktestingResults = getBacktestingResultsResponse.value;
   if (dbBacktestingResults == null) {
+    return ok(null);
+  }
+
+  // Access control: owner, explicit share recipient, or public result
+  const isOwner = dbBacktestingResults.creatorId === userId;
+  const hasShare = dbBacktestingResults.shares.length > 0;
+  if (!isOwner && !dbBacktestingResults.isPublic && !hasShare) {
     return ok(null);
   }
 

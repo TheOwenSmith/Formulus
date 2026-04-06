@@ -24,6 +24,7 @@ export function ProfilePage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteBacktests, setDeleteBacktests] = useState(false);
 
   useEffect(() => {
     if (getUserApiResponse != undefined) {
@@ -94,6 +95,10 @@ export function ProfilePage() {
     }),
   );
 
+  const handleDeleteAccountWithChoice = async (withDeleteBacktests: boolean) => {
+    await deleteAccountMutation({ deleteBacktests: withDeleteBacktests });
+  };
+
   // Sign out handler
   const handleSignOut = async () => {
     try {
@@ -149,10 +154,6 @@ export function ProfilePage() {
       toast.error('Failed to read image file');
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleDeleteAccount = async () => {
-    await deleteAccountMutation();
   };
 
   const formatDate = (dateString: string | Date | undefined) => {
@@ -445,6 +446,7 @@ export function ProfilePage() {
                 </svg>
               </div>
             ) : (
+              <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-2">
@@ -518,6 +520,33 @@ export function ProfilePage() {
                   </p>
                 </div>
               </div>
+
+              <div className="flex justify-center">
+                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300 w-full md:w-1/3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/30 flex items-center justify-center">
+                      <svg
+                        className="w-5 h-5 text-orange-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d={SHARE}
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-white/60 text-sm font-medium">Shared by Me</h3>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+                    {profileStats?.numberOfBacktestingSharesSent ?? 0}
+                  </p>
+                </div>
+              </div>
+              </div>
             )}
           </div>
 
@@ -544,7 +573,7 @@ export function ProfilePage() {
 
               {!showDeleteConfirm ? (
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
+                  onClick={() => { setShowDeleteConfirm(true); setDeleteBacktests(false); }}
                   className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 border-red-500/30 hover:border-red-500/50 text-white"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -558,13 +587,51 @@ export function ProfilePage() {
                   <span>Delete Account</span>
                 </button>
               ) : (
-                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-4">
+                <div className="p-5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-4">
                   <p className="text-red-400 font-medium">
                     Are you sure you want to delete your account? This action cannot be undone.
                   </p>
+
+                  <div className="space-y-2">
+                    <p className="text-white/60 text-sm font-medium">What should happen to your backtesting results?</p>
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition-all duration-200">
+                      <input
+                        type="radio"
+                        name="deleteBacktests"
+                        checked={!deleteBacktests}
+                        onChange={() => setDeleteBacktests(false)}
+                        className="mt-0.5 accent-blue-500"
+                        disabled={deleteAccountIsPending}
+                      />
+                      <div>
+                        <p className="text-white/90 text-sm font-medium">Keep my backtests</p>
+                        <p className="text-white/50 text-xs mt-0.5">
+                          Results remain accessible via their links, but will no longer have an owner.
+                          You will have no control over them once your account is deleted.
+                        </p>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition-all duration-200">
+                      <input
+                        type="radio"
+                        name="deleteBacktests"
+                        checked={deleteBacktests}
+                        onChange={() => setDeleteBacktests(true)}
+                        className="mt-0.5 accent-red-500"
+                        disabled={deleteAccountIsPending}
+                      />
+                      <div>
+                        <p className="text-white/90 text-sm font-medium">Delete all my backtests</p>
+                        <p className="text-white/50 text-xs mt-0.5">
+                          All results, graphs, and shared data are permanently removed.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
                   <div className="flex gap-3">
                     <button
-                      onClick={handleDeleteAccount}
+                      onClick={() => handleDeleteAccountWithChoice(deleteBacktests)}
                       disabled={deleteAccountIsPending}
                       className="flex-1 px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >

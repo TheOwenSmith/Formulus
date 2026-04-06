@@ -11,7 +11,7 @@ import {
 } from '@shared/api';
 import { ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@shared/constants';
 import { tickers as TICKERS, type Timestamp } from '@shared/trading-constants';
-import { type AnyUserAlgorithmType, type SupportedLanguage } from '@shared/worker';
+import type { AnyUserAlgorithmType, SupportedLanguage } from '@shared/worker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

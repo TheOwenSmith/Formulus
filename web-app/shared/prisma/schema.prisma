@@ -151,8 +151,10 @@ model AlgorithmVersion {
   k Int?
   language SupportedLanguage
 
-  algorithm Algorithm @relation("AlgorithmVersions", fields: [algorithmId], references: [id], onDelete: Cascade)
-  algorithmId String
+  // Nullable so that deleting an algorithm does not cascade-delete version snapshots,
+  // preserving the ability to copy algorithm code from historical backtest results.
+  algorithm Algorithm? @relation("AlgorithmVersions", fields: [algorithmId], references: [id], onDelete: SetNull)
+  algorithmId String?
 
   submission BacktestingSubmission @relation("AlgorithmVersionBacktestingSubmissions", fields: [submissionId], references: [id], onDelete: Cascade)
   submissionId String
@@ -165,14 +167,18 @@ model BacktestingResults {
   publicId String @unique @db.VarChar(12)
   createdAt DateTime @default(now())
 
+  isPublic Boolean @default(false)
+
   algorithmGraphs AlgorithmGraph[] @relation("BacktestingResultsAlgorithmGraph")
   tickerPlots TickerPlot[] @relation("BacktestingResultsTickerPlot")
   timestampsByAggregate Json @db.Json
 
   algorithms Algorithm[] @relation("AlgorithmBacktestingResults")
 
-  creator User @relation("UserBacktestingResults", fields: [creatorId], references: [id], onDelete: Cascade)
-  creatorId String
+  // Nullable so that deleting a user account can optionally orphan results rather than
+  // cascade-deleting them, giving users the choice to preserve their backtest history.
+  creator User? @relation("UserBacktestingResults", fields: [creatorId], references: [id], onDelete: SetNull)
+  creatorId String?
 
   shares BacktestingShare[] @relation("BacktestingResultsShare")
 
@@ -233,6 +239,8 @@ model TickerPlot {
 
 model BacktestingShare {
   createdAt DateTime @default(now())
+  allowCopy Boolean @default(false)
+  dismissedByRecipient Boolean @default(false)
 
   user User @relation("UserBacktestingShare", fields: [userId], references: [id], onDelete: Cascade)
   userId String

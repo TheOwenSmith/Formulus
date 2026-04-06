@@ -13,6 +13,7 @@ import { ErrorPage } from './pages/ErrorPage';
 import { LoginPage } from './pages/LoginPage';
 import { PhoenixPositionManagementPdfRedirect } from './pages/PhoenixPositionManagementPdfRedirect';
 import { ProfilePage } from './pages/ProfilePage';
+import { SharedPage } from './pages/SharedPage';
 import { SubmissionsPage } from './pages/SubmissionsPage';
 
 export const router = createBrowserRouter([
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
           {
             path: '/backtests',
             element: <SubmissionsPage />,
+          },
+          {
+            path: '/shared',
+            element: <SharedPage />,
           },
           {
             path: '/backtest/:publicId',

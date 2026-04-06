@@ -8,6 +8,7 @@ import {
   uploadAlgorithm,
 } from '@api/repository/db-algorithm';
 import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
+import { getResultAccessInfo } from '@api/repository/db-sharing';
 import { badRequest } from '@api/utils/error-handling';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import {
@@ -43,6 +44,13 @@ export function algorithmsRouter(
       .mutation(async ({ ctx, input }) => {
         const { user } = ctx;
         const { name, resultPublicId, versionId } = input;
+
+        // Verify copy access: owner or explicit share with allowCopy
+        const accessResult = await getResultAccessInfo(resultPublicId, user.id);
+        if (accessResult.isErr()) throw accessResult.error;
+        if (accessResult.value == null || !accessResult.value.canCopy) {
+          throw badRequest('You do not have permission to copy algorithms from this result');
+        }
 
         // Get algorithm version
         const versionsResult = await getAlgorithmVersionsByResultPublicId(resultPublicId);

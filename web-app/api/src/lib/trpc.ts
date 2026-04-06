@@ -1,6 +1,7 @@
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
 import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
+import { sharingRouter } from '@api/routes/sharing';
 import { usersRouter } from '@api/routes/users';
 import { initTRPC } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
@@ -41,6 +42,7 @@ export const appRouter = t.router({
   backtesting: backtestingRouter(router, authProcedure),
   env: t.procedure.query(() => config.env),
   heartbeat: t.procedure.query(() => true),
+  sharing: sharingRouter(router, authProcedure),
   thisIsAnError: t.procedure.query(() => {
     throw {
       message: 'This is an error',

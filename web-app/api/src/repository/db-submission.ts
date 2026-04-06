@@ -53,7 +53,7 @@ export async function getSubmissionsByCreatorId(
   if (result.isErr()) return err(result.error);
   return ok(
     result.value.map((s) => ({
-      algorithmIds: s.algorithmVersions.map((v) => v.algorithmId),
+      algorithmIds: s.algorithmVersions.map((v) => v.algorithmId).filter((id): id is string => id != null),
       algorithmNames: s.algorithmVersions.map((v) => v.name),
       createdAt: s.createdAt,
       endTimespan: s.endTimespan,
