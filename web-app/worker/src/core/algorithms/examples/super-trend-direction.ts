@@ -1,4 +1,5 @@
 import type { Bar, Ticker } from '@shared/api';
+import { SUPER_TREND_DIRECTION_CODE } from '@shared/examples';
 import { Action, type MarketInvariantAlgorithm } from '@worker/core/algorithms/algorithm';
 import type { IndicatorResultByIndicator } from '@worker/core/algorithms/indicators/indicator';
 import { Direction } from '@worker/core/algorithms/indicators/super-trend';
@@ -24,72 +25,7 @@ export const superTrendDirectionAlgorithm: MarketInvariantAlgorithm = {
   },
 };
 
-const superTrendDirectionUserAlgorithmImplementationCodeByLanguage: Record<
-  SupportedLanguage,
-  string
-> = {
-  cpp: `
-#include "utils.hpp"
-#include <map>
-#include <string>
-#include <vector>
-
-std::map<std::string, int> implementation(
-    std::map<std::string, std::vector<std::vector<double>>> context,
-    std::map<std::string, double> _positions,
-    std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>> indicators
-) {
-    std::map<std::string, int> result;
-    for (auto& [ticker, bars] : context) {
-        auto& st = indicators[ticker]["SuperTrend(10,3)"].back();
-        int direction = st["direction"];
-        result[ticker] = (direction == Direction::UP) ? Action::BUY : Action::SELL;
-    }
-    return result;
-}
-`,
-  javascript: `
-const { Action, Direction } = require('./utils.js');
-
-function implementation(context, _positions, indicators) {
-  const result = {};
-  for (const ticker in context) {
-    const { direction } = indicators[ticker]['SuperTrend(10,3)'].at(-1);
-    result[ticker] = direction === Direction.UP ? Action.BUY : Action.SELL;
-  }
-  return result;
-}
-
-module.exports = implementation;
-`,
-  python: `
-from utils import Action, Direction
-
-def implementation(context, _positions, indicators):
-    result = {}
-    for ticker in context:
-        super_trend = indicators[ticker]['SuperTrend(10,3)'][-1]
-        direction = super_trend['direction']
-        result[ticker] = Action.BUY if direction == Direction.UP else Action.SELL
-    return result
-`,
-  typescript: `
-import { Action, Direction, type Bar, type Ticker } from './utils';
-
-export function implementation(
-  context: Record<Ticker, Bar[]>,
-  _positions: Record<Ticker, number>,
-  indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>
-): Record<Ticker, Action> {
-  const result = {} as Record<Ticker, Action>;
-  for (const ticker in context) {
-    const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;
-    result[ticker] = direction === Direction.UP ? Action.BUY : Action.SELL;
-  }
-  return result;
-}
-`,
-};
+const superTrendDirectionUserAlgorithmImplementationCodeByLanguage = SUPER_TREND_DIRECTION_CODE;
 export const superTrendDirectionUserAlgorithmBase: Omit<
   UserAlgorithm,
   'language' | 'userAlgorithmImplementationCode'

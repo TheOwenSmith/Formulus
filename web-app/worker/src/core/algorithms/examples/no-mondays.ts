@@ -1,4 +1,5 @@
 import type { Bar } from '@shared/api';
+import { NO_MONDAYS_CODE } from '@shared/examples';
 import { Action } from '@worker/core/algorithms/algorithm';
 import { dayOfWeek } from '@worker/core/algorithms/indicators/day-of-week';
 import type { IndicatorResultByIndicator } from '@worker/core/algorithms/indicators/indicator';
@@ -24,52 +25,7 @@ export const noMondaysAlgorithm: SimpleMarketInvariantAlgorithm = {
   name: 'No Mondays',
 };
 
-const noMondaysUserAlgorithmImplementationCodeByLanguage: Record<SupportedLanguage, string> = {
-  cpp: `
-#include "utils.hpp"
-
-int implementation(std::vector<std::vector<double>> context) {
-    long long timestamp = static_cast<long long>(context[0][0]);
-    if (day_of_week(timestamp) == "Monday") {
-        return Action::SELL;
-    }
-    return Action::BUY;
-}
-`,
-  javascript: `
-const { Action, dayOfWeek } = require('./utils.js');
-
-function implementation(context, _positions, _indicators) {
-  const timestamp = context[0][0];
-  if (dayOfWeek(timestamp) === 'Monday') {
-    return Action.SELL;
-  }
-  return Action.BUY;
-}
-
-module.exports = implementation;
-`,
-  python: `
-from utils import Action, day_of_week
-
-def implementation(context, _positions, _indicators):
-    timestamp = context[0][0]
-    if day_of_week(timestamp) == 'Monday':
-      return Action.SELL
-    return Action.BUY
-`,
-  typescript: `
-import { Action, dayOfWeek, type Bar } from './utils';
-
-export function implementation(context: Bar[]): Action {
-  const timestamp = context[0][0];
-  if (dayOfWeek(timestamp) === 'Monday') {
-    return Action.SELL;
-  }
-  return Action.BUY;
-}
-`,
-};
+const noMondaysUserAlgorithmImplementationCodeByLanguage = NO_MONDAYS_CODE;
 
 export const noMondaysUserAlgorithmBase: Omit<
   UserSimpleAlgorithm,

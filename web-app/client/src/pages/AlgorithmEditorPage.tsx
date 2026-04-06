@@ -1,3 +1,4 @@
+import { ExamplesModal } from '@client/components/ExamplesModal';
 import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { AlgorithmType } from '@shared/api';
@@ -83,6 +84,148 @@ function getTickers(algorithm: AnyUserAlgorithmType): string[] {
   return (algorithm as { tickers: string[] }).tickers;
 }
 
+// ─── Monaco type declarations for ./utils module ──────────────────────────────
+
+const UTILS_TYPE_DECLARATION = `
+declare module './utils' {
+  /**
+   * A market bar tuple: [timestamp, open, high, low, close, volume]
+   *   bar[0] = ISO timestamp string
+   *   bar[1] = open price
+   *   bar[2] = high price
+   *   bar[3] = low price
+   *   bar[4] = close price
+   *   bar[5] = volume
+   */
+  export type Bar = [
+    timestamp: string,
+    open: number,
+    high: number,
+    low: number,
+    close: number,
+    volume: number,
+  ];
+
+  /** A stock ticker symbol, e.g. 'SPY', 'AAPL' */
+  export type Ticker = string;
+
+  /** Trading action returned by your implementation function */
+  export enum Action {
+    /** Buy the asset (or increase position) */
+    BUY = 0,
+    /** Sell the asset (or decrease position) */
+    SELL = 1,
+    /** Hold current position unchanged */
+    HOLD = 2,
+  }
+
+  /** SuperTrend direction */
+  export enum Direction {
+    /** Price is above the SuperTrend line (uptrend) */
+    UP = 0,
+    /** Price is below the SuperTrend line (downtrend) */
+    DOWN = 1,
+  }
+
+  /**
+   * Returns the day of the week name for a bar timestamp.
+   * @param timestamp ISO timestamp string from bar[0], e.g. "2024-01-15T10:00:00Z"
+   * @returns Day name, e.g. 'Monday', 'Tuesday', ...
+   *
+   * @example
+   * const timestamp = context[0][0];
+   * if (dayOfWeek(timestamp) === 'Monday') return Action.SELL;
+   */
+  export function dayOfWeek(
+    timestamp: string,
+  ): 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+}
+
+/**
+ * Maps indicator strings to their computed result types.
+ *
+ * SMA(n), EMA(n), RSI(n), ATR(n)  →  (number | null)[]
+ *   Access: indicators[ticker]['SMA(20)']!.at(-1)!
+ *
+ * LinearRegression(n)  →  { slope: number; intercept: number }
+ *   Access: const { slope, intercept } = indicators[ticker]['LinearRegression(50)']!;
+ *
+ * SuperTrend(n,m)  →  ({ superTrendValue: number; direction: number } | null)[]
+ *   Access: const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;
+ *   Compare direction to Direction.UP (0) or Direction.DOWN (1).
+ */
+declare interface IndicatorResultByIndicator {
+  [key: \`SMA(\${number})\`]: (number | null)[];
+  [key: \`EMA(\${number})\`]: (number | null)[];
+  [key: \`RSI(\${number})\`]: (number | null)[];
+  [key: \`ATR(\${number})\`]: (number | null)[];
+  [key: \`LinearRegression(\${number})\`]: { slope: number; intercept: number };
+  [key: \`SuperTrend(\${number},\${number})\`]: ({ superTrendValue: number; direction: number } | null)[];
+}
+`;
+
+// ─── Indicators reference data ────────────────────────────────────────────────
+
+type IndicatorRef = {
+  name: string;
+  fullName: string;
+  description: string;
+  returns: string;
+  example: string;
+  url: string;
+};
+
+const INDICATORS_REF: IndicatorRef[] = [
+  {
+    name: 'SMA(n)',
+    fullName: 'Simple Moving Average',
+    description: 'Average closing price over the last n bars.',
+    returns: '(number | null)[]',
+    example: "const sma = indicators[ticker]['SMA(20)']!.at(-1)!;",
+    url: 'https://www.investopedia.com/terms/s/sma.asp',
+  },
+  {
+    name: 'EMA(n)',
+    fullName: 'Exponential Moving Average',
+    description: 'Weighted average giving more weight to recent prices.',
+    returns: '(number | null)[]',
+    example: "const ema = indicators[ticker]['EMA(12)']!.at(-1)!;",
+    url: 'https://www.investopedia.com/terms/e/ema.asp',
+  },
+  {
+    name: 'RSI(n)',
+    fullName: 'Relative Strength Index',
+    description: 'Momentum oscillator ranging 0-100. Below 30 = oversold, above 70 = overbought.',
+    returns: '(number | null)[]',
+    example: "const rsi = indicators[ticker]['RSI(14)']!.at(-1)!;\nif (rsi < 30) result[ticker] = Action.BUY;",
+    url: 'https://www.investopedia.com/terms/r/rsi.asp',
+  },
+  {
+    name: 'ATR(n)',
+    fullName: 'Average True Range',
+    description: 'Measures market volatility. Higher value = larger price swings.',
+    returns: '(number | null)[]',
+    example: "const atr = indicators[ticker]['ATR(14)']!.at(-1)!;",
+    url: 'https://www.investopedia.com/terms/a/atr.asp',
+  },
+  {
+    name: 'LinearRegression(n)',
+    fullName: 'Linear Regression',
+    description: 'Fits a trend line over n bars. Returns slope and intercept.',
+    returns: '{ slope: number; intercept: number }',
+    example: "const { slope, intercept } = indicators[ticker]['LinearRegression(50)']!;\nconst value = slope * 49 + intercept; // value at last bar",
+    url: 'https://www.investopedia.com/terms/r/regression.asp',
+  },
+  {
+    name: 'SuperTrend(n,m)',
+    fullName: 'SuperTrend',
+    description: 'Trend-following indicator. direction: UP (0) or DOWN (1). Multiply m controls sensitivity.',
+    returns: '({ superTrendValue: number; direction: number } | null)[]',
+    example: "const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;\nif (direction === Direction.UP) result[ticker] = Action.BUY;",
+    url: 'https://www.investopedia.com/supertrend-indicator-7976167',
+  },
+];
+
 // ─── Spinner ──────────────────────────────────────────────────────────────────
 
 function Spinner({ size = 4 }: { size?: number }) {
@@ -127,14 +270,90 @@ function InfoRow({
   );
 }
 
+function IndicatorReferenceSection() {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  return (
+    <div className="p-5 border-t border-white/[0.07]">
+      <div className="flex items-center gap-2 mb-3">
+        <svg className="w-3.5 h-3.5 text-white/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Indicators</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {INDICATORS_REF.map((ind) => {
+          const isOpen = expanded === ind.name;
+          return (
+            <div key={ind.name}>
+              <button
+                type="button"
+                onClick={() => setExpanded(isOpen ? null : ind.name)}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-white/[0.05] transition-colors text-left cursor-pointer group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-mono text-violet-300 shrink-0">{ind.name}</span>
+                  <span className="text-[10px] text-white/35 truncate">{ind.fullName}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                  <a
+                    href={ind.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`${ind.fullName} on Investopedia`}
+                    className="text-white/20 hover:text-blue-400 transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <svg
+                    className={`w-3 h-3 text-white/25 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+
+              {isOpen && (
+                <div className="mx-2 mb-1 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07] text-[10px] space-y-2">
+                  <p className="text-white/60 leading-relaxed">{ind.description}</p>
+                  <div>
+                    <span className="text-white/30 uppercase tracking-wider text-[9px]">Returns</span>
+                    <p className="font-mono text-violet-300/80 mt-0.5">{ind.returns}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/30 uppercase tracking-wider text-[9px]">Example</span>
+                    <pre className="font-mono text-emerald-300/70 mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
+                      {ind.example}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LeftPanel({
   algorithm,
   submissions,
   onCancel,
+  onOpenExamples,
 }: {
   algorithm: AlgorithmWithId;
   submissions: SubmissionSummary[];
   onCancel: (publicId: string) => void;
+  onOpenExamples: () => void;
 }) {
   const navigate = useNavigate();
   const tickers = getTickers(algorithm);
@@ -158,7 +377,7 @@ function LeftPanel({
       </div>
 
       {/* Info rows */}
-      <div className="p-5 flex-1">
+      <div className="p-5">
         <InfoRow
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,6 +453,24 @@ function LeftPanel({
         />
       </div>
 
+      {/* Indicators reference */}
+      <IndicatorReferenceSection />
+
+      {/* Examples button */}
+      <div className="px-5 pb-4">
+        <button
+          type="button"
+          onClick={onOpenExamples}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white/50 hover:text-white/80 transition-all text-xs cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Browse Examples
+        </button>
+      </div>
+
       {/* Past Runs */}
       {pastRuns.length > 0 && (
         <div className="p-5 border-t border-white/[0.07]">
@@ -285,24 +522,6 @@ function LeftPanel({
           </div>
         </div>
       )}
-
-      {/* Docs hint */}
-      <div className="p-5 border-t border-white/[0.07]">
-        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-xs font-semibold text-blue-300">Getting started</span>
-          </div>
-          <p className="text-xs text-white/45 leading-relaxed">
-            Your function receives market context and positions. Return{' '}
-            {algorithm.type === AlgorithmType.SIMPLE ? 'BUY, SELL, or HOLD' : 'a record of actions by ticker'}{' '}
-            on each bar.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -359,6 +578,7 @@ export function AlgorithmEditorPage() {
   );
 
   const [showRunModal, setShowRunModal] = useState(false);
+  const [showExamples, setShowExamples] = useState(false);
 
   const isRunning = isPendingIds.has(algorithm.id) && cooldownSecondsLeft > 0;
   const isBacktestDisabled = isRunning || cooldownSecondsLeft > 0;
@@ -375,6 +595,8 @@ export function AlgorithmEditorPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDirty, isSaving, code, algorithm.id, saveCode]);
+
+  const monacoPath = `algorithm.${getExtension(algorithm.language as SupportedLanguage)}`;
 
   return (
     <>
@@ -484,6 +706,7 @@ export function AlgorithmEditorPage() {
             algorithm={algorithm}
             submissions={submissions}
             onCancel={(publicId) => cancelBacktest({ publicId })}
+            onOpenExamples={() => setShowExamples(true)}
           />
         </div>
 
@@ -505,8 +728,36 @@ export function AlgorithmEditorPage() {
               height="100%"
               language={MONACO_LANG[algorithm.language as SupportedLanguage] ?? 'javascript'}
               value={code}
+              path={monacoPath}
               onChange={(value) => setCode(value ?? '')}
               theme="vs-dark"
+              beforeMount={(monaco) => {
+                // Inject ./utils type declarations for TypeScript and JavaScript
+                monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                  target: monaco.languages.typescript.ScriptTarget.ESNext,
+                  module: monaco.languages.typescript.ModuleKind.ESNext,
+                  moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                  strict: false,
+                  noUnusedLocals: false,
+                  noUnusedParameters: false,
+                  allowJs: true,
+                });
+                monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                  target: monaco.languages.typescript.ScriptTarget.ESNext,
+                  module: monaco.languages.typescript.ModuleKind.CommonJS,
+                  moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                  allowJs: true,
+                  checkJs: false,
+                });
+                monaco.languages.typescript.typescriptDefaults.addExtraLib(
+                  UTILS_TYPE_DECLARATION,
+                  'file:///utils.d.ts',
+                );
+                monaco.languages.typescript.javascriptDefaults.addExtraLib(
+                  UTILS_TYPE_DECLARATION,
+                  'file:///utils.d.ts',
+                );
+              }}
               options={{
                 fontSize: 14,
                 fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
@@ -534,6 +785,19 @@ export function AlgorithmEditorPage() {
           setShowRunModal(false);
         }}
         onClose={() => setShowRunModal(false)}
+      />
+    )}
+
+    {showExamples && (
+      <ExamplesModal
+        algorithmType={algorithm.type as 0 | 1 | 2}
+        language={algorithm.language as SupportedLanguage}
+        onLoad={(exampleCode) => {
+          setCode(exampleCode.trim());
+          setShowExamples(false);
+          toast.success('Example loaded — remember to save when ready');
+        }}
+        onClose={() => setShowExamples(false)}
       />
     )}
     </>
