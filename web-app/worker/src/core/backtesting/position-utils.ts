@@ -11,6 +11,7 @@ export function updatePosition({
   algorithmMaxHoldingProportion,
   algorithmTickers,
   priceByTicker,
+  sharePrecisionNumberOfDecimals,
   slippageByTicker,
   ticks,
 }: {
@@ -19,6 +20,7 @@ export function updatePosition({
   algorithmMaxHoldingProportion: number;
   algorithmTickers: Ticker[];
   priceByTicker: Record<Ticker, number>;
+  sharePrecisionNumberOfDecimals: number;
   slippageByTicker: Record<Ticker, number>;
   ticks: number;
 }): Result<undefined, AppError> {
@@ -73,40 +75,45 @@ export function updatePosition({
     });
   }
 
+  // Round factor
+  const factor = Math.pow(10, sharePrecisionNumberOfDecimals);
+
   // Adjust holding
   for (const ticker of h) {
     const sharesOwned = algorithmData.positions[ticker];
     const positionSize = priceByTicker[ticker] * sharesOwned;
     const deltaPositionSize = k - positionSize;
     const slippage = slippageByTicker[ticker] / 10_000;
+    const deltaShares = Math.floor((deltaPositionSize / priceByTicker[ticker]) * factor) / factor;
 
     // Update balance
     if (deltaPositionSize > 0) {
       // Buy to correct position
       const slippageFactor = 1 + slippage;
-      const cost = slippageFactor * deltaPositionSize;
+      const cost = slippageFactor * deltaShares * priceByTicker[ticker];
       algorithmData.balance -= cost;
       algorithmData.entracePriceExitPriceByTickerPosition[ticker][0] += cost;
     } else if (deltaPositionSize < 0) {
       // Sell to correct position
       const slippageFactor = 1 - slippage;
-      const profit = slippageFactor * -deltaPositionSize;
+      const profit = slippageFactor * -deltaShares * priceByTicker[ticker];
       algorithmData.balance += profit;
       algorithmData.entracePriceExitPriceByTickerPosition[ticker][1] += profit;
     } else {
       continue;
     }
 
-    algorithmData.positions[ticker] += deltaPositionSize / priceByTicker[ticker];
+    algorithmData.positions[ticker] += deltaShares;
     algorithmData.trades++;
   }
 
   // Buy
   for (const ticker of b) {
     const slippage = slippageByTicker[ticker] / 10_000;
-    algorithmData.positions[ticker] = k / priceByTicker[ticker];
+    const shares = Math.floor((k / priceByTicker[ticker]) * factor) / factor;
+    algorithmData.positions[ticker] += shares;
 
-    const cost = (1 + slippage) * k;
+    const cost = (1 + slippage) * shares * priceByTicker[ticker];
     algorithmData.balance -= cost;
     algorithmData.entracePriceExitPriceByTickerPosition[ticker][0] += cost;
     algorithmData.entraceTimeByTickerPosition[ticker] = ticks;

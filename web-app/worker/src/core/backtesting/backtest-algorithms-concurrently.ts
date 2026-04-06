@@ -77,6 +77,7 @@ export type AlgorithmData = {
 export type BacktestingAlgorithmsConcurrentlyOptions = {
   iteratorStrictParsing?: boolean;
   onProgress?: (pct: number) => void | Promise<void>;
+  sharePrecisionNumberOfDecimals?: number;
   slippageByTicker?: Partial<Record<Ticker, number>>;
   tickerData?: TickerData[];
   verboseLogging?: boolean;
@@ -124,6 +125,7 @@ export async function backtestAlgorithmsConcurrently({
   const {
     iteratorStrictParsing = false,
     onProgress,
+    sharePrecisionNumberOfDecimals = 8,
     slippageByTicker: userInuttedSlippageByTicker,
     tickerData = [],
     verboseLogging = false,
@@ -547,6 +549,7 @@ export async function backtestAlgorithmsConcurrently({
               algorithmMaxHoldingProportion,
               algorithmTickers: tickers,
               priceByTicker,
+              sharePrecisionNumberOfDecimals,
               slippageByTicker,
               ticks,
             });
