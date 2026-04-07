@@ -38,7 +38,7 @@ export function algorithmsRouter(
         z.object({
           name: z
             .string()
-            .min(1)
+            .min(4)
             .max(64)
             .regex(/^[a-zA-Z0-9\-() ]+$/),
           resultPublicId: z.string(),

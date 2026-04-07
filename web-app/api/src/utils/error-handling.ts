@@ -26,14 +26,8 @@ export const appErrorSchema = z
   })
   .strict();
 
-export function isAppError(cause: unknown): cause is AppError {
-  return (
-    typeof cause === 'object' &&
-    cause !== null &&
-    'code' in cause &&
-    typeof (cause as { code: unknown }).code === 'string' &&
-    !('stack' in cause)
-  );
+export function isAppError(x: unknown): x is AppError {
+  return appErrorSchema.safeParse(x).success;
 }
 
 export function internal(error: unknown, message?: string): AppError {

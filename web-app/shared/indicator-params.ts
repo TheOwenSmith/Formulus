@@ -17,7 +17,7 @@ export const maxPeriodByIndicatorByContextLength: Record<
 > = {
   atr: (contextLength) => contextLength - 1,
   ema: (contextLength) => contextLength,
-  linearRegression: (contextLength) => contextLength - 1,
+  linearRegression: (contextLength) => contextLength,
   rsi: (contextLength) => contextLength,
   sma: (contextLength) => contextLength,
   superTrend: (contextLength) => contextLength - 1,

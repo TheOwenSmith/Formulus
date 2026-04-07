@@ -202,21 +202,6 @@ export async function cancelSubmission(
   return ok(result.value.count > 0);
 }
 
-export async function getSubmissionNameByResultPublicId(
-  resultPublicId: string,
-): Promise<Result<string | null, AppError>> {
-  const result = await fromThrowableAsync(
-    () =>
-      prisma.backtestingResults.findUnique({
-        where: { publicId: resultPublicId },
-        select: { submissions: { select: { name: true }, take: 1 } },
-      }),
-    (e) => internal(e, 'Failed to load submission name'),
-  );
-  if (result.isErr()) return err(result.error);
-  return ok(result.value?.submissions[0]?.name ?? null);
-}
-
 export async function deleteSubmission(
   publicId: string,
   creatorId: string,

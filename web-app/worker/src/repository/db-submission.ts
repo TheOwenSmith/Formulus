@@ -6,6 +6,7 @@ import { err, ok, Result } from 'neverthrow';
 
 export type SubmissionWithVersions = {
   id: string;
+  name: string | null;
   publicId: string;
   creatorId: string;
   status: BacktestingSubmissionStatus;
@@ -26,6 +27,7 @@ export async function getSubmissionWithVersions(
           creatorId: true,
           endTimespan: true,
           id: true,
+          name: true,
           publicId: true,
           startTimespan: true,
           status: true,

@@ -12,7 +12,6 @@ import {
   createSubmission,
   deleteSubmission,
   getAlgorithmVersionsByResultPublicId,
-  getSubmissionNameByResultPublicId,
   getSubmissionsByCreatorId,
   getSubmissionStatus,
 } from '@api/repository/db-submission';
@@ -188,14 +187,6 @@ export function backtestingRouter(
           throw retrievedBacktestingResultsResponse.error;
         }
         return retrievedBacktestingResultsResponse.value;
-      }),
-
-    getSubmissionName: authProcedure
-      .input(z.object({ publicId: z.string() }))
-      .query(async ({ input }) => {
-        const result = await getSubmissionNameByResultPublicId(input.publicId);
-        if (result.isErr()) throw result.error;
-        return { name: result.value };
       }),
 
     getSubmissions: authProcedure.query(async ({ ctx }) => {

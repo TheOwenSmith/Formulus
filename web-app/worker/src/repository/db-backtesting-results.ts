@@ -8,11 +8,13 @@ import { ok, type Result } from 'neverthrow';
 export async function createBacktestingResults({
   algorithmIds,
   creatorId,
+  name,
   publicId,
   result,
 }: {
   algorithmIds: string[];
   creatorId: string;
+  name: string | null;
   publicId: string;
   result: BacktestAlgorithmsResult;
 }): Promise<Result<string, AppError>> {
@@ -45,6 +47,7 @@ export async function createBacktestingResults({
           },
           algorithms: { connect: algorithmIds.map((id) => ({ id })) },
           creatorId,
+          name,
           publicId,
           tickerPlots: {
             create: Object.entries(result.tickerPlotByAggregateByTicker).flatMap(

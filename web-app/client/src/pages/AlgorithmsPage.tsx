@@ -343,7 +343,7 @@ export function AlgorithmsPage() {
   return (
     <>
     <div
-      className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 font-sans text-white overflow-hidden flex flex-col"
+      className="bg-slate-900 font-sans text-white overflow-hidden flex flex-col"
       style={{ position: 'fixed', top: HEADER_OFFSET, left: 0, right: 0, bottom: 0 }}
     >
       <div

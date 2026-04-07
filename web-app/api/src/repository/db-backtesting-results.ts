@@ -6,10 +6,12 @@ import type { Timestamp } from '@shared/trading-constants';
 import type { BacktestAlgorithmsResult, ProfitLossRatio, SimplePlot } from '@shared/worker';
 import { err, ok, type Result } from 'neverthrow';
 
+export type BacktestingResultsWithName = BacktestAlgorithmsResult & { name: string | null };
+
 export async function retrieveBacktestingResultsByPublicId(
   publicId: string,
   userId: string,
-): Promise<Result<BacktestAlgorithmsResult | null, AppError>> {
+): Promise<Result<BacktestingResultsWithName | null, AppError>> {
   const getBacktestingResultsResponse = await fromThrowableAsync(
     () =>
       prisma.backtestingResults.findUnique({
@@ -39,7 +41,8 @@ export async function retrieveBacktestingResultsByPublicId(
     return ok(null);
   }
 
-  const formattedBacktestingResults: BacktestAlgorithmsResult = {
+  const formattedBacktestingResults: BacktestingResultsWithName = {
+    name: dbBacktestingResults.name,
     algorithmGraphs: dbBacktestingResults.algorithmGraphs.map((algorithmGraph) => ({
       aggregate: convertDbTimestampToTimestamp(algorithmGraph.aggregate),
       descriptionMetrics: {

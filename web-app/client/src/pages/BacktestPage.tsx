@@ -211,9 +211,8 @@ function CopyAlgorithmModal({
 }
 
 export function BacktestPage() {
-  const { data, publicId } = useLoaderData<{ data: BacktestAlgorithmsResult; publicId: string }>();
-  const { data: nameResult } = useQuery(trpcCredentials.backtesting.getSubmissionName.queryOptions({ publicId }));
-  const name = nameResult?.name ?? null;
+  const { data, publicId } = useLoaderData<{ data: BacktestAlgorithmsResult & { name: string | null }; publicId: string }>();
+  const name = data.name;
   const { data: algorithmVersions } = useQuery(
     trpcCredentials.backtesting.getAlgorithmVersionsForResult.queryOptions({ publicId }),
   );

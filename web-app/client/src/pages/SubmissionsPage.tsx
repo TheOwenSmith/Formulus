@@ -794,7 +794,7 @@ export function SubmissionsPage() {
   return (
     <>
       <div
-        className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 font-sans text-white overflow-hidden flex flex-col"
+        className="bg-slate-900 font-sans text-white overflow-hidden flex flex-col"
         style={{ bottom: 0, left: 0, position: 'fixed', right: 0, top: HEADER_OFFSET }}
       >
         <div

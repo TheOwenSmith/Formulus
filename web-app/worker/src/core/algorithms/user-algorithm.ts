@@ -19,7 +19,7 @@ export enum AlgorithmType {
 
 export const userAlgorithmNameSchema = z
   .string()
-  .min(1)
+  .min(4)
   .max(64)
   .superRefine((name, ctx) => {
     if (!/^[a-zA-Z0-9\-() ]+$/.test(name)) {

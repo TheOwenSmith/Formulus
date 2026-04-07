@@ -1,5 +1,4 @@
 import { queryClient, trpcCredentials } from '@client/lib/trpc';
-import type { BacktestAlgorithmsResult } from '@shared/worker';
 import type { LoaderFunctionArgs } from 'react-router-dom';
 
 export async function backtestLoader({ params }: LoaderFunctionArgs) {
@@ -9,7 +8,7 @@ export async function backtestLoader({ params }: LoaderFunctionArgs) {
     trpcCredentials.backtesting.getBacktestingResults.queryOptions(
       { publicId },
       {
-        select: (data: BacktestAlgorithmsResult | null) =>
+        select: (data) =>
           data != null
             ? {
                 ...data,

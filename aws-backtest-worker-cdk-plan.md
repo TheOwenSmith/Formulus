@@ -95,6 +95,30 @@ Use **cross-stack references** (SSM or `export`/`import`) for queue URL, cluster
 
 **Entry point change (application, not CDK):** replace infinite `while(true) { ReceiveMessage }` loop with **“run single `submissionId` from env then exit”** so each Fargate task is one job. CDK/IaC only *starts* tasks; the **task lifecycle** is the billing unit.
 
+### 3.5 Market data (tick files)
+
+Your backtests read historical market data (tick/bar files). In cloud, you need a storage option that every Fargate task can access.
+
+If you do **not care about partitioning**, you have two straightforward choices:
+
+- **Option A: S3 as the source of truth (simplest infrastructure)**
+  - Store large files in S3 (for example, one file per ticker/timeframe, even if it contains 10 years).
+  - Each Fargate task downloads or streams the files it needs and filters to the requested time window in-process (for example, 3 years out of 10).
+  - **Tradeoff**: tasks may repeatedly read large objects, which can increase runtime and S3 data transfer cost.
+  - CDK/IAM: grant the task role `s3:GetObject` (and possibly `s3:ListBucket` for a fixed prefix).
+  - Networking: prefer an **S3 VPC gateway endpoint** to avoid NAT data charges if tasks run in private subnets.
+
+- **Option B: EFS mounted into Fargate tasks (avoids repeated downloads)**
+  - Put the dataset onto EFS once and mount it into each backtest task (read-only is typical).
+  - Fargate tasks read files like local disk and filter to the time window in-process.
+  - **Tradeoff**: EFS has ongoing cost and requires VPC mount targets, but can be cheaper than repeatedly downloading big S3 objects when backtests are frequent.
+  - CDK/IAM: add an EFS file system, access point, and mount in the task definition.
+
+Notes:
+
+- Start with **S3** for v1 unless repeated downloads become a bottleneck. Add **EFS** if cost or performance demands it.
+- You can still avoid downloading "everything" even without partitioning if you store multiple large files (for example by ticker). True single-monolith datasets force over-fetching.
+
 ### 4. API (existing)
 
 - Continues to `SendMessage` to the queue URL from config/secrets.
@@ -150,6 +174,7 @@ Tradeoff: more moving parts (compute environment, job queues, AMI/container). **
 | Fargate tasks | **$0** when **no tasks running** (no ECS service with desired > 0). |
 | NAT Gateway | **Often significant fixed monthly cost** if tasks need outbound internet in private subnets — budget explicitly (see §8). |
 | RDS | Usually **always-on** unless you use Aurora Serverless v2 pause / dev schedules — separate from worker design. |
+| Market data storage | S3 is cheap per GB-month; EFS is also managed storage with ongoing cost but can reduce per-run download/transfer costs. |
 
 ---
 

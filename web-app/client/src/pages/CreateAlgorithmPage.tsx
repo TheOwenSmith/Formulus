@@ -145,7 +145,7 @@ export function CreateAlgorithmPage() {
 
   const nameError = state.name.length > 0 ? validateName(state.name) : null;
   const step1Valid =
-    state.algorithmType !== null && state.name.length > 0 && !validateName(state.name);
+    state.algorithmType !== null && state.name.length >= 4 && !validateName(state.name);
 
   const step2Valid =
     state.language !== null &&

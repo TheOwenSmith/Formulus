@@ -182,25 +182,25 @@ export function getDefaultImplementationCode(
   selectedTickers: string[] = [],
 ): string {
   if (algorithmType === AlgorithmType.SIMPLE) {
-    return DEFAULT_SIMPLE[language].trim();
+    return DEFAULT_SIMPLE[language].trimStart();
   }
   if (algorithmType === AlgorithmType.NORMAL) {
-    return DEFAULT_NORMAL[language].trim();
+    return DEFAULT_NORMAL[language].trimStart();
   }
   if (algorithmType === AlgorithmType.TOP_K) {
     const tickers = selectedTickers.length > 0 ? selectedTickers : ['SPY'];
     switch (language) {
       case 'typescript':
-        return defaultTopKTs(tickers).trim();
+        return defaultTopKTs(tickers).trimStart();
       case 'javascript':
-        return defaultTopKJs(tickers).trim();
+        return defaultTopKJs(tickers).trimStart();
       case 'python':
-        return defaultTopKPy(tickers).trim();
+        return defaultTopKPy(tickers).trimStart();
       case 'cpp':
-        return defaultTopKCpp(tickers).trim();
+        return defaultTopKCpp(tickers).trimStart();
       default:
-        return defaultTopKTs(tickers).trim();
+        return defaultTopKTs(tickers).trimStart();
     }
   }
-  return DEFAULT_SIMPLE[language].trim();
+  return DEFAULT_SIMPLE[language].trimStart();
 }

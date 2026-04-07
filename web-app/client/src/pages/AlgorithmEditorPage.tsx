@@ -28,7 +28,7 @@ type SubmissionSummary = {
   message: string | null;
   error: string | null;
   errorCode: string | null;
-  createdAt: Date;
+  createdAt: string;
   algorithmIds: string[];
 };
 
@@ -117,59 +117,57 @@ function getTickers(algorithm: AnyUserAlgorithmType): string[] {
 // ─── Monaco type declarations for ./utils module ──────────────────────────────
 
 const UTILS_TYPE_DECLARATION = `
-declare module './utils' {
-  /**
-   * A market bar tuple: [timestamp, open, high, low, close, volume]
-   *   bar[0] = ISO timestamp string
-   *   bar[1] = open price
-   *   bar[2] = high price
-   *   bar[3] = low price
-   *   bar[4] = close price
-   *   bar[5] = volume
-   */
-  export type Bar = [
-    timestamp: string,
-    open: number,
-    high: number,
-    low: number,
-    close: number,
-    volume: number,
-  ];
+/**
+ * A market bar tuple: [timestamp, open, high, low, close, volume]
+ *   bar[0] = ISO timestamp string
+ *   bar[1] = open price
+ *   bar[2] = high price
+ *   bar[3] = low price
+ *   bar[4] = close price
+ *   bar[5] = volume
+ */
+export type Bar = [
+  timestamp: string,
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+  volume: number,
+];
 
-  /** A stock ticker symbol, e.g. 'SPY', 'AAPL' */
-  export type Ticker = string;
+/** A stock ticker symbol, e.g. 'SPY', 'AAPL' */
+export type Ticker = string;
 
-  /** Trading action returned by your implementation function */
-  export enum Action {
-    /** Buy the asset (or increase position) */
-    BUY = 0,
-    /** Sell the asset (or decrease position) */
-    SELL = 1,
-    /** Hold current position unchanged */
-    HOLD = 2,
-  }
-
-  /** SuperTrend direction */
-  export enum Direction {
-    /** Price is above the SuperTrend line (uptrend) */
-    UP = 0,
-    /** Price is below the SuperTrend line (downtrend) */
-    DOWN = 1,
-  }
-
-  /**
-   * Returns the day of the week name for a bar timestamp.
-   * @param timestamp ISO timestamp string from bar[0], e.g. "2024-01-15T10:00:00Z"
-   * @returns Day name, e.g. 'Monday', 'Tuesday', ...
-   *
-   * @example
-   * const timestamp = context[0][0];
-   * if (dayOfWeek(timestamp) === 'Monday') return Action.SELL;
-   */
-  export function dayOfWeek(
-    timestamp: string,
-  ): 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+/** Trading action returned by your implementation function */
+export declare enum Action {
+  /** Buy the asset (or increase position) */
+  BUY = 0,
+  /** Sell the asset (or decrease position) */
+  SELL = 1,
+  /** Hold current position unchanged */
+  HOLD = 2,
 }
+
+/** SuperTrend direction */
+export declare enum Direction {
+  /** Price is above the SuperTrend line (uptrend) */
+  UP = 0,
+  /** Price is below the SuperTrend line (downtrend) */
+  DOWN = 1,
+}
+
+/**
+ * Returns the day of the week name for a bar timestamp.
+ * @param timestamp ISO timestamp string from bar[0], e.g. "2024-01-15T10:00:00Z"
+ * @returns Day name, e.g. 'Monday', 'Tuesday', ...
+ *
+ * @example
+ * const timestamp = context[0][0];
+ * if (dayOfWeek(timestamp) === 'Monday') return Action.SELL;
+ */
+export declare function dayOfWeek(
+  timestamp: string,
+): 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 
 /**
  * Maps indicator strings to their computed result types.
@@ -184,13 +182,15 @@ declare module './utils' {
  *   Access: const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;
  *   Compare direction to Direction.UP (0) or Direction.DOWN (1).
  */
-declare interface IndicatorResultByIndicator {
-  [key: \`SMA(\${number})\`]: (number | null)[];
-  [key: \`EMA(\${number})\`]: (number | null)[];
-  [key: \`RSI(\${number})\`]: (number | null)[];
-  [key: \`ATR(\${number})\`]: (number | null)[];
-  [key: \`LinearRegression(\${number})\`]: { slope: number; intercept: number };
-  [key: \`SuperTrend(\${number},\${number})\`]: ({ superTrendValue: number; direction: number } | null)[];
+declare global {
+  interface IndicatorResultByIndicator {
+    [key: \`SMA(\${number})\`]: (number | null)[];
+    [key: \`EMA(\${number})\`]: (number | null)[];
+    [key: \`RSI(\${number})\`]: (number | null)[];
+    [key: \`ATR(\${number})\`]: (number | null)[];
+    [key: \`LinearRegression(\${number})\`]: { slope: number; intercept: number };
+    [key: \`SuperTrend(\${number},\${number})\`]: ({ superTrendValue: number; direction: number } | null)[];
+  }
 }
 `;
 
@@ -370,7 +370,9 @@ std::map<std::string, Action> implementation(
   {
     chipColor: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25',
     configExample: "'LinearRegression(50)'",
-    defaultParams: [50],
+    // LinearRegression requires period >= 2 and period <= contextLength - 1.
+    // Keep a conservative default that stays valid for common context lengths.
+    defaultParams: [10],
     description:
       'Fits a straight trend line through the last n closing prices. Returns the slope (trend direction) and intercept, letting you extrapolate where the price line is headed.',
     fullName: 'Linear Regression',
@@ -569,16 +571,16 @@ function ParamStepper({
   min = 1,
   max = Number.MAX_SAFE_INTEGER,
 }: {
-  value: number;
+  value: number | null;
   onChange: (n: number) => void;
   onEmptyChange?: (isEmpty: boolean) => void;
   min?: number;
   max?: number;
 }) {
-  const [localValue, setLocalValue] = useState(String(value));
+  const [localValue, setLocalValue] = useState(value == null ? '' : String(value));
 
   useEffect(() => {
-    setLocalValue(String(value));
+    setLocalValue(value == null ? '' : String(value));
   }, [value]);
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -596,8 +598,17 @@ function ParamStepper({
   }
 
   function handleBlur() {
+    if (localValue === '') {
+      onEmptyChange?.(true);
+      return;
+    }
     const n = parseInt(localValue, 10);
-    const clamped = isNaN(n) ? value : Math.min(max, Math.max(min, n));
+    if (isNaN(n)) {
+      onEmptyChange?.(true);
+      setLocalValue('');
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, n));
     onChange(clamped);
     onEmptyChange?.(false);
     setLocalValue(String(clamped));
@@ -607,8 +618,11 @@ function ParamStepper({
     <div className="flex items-center rounded-lg border border-white/10 bg-white/5 overflow-hidden">
       <button
         type="button"
-        onClick={() => onChange(Math.max(min, value - 1))}
-        disabled={localValue === '' || value <= min}
+        onClick={() => {
+          if (value == null) return;
+          onChange(Math.max(min, value - 1));
+        }}
+        disabled={localValue === '' || value == null || value <= min}
         className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,8 +639,11 @@ function ParamStepper({
       />
       <button
         type="button"
-        onClick={() => onChange(Math.min(max, value + 1))}
-        disabled={localValue === '' || value >= max}
+        onClick={() => {
+          if (value == null) return;
+          onChange(Math.min(max, value + 1));
+        }}
+        disabled={localValue === '' || value == null || value >= max}
         className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -650,12 +667,20 @@ function IndicatorAddRow({
   onAdd: (indicatorString: string) => void;
   onOpenDocs: () => void;
 }) {
-  const [params, setParams] = useState<number[]>(indicatorRef.defaultParams);
-  const [emptyParams, setEmptyParams] = useState<Set<number>>(new Set());
-  const indicatorString = buildIndicatorString(indicatorRef.prefix, params);
-  const isAdded = existingIndicators.includes(indicatorString);
-  const atLimit = existingIndicators.length >= MAX_INDICATORS_COUNT;
+  const [params, setParams] = useState<(number | null)[]>(() => {
+    if (contextLength < 20) return indicatorRef.defaultParams.map(() => null);
+    return indicatorRef.defaultParams;
+  });
+  const [emptyParams, setEmptyParams] = useState<Set<number>>(() => {
+    if (contextLength < 20) return new Set(indicatorRef.defaultParams.map((_, i) => i));
+    return new Set();
+  });
   const hasEmptyInput = emptyParams.size > 0;
+  const indicatorString = hasEmptyInput
+    ? ''
+    : buildIndicatorString(indicatorRef.prefix, params as number[]);
+  const isAdded = indicatorString !== '' && existingIndicators.includes(indicatorString);
+  const atLimit = existingIndicators.length >= MAX_INDICATORS_COUNT;
 
   function handleEmptyChange(paramIndex: number, isEmpty: boolean) {
     setEmptyParams((prev) => {
@@ -1039,7 +1064,7 @@ function LeftPanel({
                   >
                     <span className={`text-xs font-medium ${color}`}>{label}</span>
                     <span className="text-xs text-white/30 group-hover:text-white/50 transition-colors">
-                      {timeAgo(s.createdAt)}
+                      {timeAgo(new Date(s.createdAt))}
                     </span>
                   </button>
                   {isCancellable && (
@@ -1118,6 +1143,11 @@ export function AlgorithmEditorPage() {
       onError: (error) => {
         toast.error(error instanceof Error ? error.message : 'Failed to update indicators');
       },
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpcCredentials.algorithms.getAlgorithm.queryKey({ id: algorithm.id }),
+        });
+      },
     }),
   );
 
@@ -1195,15 +1225,24 @@ export function AlgorithmEditorPage() {
       indicators: example.indicators as AnyUserAlgorithmType['indicators'],
       language: lang,
       name: example.name,
-      userAlgorithmImplementationCode: example.code[lang].trim(),
+      userAlgorithmImplementationCode: example.code[lang].trimStart(),
     };
     let input: Parameters<typeof createAlgorithm>[0];
     if (example.algorithmType === 1) {
-      input = { ...base, ticker: example.ticker!, type: 1 as const };
+      input = {
+        ...base,
+        ticker: example.ticker! as any,
+        type: 1 as const,
+      };
     } else if (example.algorithmType === 2) {
-      input = { ...base, tickers: example.tickers!, k: example.k!, type: 2 as const };
+      input = {
+        ...base,
+        tickers: example.tickers! as any,
+        k: example.k!,
+        type: 2 as const,
+      };
     } else {
-      input = { ...base, tickers: example.tickers!, type: 0 as const };
+      input = { ...base, tickers: example.tickers! as any, type: 0 as const };
     }
     if (overwriteId) deleteAlgorithm({ id: overwriteId });
     const result = await createAlgorithm(input);
@@ -1442,6 +1481,9 @@ export function AlgorithmEditorPage() {
                     moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
                     target: monaco.languages.typescript.ScriptTarget.ESNext,
                   });
+                  monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+                    noSuggestionDiagnostics: true,
+                  });
                   monaco.languages.typescript.typescriptDefaults.addExtraLib(
                     UTILS_TYPE_DECLARATION,
                     'file:///utils.d.ts',
@@ -1534,7 +1576,7 @@ export function AlgorithmEditorPage() {
             <p className="text-sm text-white/50 leading-relaxed mb-5">
               You already have an algorithm called{' '}
               <span className="text-white/80 font-medium">"{pendingCreate.example.name}"</span>.
-              Replacing it will permanently delete that algorithm and all its backtest history.
+              Replacing it will permanently delete that algorithm.
             </p>
             <div className="flex items-center gap-2 justify-end">
               <button

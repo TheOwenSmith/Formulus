@@ -152,6 +152,7 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
   const createResultsResult = await createBacktestingResults({
     algorithmIds,
     creatorId: submission.creatorId,
+    name: submission.name,
     publicId: submission.publicId,
     result: backtestResult.value,
   });
