@@ -3,6 +3,7 @@ import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
 import { sharingRouter } from '@api/routes/sharing';
 import { usersRouter } from '@api/routes/users';
+import { isAppError } from '@api/utils/error-handling';
 import { initTRPC } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import { config } from './config';
@@ -12,10 +13,10 @@ export type Context = Awaited<ReturnType<typeof createContext>>;
 
 export const t = initTRPC.context<Context>().create({
   errorFormatter({ shape, error, ctx }) {
-    if (error.code === 'INTERNAL_SERVER_ERROR') {
+    const errorCode = isAppError(error.cause) ? error.cause.code : error.code;
+    if (errorCode === 'INTERNAL_SERVER_ERROR') {
       console.error(`[${ctx?.req.path ?? '??'}]`, error);
     }
-
     return {
       ...shape,
       // In prod, hide stack traces completely

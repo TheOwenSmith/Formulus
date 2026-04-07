@@ -85,3 +85,5 @@ export const AlgorithmType = {
 export type AlgorithmTypeValue = (typeof AlgorithmType)[keyof typeof AlgorithmType];
 
 export const MAX_ALGORITHMS_TO_COMPARE = 25;
+export const MAX_INDICATORS_COUNT = 40;
+export const MAX_INDICATOR_MULTIPLIER = 20;

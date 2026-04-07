@@ -1,10 +1,11 @@
 import { tickerSchema, timestampSchema, type Ticker } from '@shared/api';
 import { ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@shared/constants';
+import { MAX_INDICATORS_COUNT } from '@shared/trading-constants';
 import { actionSchema } from '@worker/core/algorithms/algorithm';
-import { indicatorSchema } from '@worker/core/algorithms/indicators/indicator';
 import { supportedLanguageSchema } from '@worker/core/backtesting/rpc/languages';
 import z from 'zod';
 import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from './constants';
+import { indicatorSchema } from './indicators/indicator';
 import type { UserSimpleAlgorithm } from './user-simple-algorithm';
 import type { UserTopKAlgorithm } from './user-top-k-algorithm';
 
@@ -54,7 +55,20 @@ export const userAlgorithmSchemaBase = z.object({
     })
     .optional(),
   contextLength: z.int().positive(),
-  indicators: indicatorSchema.array().optional(),
+  // ensure no duplicate indicators
+  indicators: z
+    .array(indicatorSchema)
+    .max(MAX_INDICATORS_COUNT)
+    .superRefine((indicators, ctx) => {
+      if (new Set(indicators).size !== indicators.length) {
+        ctx.addIssue({
+          code: 'custom',
+          input: indicators,
+          message: `Indicators must be distinct`,
+        });
+      }
+    })
+    .optional(),
   language: supportedLanguageSchema,
   name: userAlgorithmNameSchema,
 });

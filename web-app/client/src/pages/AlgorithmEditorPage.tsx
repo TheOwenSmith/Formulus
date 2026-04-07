@@ -1,11 +1,17 @@
 import { ExamplesModal } from '@client/components/ExamplesModal';
 import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
-import { AlgorithmType } from '@shared/api';
 import { trpcCredentials } from '@client/lib/trpc';
 import Editor from '@monaco-editor/react';
-import type { AnyUserAlgorithmType } from '@shared/worker';
-import type { SupportedLanguage } from '@shared/worker';
+import { AlgorithmType } from '@shared/api';
+import { ALGORITHM_EXAMPLES, type AlgorithmExample } from '@shared/examples';
+import {
+  maxPeriodByIndicatorByContextLength,
+  minPeriodByIndicator,
+  type IndicatorMetadataKey,
+} from '@shared/indicator-params';
+import { MAX_INDICATOR_MULTIPLIER, MAX_INDICATORS_COUNT } from '@shared/trading-constants';
+import type { AnyUserAlgorithmType, SupportedLanguage } from '@shared/worker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useLoaderData, useNavigate } from 'react-router-dom';
@@ -26,6 +32,24 @@ type SubmissionSummary = {
   algorithmIds: string[];
 };
 
+type IndicatorRef = {
+  id: string;
+  name: string;
+  fullName: string;
+  description: string;
+  returns: string;
+  configExample: string;
+  usageByLang?: Record<SupportedLanguage, string>;
+  url: string;
+  chipColor: string;
+  linkedExampleId?: string;
+  indicatorKey: IndicatorMetadataKey;
+  prefix: string;
+  defaultParams: number[];
+  paramLabels: string[];
+  paramTypes: ('period' | 'multiplier')[];
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const TYPE_LABEL: Record<number, string> = {
@@ -36,7 +60,8 @@ const TYPE_LABEL: Record<number, string> = {
 
 const TYPE_COLOR: Record<number, string> = {
   [AlgorithmType.NORMAL]: 'from-blue-500/20 to-cyan-500/20 border-blue-500/40 text-blue-300',
-  [AlgorithmType.SIMPLE]: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300',
+  [AlgorithmType.SIMPLE]:
+    'from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300',
   [AlgorithmType.TOP_K]: 'from-purple-500/20 to-pink-500/20 border-purple-500/40 text-purple-300',
 };
 
@@ -46,6 +71,8 @@ const LANG_LABEL: Record<string, string> = {
   python: 'Python',
   typescript: 'TypeScript',
 };
+
+const LANG_ORDER: SupportedLanguage[] = ['typescript', 'javascript', 'python', 'cpp'];
 
 const MONACO_LANG: Record<SupportedLanguage, string> = {
   cpp: 'cpp',
@@ -64,7 +91,10 @@ function timeAgo(date: Date): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function submissionStatusLabel(status: string, message: string | null): { label: string; color: string } {
+function submissionStatusLabel(
+  status: string,
+  message: string | null,
+): { label: string; color: string } {
   if (status === 'PENDING') return { label: 'Queued', color: 'text-amber-400' };
   if (status === 'RUNNING') {
     if (message === 'Preparing...') return { label: 'Preparing', color: 'text-amber-400' };
@@ -144,13 +174,13 @@ declare module './utils' {
 /**
  * Maps indicator strings to their computed result types.
  *
- * SMA(n), EMA(n), RSI(n), ATR(n)  →  (number | null)[]
+ * SMA(n), EMA(n), RSI(n), ATR(n)  ->  (number | null)[]
  *   Access: indicators[ticker]['SMA(20)']!.at(-1)!
  *
- * LinearRegression(n)  →  { slope: number; intercept: number }
+ * LinearRegression(n)  ->  { slope: number; intercept: number }
  *   Access: const { slope, intercept } = indicators[ticker]['LinearRegression(50)']!;
  *
- * SuperTrend(n,m)  →  ({ superTrendValue: number; direction: number } | null)[]
+ * SuperTrend(n,m)  ->  ({ superTrendValue: number; direction: number } | null)[]
  *   Access: const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;
  *   Compare direction to Direction.UP (0) or Direction.DOWN (1).
  */
@@ -166,62 +196,209 @@ declare interface IndicatorResultByIndicator {
 
 // ─── Indicators reference data ────────────────────────────────────────────────
 
-type IndicatorRef = {
-  name: string;
-  fullName: string;
-  description: string;
-  returns: string;
-  example: string;
-  url: string;
-};
-
 const INDICATORS_REF: IndicatorRef[] = [
   {
-    name: 'SMA(n)',
+    chipColor: 'bg-blue-500/15 border-blue-500/30 text-blue-300 hover:bg-blue-500/25',
+    configExample: "'SMA(20)'",
+    defaultParams: [20],
+    description:
+      'Average closing price over the last n bars. Smooths out noise to reveal the underlying trend direction.',
     fullName: 'Simple Moving Average',
-    description: 'Average closing price over the last n bars.',
+    id: 'sma',
+    indicatorKey: 'sma' as IndicatorMetadataKey,
+    linkedExampleId: 'above-below-sma',
+    name: 'SMA(n)',
+    paramLabels: ['Period'],
+    paramTypes: ['period'],
+    prefix: 'SMA',
     returns: '(number | null)[]',
-    example: "const sma = indicators[ticker]['SMA(20)']!.at(-1)!;",
     url: 'https://www.investopedia.com/terms/s/sma.asp',
   },
   {
-    name: 'EMA(n)',
+    chipColor: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25',
+    configExample: "'EMA(12)'",
+    defaultParams: [12],
+    description:
+      'Like SMA but gives more weight to recent prices, making it faster to react to new price changes.',
     fullName: 'Exponential Moving Average',
-    description: 'Weighted average giving more weight to recent prices.',
+    id: 'ema',
+    indicatorKey: 'ema' as IndicatorMetadataKey,
+    name: 'EMA(n)',
+    paramLabels: ['Period'],
+    paramTypes: ['period'],
+    prefix: 'EMA',
     returns: '(number | null)[]',
-    example: "const ema = indicators[ticker]['EMA(12)']!.at(-1)!;",
     url: 'https://www.investopedia.com/terms/e/ema.asp',
+    usageByLang: {
+      typescript: `import { Action, type Bar, type Ticker } from './utils';
+
+export async function implementation(
+  context: Record<Ticker, Bar[]>,
+  _positions: Record<Ticker, number>,
+  indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
+) {
+  const result = {} as Record<Ticker, Action>;
+  for (const ticker in context) {
+    const ema12 = indicators[ticker]['EMA(12)'].at(-1);
+    const ema26 = indicators[ticker]['EMA(26)'].at(-1);
+    result[ticker] = ema12 > ema26 ? Action.BUY : Action.SELL;
+  }
+  return result;
+}`,
+      javascript: `const { Action } = require('./utils');
+
+async function implementation(context, _positions, indicators) {
+  const result = {};
+  for (const ticker in context) {
+    const ema12 = indicators[ticker]['EMA(12)'].at(-1);
+    const ema26 = indicators[ticker]['EMA(26)'].at(-1);
+    result[ticker] = ema12 > ema26 ? Action.BUY : Action.SELL;
+  }
+  return result;
+}`,
+      python: `from utils import Action
+
+async def implementation(context, positions, indicators):
+    result = {}
+    for ticker in context:
+        ema12 = indicators[ticker]['EMA(12)'][-1]
+        ema26 = indicators[ticker]['EMA(26)'][-1]
+        result[ticker] = 'BUY' if ema12 > ema26 else 'SELL'
+    return result`,
+      cpp: `#include "utils.hpp"
+
+std::map<std::string, Action> implementation(
+    const Context& context,
+    const Positions& positions,
+    const Indicators& indicators
+) {
+    std::map<std::string, Action> result;
+    for (auto& [ticker, bars] : context) {
+        double ema12 = indicators.at(ticker).at("EMA(12)").back();
+        double ema26 = indicators.at(ticker).at("EMA(26)").back();
+        result[ticker] = ema12 > ema26 ? Action::BUY : Action::SELL;
+    }
+    return result;
+}`,
+    },
   },
   {
-    name: 'RSI(n)',
+    chipColor: 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25',
+    configExample: "'RSI(14)'",
+    defaultParams: [14],
+    description:
+      'Momentum oscillator ranging 0 to 100. Values below 30 suggest oversold conditions (potential buy), above 70 suggest overbought (potential sell).',
     fullName: 'Relative Strength Index',
-    description: 'Momentum oscillator ranging 0-100. Below 30 = oversold, above 70 = overbought.',
+    id: 'rsi',
+    indicatorKey: 'rsi' as IndicatorMetadataKey,
+    linkedExampleId: 'overbought-oversold',
+    name: 'RSI(n)',
+    paramLabels: ['Period'],
+    paramTypes: ['period'],
+    prefix: 'RSI',
     returns: '(number | null)[]',
-    example: "const rsi = indicators[ticker]['RSI(14)']!.at(-1)!;\nif (rsi < 30) result[ticker] = Action.BUY;",
     url: 'https://www.investopedia.com/terms/r/rsi.asp',
   },
   {
-    name: 'ATR(n)',
+    chipColor: 'bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/25',
+    configExample: "'ATR(14)'",
+    defaultParams: [14],
+    description:
+      'Measures market volatility over the last n bars. A higher value means larger price swings. Useful for position sizing and setting stop-losses.',
     fullName: 'Average True Range',
-    description: 'Measures market volatility. Higher value = larger price swings.',
+    id: 'atr',
+    indicatorKey: 'atr' as IndicatorMetadataKey,
+    name: 'ATR(n)',
+    paramLabels: ['Period'],
+    paramTypes: ['period'],
+    prefix: 'ATR',
     returns: '(number | null)[]',
-    example: "const atr = indicators[ticker]['ATR(14)']!.at(-1)!;",
     url: 'https://www.investopedia.com/terms/a/atr.asp',
+    usageByLang: {
+      typescript: `import { Action, type Bar, type Ticker } from './utils';
+
+export async function implementation(
+  context: Record<Ticker, Bar[]>,
+  _positions: Record<Ticker, number>,
+  indicators: Record<Ticker, Partial<IndicatorResultByIndicator>>,
+) {
+  const result = {} as Record<Ticker, Action>;
+  for (const ticker in context) {
+    const atr = indicators[ticker]['ATR(14)'].at(-1);
+    const close = context[ticker].at(-1)![4];
+    result[ticker] = atr / close < 0.02 ? Action.BUY : Action.HOLD;
+  }
+  return result;
+}`,
+      javascript: `const { Action } = require('./utils');
+
+async function implementation(context, _positions, indicators) {
+  const result = {};
+  for (const ticker in context) {
+    const atr = indicators[ticker]['ATR(14)'].at(-1);
+    const close = context[ticker].at(-1)[4];
+    result[ticker] = atr / close < 0.02 ? Action.BUY : Action.HOLD;
+  }
+  return result;
+}`,
+      python: `from utils import Action
+
+async def implementation(context, positions, indicators):
+    result = {}
+    for ticker in context:
+        atr = indicators[ticker]['ATR(14)'][-1]
+        close = context[ticker][-1][4]
+        result[ticker] = 'BUY' if atr / close < 0.02 else 'HOLD'
+    return result`,
+      cpp: `#include "utils.hpp"
+
+std::map<std::string, Action> implementation(
+    const Context& context,
+    const Positions& positions,
+    const Indicators& indicators
+) {
+    std::map<std::string, Action> result;
+    for (auto& [ticker, bars] : context) {
+        double atr = indicators.at(ticker).at("ATR(14)").back();
+        double close = bars.back()[4];
+        result[ticker] = atr / close < 0.02 ? Action::BUY : Action::HOLD;
+    }
+    return result;
+}`,
+    },
   },
   {
-    name: 'LinearRegression(n)',
+    chipColor: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25',
+    configExample: "'LinearRegression(50)'",
+    defaultParams: [50],
+    description:
+      'Fits a straight trend line through the last n closing prices. Returns the slope (trend direction) and intercept, letting you extrapolate where the price line is headed.',
     fullName: 'Linear Regression',
-    description: 'Fits a trend line over n bars. Returns slope and intercept.',
+    id: 'lr',
+    indicatorKey: 'linearRegression' as IndicatorMetadataKey,
+    linkedExampleId: 'regression-line',
+    name: 'LinReg(n)',
+    paramLabels: ['Period'],
+    paramTypes: ['period'],
+    prefix: 'LinearRegression',
     returns: '{ slope: number; intercept: number }',
-    example: "const { slope, intercept } = indicators[ticker]['LinearRegression(50)']!;\nconst value = slope * 49 + intercept; // value at last bar",
     url: 'https://www.investopedia.com/terms/r/regression.asp',
   },
   {
-    name: 'SuperTrend(n,m)',
+    chipColor: 'bg-purple-500/15 border-purple-500/30 text-purple-300 hover:bg-purple-500/25',
+    configExample: "'SuperTrend(10,3)'",
+    defaultParams: [10, 3],
+    description:
+      'Trend-following indicator that outputs a direction (UP or DOWN) and a trailing stop level. When direction flips from DOWN to UP it signals a buy; UP to DOWN signals a sell.',
     fullName: 'SuperTrend',
-    description: 'Trend-following indicator. direction: UP (0) or DOWN (1). Multiply m controls sensitivity.',
+    id: 'supertrend',
+    indicatorKey: 'superTrend' as IndicatorMetadataKey,
+    linkedExampleId: 'super-trend-direction',
+    name: 'SuperTrend',
+    paramLabels: ['Period', 'Multiplier'],
+    paramTypes: ['period', 'multiplier'],
+    prefix: 'SuperTrend',
     returns: '({ superTrendValue: number; direction: number } | null)[]',
-    example: "const { direction } = indicators[ticker]['SuperTrend(10,3)']!.at(-1)!;\nif (direction === Direction.UP) result[ticker] = Action.BUY;",
     url: 'https://www.investopedia.com/supertrend-indicator-7976167',
   },
 ];
@@ -243,6 +420,341 @@ function Spinner({ size = 4 }: { size?: number }) {
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
       />
     </svg>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildIndicatorString(prefix: string, params: number[]): string {
+  return `${prefix}(${params.join(',')})`;
+}
+
+// ─── Indicator Detail Modal ───────────────────────────────────────────────────
+
+function IndicatorDetailModal({
+  indicator,
+  language,
+  onClose,
+  onSeeExample,
+}: {
+  indicator: IndicatorRef;
+  language: SupportedLanguage;
+  onClose: () => void;
+  onSeeExample: (exampleId: string) => void;
+}) {
+  const [lang, setLang] = useState<SupportedLanguage>(language);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-full max-w-2xl max-h-[82vh] flex flex-col rounded-2xl bg-slate-900 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.5)] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b border-white/[0.07] shrink-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${indicator.chipColor}`}
+              >
+                {indicator.name}
+              </span>
+              <code className="text-xs font-mono text-violet-300/70 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded">
+                {indicator.returns}
+              </code>
+              <a
+                href={indicator.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-white/30 hover:text-blue-400 transition-colors ml-auto"
+              >
+                Docs
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </a>
+            </div>
+            <h2 className="text-base font-bold text-white">{indicator.fullName}</h2>
+            <p className="text-sm text-white/50 mt-1 leading-relaxed">{indicator.description}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 ml-4 w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/50 hover:text-white transition-all cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-4">
+            {/* Language tabs */}
+            <div className="flex items-center gap-1 mb-3">
+              {LANG_ORDER.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setLang(l)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                    lang === l
+                      ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                      : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {LANG_LABEL[l]}
+                </button>
+              ))}
+            </div>
+
+            {(() => {
+              const code =
+                indicator.usageByLang ??
+                ALGORITHM_EXAMPLES.find((e) => e.id === indicator.linkedExampleId)?.code;
+              return code != null ? (
+                <div className="rounded-xl bg-slate-950/70 border border-white/[0.07] overflow-hidden">
+                  <pre className="p-4 text-xs font-mono text-white/80 leading-relaxed overflow-x-auto whitespace-pre">
+                    {code[lang].trim()}
+                  </pre>
+                </div>
+              ) : null;
+            })()}
+          </div>
+        </div>
+
+        {/* Footer */}
+        {indicator.linkedExampleId != null && (
+          <div className="flex items-center justify-end px-6 py-4 border-t border-white/[0.07] shrink-0 bg-slate-900/50">
+            <button
+              type="button"
+              onClick={() => onSeeExample(indicator.linkedExampleId!)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm border border-violet-500/40 bg-gradient-to-r from-violet-500/20 to-purple-500/20 text-white hover:from-violet-500/30 hover:to-purple-500/30 hover:-translate-y-0.5 transition-all cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              See Full Example
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Indicator Add Row ────────────────────────────────────────────────────────
+
+function ParamStepper({
+  value,
+  onChange,
+  onEmptyChange,
+  min = 1,
+  max = Number.MAX_SAFE_INTEGER,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onEmptyChange?: (isEmpty: boolean) => void;
+  min?: number;
+  max?: number;
+}) {
+  const [localValue, setLocalValue] = useState(String(value));
+
+  useEffect(() => {
+    setLocalValue(String(value));
+  }, [value]);
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/[^0-9]/g, '');
+    const n = parseInt(raw, 10);
+    if (raw === '' || isNaN(n)) {
+      setLocalValue(raw);
+      onEmptyChange?.(true);
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, n));
+    setLocalValue(String(clamped));
+    onEmptyChange?.(false);
+    onChange(clamped);
+  }
+
+  function handleBlur() {
+    const n = parseInt(localValue, 10);
+    const clamped = isNaN(n) ? value : Math.min(max, Math.max(min, n));
+    onChange(clamped);
+    onEmptyChange?.(false);
+    setLocalValue(String(clamped));
+  }
+
+  return (
+    <div className="flex items-center rounded-lg border border-white/10 bg-white/5 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={localValue === '' || value <= min}
+        className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+        </svg>
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={localValue}
+        onChange={handleInputChange}
+        onBlur={handleBlur}
+        className="w-8 text-center text-xs font-mono text-white bg-transparent border-none outline-none"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={localValue === '' || value >= max}
+        className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function IndicatorAddRow({
+  ref: indicatorRef,
+  existingIndicators,
+  contextLength,
+  onAdd,
+  onOpenDocs,
+}: {
+  ref: IndicatorRef;
+  existingIndicators: string[];
+  contextLength: number;
+  onAdd: (indicatorString: string) => void;
+  onOpenDocs: () => void;
+}) {
+  const [params, setParams] = useState<number[]>(indicatorRef.defaultParams);
+  const [emptyParams, setEmptyParams] = useState<Set<number>>(new Set());
+  const indicatorString = buildIndicatorString(indicatorRef.prefix, params);
+  const isAdded = existingIndicators.includes(indicatorString);
+  const atLimit = existingIndicators.length >= MAX_INDICATORS_COUNT;
+  const hasEmptyInput = emptyParams.size > 0;
+
+  function handleEmptyChange(paramIndex: number, isEmpty: boolean) {
+    setEmptyParams((prev) => {
+      const next = new Set(prev);
+      if (isEmpty) next.add(paramIndex);
+      else next.delete(paramIndex);
+      return next;
+    });
+  }
+
+  function effectiveMax(paramIndex: number): number {
+    if (indicatorRef.paramTypes[paramIndex] === 'multiplier') return MAX_INDICATOR_MULTIPLIER;
+    return maxPeriodByIndicatorByContextLength[indicatorRef.indicatorKey](contextLength);
+  }
+
+  function effectiveMin(paramIndex: number): number {
+    if (indicatorRef.paramTypes[paramIndex] === 'multiplier') return 1;
+    return minPeriodByIndicator[indicatorRef.indicatorKey];
+  }
+
+  function handleChange(index: number, n: number) {
+    setParams((prev) => prev.map((v, i) => (i === index ? n : v)));
+  }
+
+  const labelText = indicatorRef.prefix === 'LinearRegression' ? 'LinReg' : indicatorRef.prefix;
+
+  const addBtn = (
+    <button
+      type="button"
+      onClick={() => onAdd(indicatorString)}
+      disabled={isAdded || atLimit || hasEmptyInput}
+      title={
+        isAdded
+          ? 'Already added'
+          : atLimit
+            ? `Limit of ${MAX_INDICATORS_COUNT} indicators reached`
+            : hasEmptyInput
+              ? 'Enter a valid value'
+              : `Add ${indicatorString}`
+      }
+      className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border transition-all ${
+        isAdded || atLimit
+          ? 'bg-white/[0.03] border-white/[0.06] text-white/20 cursor-not-allowed'
+          : 'bg-white/5 border-white/10 text-white/40 hover:bg-blue-500/20 hover:border-blue-500/40 hover:text-blue-300 cursor-pointer'
+      }`}
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      </svg>
+    </button>
+  );
+
+  if (params.length > 1) {
+    return (
+      <div className="py-1.5">
+        <button
+          type="button"
+          onClick={onOpenDocs}
+          title={indicatorRef.fullName}
+          className={`text-[11px] font-mono font-semibold px-2 py-1 rounded-lg border transition-all cursor-pointer mb-1.5 ${indicatorRef.chipColor}`}
+        >
+          {labelText}
+        </button>
+        <div className="flex items-center gap-1.5">
+          {params.map((val, i) => (
+            <ParamStepper
+              key={i}
+              value={val}
+              onChange={(n) => handleChange(i, n)}
+              onEmptyChange={(empty) => handleEmptyChange(i, empty)}
+              min={effectiveMin(i)}
+              max={effectiveMax(i)}
+            />
+          ))}
+          {addBtn}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 py-1">
+      <button
+        type="button"
+        onClick={onOpenDocs}
+        title={indicatorRef.fullName}
+        className={`shrink-0 text-[11px] font-mono font-semibold px-2 py-1 rounded-lg border transition-all cursor-pointer w-[4.5rem] text-center ${indicatorRef.chipColor}`}
+      >
+        {labelText}
+      </button>
+      <ParamStepper
+        value={params[0]}
+        onChange={(n) => handleChange(0, n)}
+        onEmptyChange={(empty) => handleEmptyChange(0, empty)}
+        min={effectiveMin(0)}
+        max={effectiveMax(0)}
+      />
+      {addBtn}
+    </div>
   );
 }
 
@@ -270,97 +782,29 @@ function InfoRow({
   );
 }
 
-function IndicatorReferenceSection() {
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  return (
-    <div className="p-5 border-t border-white/[0.07]">
-      <div className="flex items-center gap-2 mb-3">
-        <svg className="w-3.5 h-3.5 text-white/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-        <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Indicators</span>
-      </div>
-      <div className="flex flex-col gap-0.5">
-        {INDICATORS_REF.map((ind) => {
-          const isOpen = expanded === ind.name;
-          return (
-            <div key={ind.name}>
-              <button
-                type="button"
-                onClick={() => setExpanded(isOpen ? null : ind.name)}
-                className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-white/[0.05] transition-colors text-left cursor-pointer group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[11px] font-mono text-violet-300 shrink-0">{ind.name}</span>
-                  <span className="text-[10px] text-white/35 truncate">{ind.fullName}</span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                  <a
-                    href={ind.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    title={`${ind.fullName} on Investopedia`}
-                    className="text-white/20 hover:text-blue-400 transition-colors"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                  <svg
-                    className={`w-3 h-3 text-white/25 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
-
-              {isOpen && (
-                <div className="mx-2 mb-1 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07] text-[10px] space-y-2">
-                  <p className="text-white/60 leading-relaxed">{ind.description}</p>
-                  <div>
-                    <span className="text-white/30 uppercase tracking-wider text-[9px]">Returns</span>
-                    <p className="font-mono text-violet-300/80 mt-0.5">{ind.returns}</p>
-                  </div>
-                  <div>
-                    <span className="text-white/30 uppercase tracking-wider text-[9px]">Example</span>
-                    <pre className="font-mono text-emerald-300/70 mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
-                      {ind.example}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function LeftPanel({
   algorithm,
+  indicators,
   submissions,
   onCancel,
   onOpenExamples,
+  onOpenIndicatorDocs,
+  onAddIndicator,
+  onRemoveIndicator,
 }: {
   algorithm: AlgorithmWithId;
+  indicators: string[];
   submissions: SubmissionSummary[];
   onCancel: (publicId: string) => void;
   onOpenExamples: () => void;
+  onOpenIndicatorDocs: (id: string) => void;
+  onAddIndicator: (indicatorString: string) => void;
+  onRemoveIndicator: (indicator: string) => void;
 }) {
   const navigate = useNavigate();
   const tickers = getTickers(algorithm);
   const typeColor = TYPE_COLOR[algorithm.type] ?? TYPE_COLOR[AlgorithmType.NORMAL];
-  const pastRuns = submissions
-    .filter((s) => s.algorithmIds.includes(algorithm.id))
-    .slice(0, 5);
+  const pastRuns = submissions.filter((s) => s.algorithmIds.includes(algorithm.id)).slice(0, 5);
 
   return (
     <div className="flex flex-col h-full overflow-y-auto border-r border-white/[0.07]">
@@ -381,8 +825,12 @@ function LeftPanel({
         <InfoRow
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+              />
             </svg>
           }
           label="Language"
@@ -391,8 +839,12 @@ function LeftPanel({
         <InfoRow
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           }
           label="Timeframe"
@@ -401,8 +853,12 @@ function LeftPanel({
         <InfoRow
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
           }
           label="Context Length"
@@ -411,8 +867,12 @@ function LeftPanel({
         <InfoRow
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+              />
             </svg>
           }
           label="Max Holding"
@@ -422,8 +882,12 @@ function LeftPanel({
           <InfoRow
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                />
               </svg>
             }
             label="K (top tickers)"
@@ -433,8 +897,12 @@ function LeftPanel({
         <InfoRow
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
+              />
             </svg>
           }
           label={algorithm.type === AlgorithmType.SIMPLE ? 'Ticker' : `Tickers (${tickers.length})`}
@@ -453,8 +921,69 @@ function LeftPanel({
         />
       </div>
 
-      {/* Indicators reference */}
-      <IndicatorReferenceSection />
+      {/* Indicators section */}
+      <div className="px-5 pb-4 border-t border-white/[0.07] pt-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
+            Indicators
+          </span>
+          {indicators.length > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300">
+              {indicators.length}
+            </span>
+          )}
+        </div>
+
+        {/* Active indicators */}
+        {indicators.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {indicators.map((ind) => {
+              const ref = INDICATORS_REF.find((r) => ind.startsWith(r.prefix + '('));
+              return (
+                <div
+                  key={ind}
+                  className={`flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg border text-[11px] font-mono font-semibold ${ref?.chipColor ?? 'bg-white/5 border-white/10 text-white/60'}`}
+                >
+                  <span>{ind}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveIndicator(ind)}
+                    className="w-3.5 h-3.5 flex items-center justify-center rounded opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    <svg
+                      className="w-2.5 h-2.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2.5}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Inline add rows */}
+        <div className="flex flex-col">
+          {INDICATORS_REF.map((ref) => (
+            <IndicatorAddRow
+              key={ref.id}
+              ref={ref}
+              existingIndicators={indicators}
+              contextLength={algorithm.contextLength}
+              onAdd={onAddIndicator}
+              onOpenDocs={() => onOpenIndicatorDocs(ref.id)}
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Examples button */}
       <div className="px-5 pb-4">
@@ -464,8 +993,12 @@ function LeftPanel({
           className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white/50 hover:text-white/80 transition-all text-xs cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
           </svg>
           Browse Examples
         </button>
@@ -475,7 +1008,9 @@ function LeftPanel({
       {pastRuns.length > 0 && (
         <div className="p-5 border-t border-white/[0.07]">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Past Runs</span>
+            <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
+              Past Runs
+            </span>
             <button
               type="button"
               onClick={() => navigate(`/backtests?algorithm=${algorithm.id}`)}
@@ -490,13 +1025,16 @@ function LeftPanel({
               const isFinished = s.status === 'FINISHED';
               const isCancellable = s.status === 'PENDING' || s.status === 'RUNNING';
               return (
-                <div
-                  key={s.publicId}
-                  className="flex items-center gap-1.5"
-                >
+                <div key={s.publicId} className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => navigate(isFinished ? `/backtest/${s.publicId}` : `/backtests?algorithm=${algorithm.id}`)}
+                    onClick={() =>
+                      navigate(
+                        isFinished
+                          ? `/backtest/${s.publicId}`
+                          : `/backtests?algorithm=${algorithm.id}`,
+                      )
+                    }
                     className="flex-1 flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-colors text-left cursor-pointer group"
                   >
                     <span className={`text-xs font-medium ${color}`}>{label}</span>
@@ -511,8 +1049,18 @@ function LeftPanel({
                       onClick={() => onCancel(s.publicId)}
                       className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.04] hover:bg-red-500/20 border border-white/[0.06] hover:border-red-500/40 text-white/30 hover:text-red-400 transition-all cursor-pointer"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   )}
@@ -537,6 +1085,8 @@ export function AlgorithmEditorPage() {
   const [code, setCode] = useState(algorithm.userAlgorithmImplementationCode);
   const [savedCode, setSavedCode] = useState(algorithm.userAlgorithmImplementationCode);
   const isDirty = code !== savedCode;
+
+  const [indicators, setIndicators] = useState<string[]>(algorithm.indicators ?? []);
 
   const { data: submissions = [] } = useQuery({
     ...trpcCredentials.backtesting.getSubmissions.queryOptions(),
@@ -563,6 +1113,31 @@ export function AlgorithmEditorPage() {
     }),
   );
 
+  const { mutate: saveIndicators } = useMutation(
+    trpcCredentials.algorithms.updateAlgorithmIndicators.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to update indicators');
+      },
+    }),
+  );
+
+  function handleAddIndicator(indicatorString: string) {
+    if (indicators.includes(indicatorString)) return;
+    if (indicators.length >= MAX_INDICATORS_COUNT) {
+      toast.error(`You can add at most ${MAX_INDICATORS_COUNT} indicators per algorithm`);
+      return;
+    }
+    const next = [...indicators, indicatorString];
+    setIndicators(next);
+    saveIndicators({ id: algorithm.id, indicators: next });
+  }
+
+  function handleRemoveIndicator(indicatorString: string) {
+    const next = indicators.filter((i) => i !== indicatorString);
+    setIndicators(next);
+    saveIndicators({ id: algorithm.id, indicators: next });
+  }
+
   const { mutate: cancelBacktest } = useMutation(
     trpcCredentials.backtesting.cancelSubmission.mutationOptions({
       onError: (error) => {
@@ -577,11 +1152,76 @@ export function AlgorithmEditorPage() {
     }),
   );
 
+  const { mutateAsync: createAlgorithm, isPending: isCreating } = useMutation(
+    trpcCredentials.algorithms.createAlgorithm.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to create algorithm');
+      },
+    }),
+  );
+
+  const { mutate: deleteAlgorithm } = useMutation(
+    trpcCredentials.algorithms.deleteAlgorithm.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete algorithm');
+      },
+    }),
+  );
+
+  const { data: allAlgorithms = [] } = useQuery(
+    trpcCredentials.algorithms.getAlgorithms.queryOptions(),
+  );
+
+  type PendingCreate = { example: AlgorithmExample; lang: SupportedLanguage; conflictId: string };
+  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
+
+  async function handleCreateFromExample(example: AlgorithmExample, lang: SupportedLanguage) {
+    const existing = allAlgorithms.find((a) => a.name === example.name);
+    if (existing) {
+      setPendingCreate({ example, lang, conflictId: existing.id });
+      return;
+    }
+    await doCreateFromExample(example, lang);
+  }
+
+  async function doCreateFromExample(
+    example: AlgorithmExample,
+    lang: SupportedLanguage,
+    overwriteId?: string,
+  ) {
+    const base = {
+      aggregate: example.aggregate as AnyUserAlgorithmType['aggregate'],
+      contextLength: example.contextLength,
+      indicators: example.indicators as AnyUserAlgorithmType['indicators'],
+      language: lang,
+      name: example.name,
+      userAlgorithmImplementationCode: example.code[lang].trim(),
+    };
+    let input: Parameters<typeof createAlgorithm>[0];
+    if (example.algorithmType === 1) {
+      input = { ...base, ticker: example.ticker!, type: 1 as const };
+    } else if (example.algorithmType === 2) {
+      input = { ...base, tickers: example.tickers!, k: example.k!, type: 2 as const };
+    } else {
+      input = { ...base, tickers: example.tickers!, type: 0 as const };
+    }
+    if (overwriteId) deleteAlgorithm({ id: overwriteId });
+    const result = await createAlgorithm(input);
+    navigate(`/algorithms/${result.id}`);
+  }
+
   const [showRunModal, setShowRunModal] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const [examplesInitialId, setExamplesInitialId] = useState<string | undefined>(undefined);
+  const [activeIndicator, setActiveIndicator] = useState<IndicatorRef | null>(null);
 
   const isRunning = isPendingIds.has(algorithm.id) && cooldownSecondsLeft > 0;
   const isBacktestDisabled = isRunning || cooldownSecondsLeft > 0;
+
+  function openExamples(initialId?: string) {
+    setExamplesInitialId(initialId);
+    setShowExamples(true);
+  }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -600,206 +1240,326 @@ export function AlgorithmEditorPage() {
 
   return (
     <>
-    <div className="flex flex-col bg-slate-950 text-white font-sans overflow-hidden" style={{ height: 'calc(100vh - 79px)' }}>
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.07] bg-slate-900/70 backdrop-blur-sm shrink-0">
-        {/* Left: nav + name */}
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={() => navigate('/algorithms')}
-            className="flex items-center gap-1 text-white/40 hover:text-white/70 transition-colors text-sm shrink-0 cursor-pointer"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span className="hidden sm:inline">Algorithms</span>
-          </button>
-          <span className="text-white/20">/</span>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold text-white text-sm truncate">{algorithm.name}</span>
-            {isDirty && (
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" title="Unsaved changes" />
-            )}
+      <div
+        className="flex flex-col bg-slate-950 text-white font-sans overflow-hidden"
+        style={{ height: 'calc(100vh - 79px)' }}
+      >
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.07] bg-slate-900/70 backdrop-blur-sm shrink-0">
+          {/* Left: nav + name */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate('/algorithms')}
+              className="flex items-center gap-1 text-white/40 hover:text-white/70 transition-colors text-sm shrink-0 cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span className="hidden sm:inline">Algorithms</span>
+            </button>
+            <span className="text-white/20">/</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold text-white text-sm truncate">{algorithm.name}</span>
+              {isDirty && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0"
+                  title="Unsaved changes"
+                />
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Right: actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Language pill */}
-          <span className="text-xs text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg font-mono">
-            {LANG_LABEL[algorithm.language] ?? algorithm.language}
-          </span>
-
-          {/* Save */}
-          <button
-            type="button"
-            disabled={!isDirty || isSaving}
-            onClick={() => saveCode({ code, id: algorithm.id })}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer ${
-              isDirty && !isSaving
-                ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-500/40 text-white hover:-translate-y-0.5'
-                : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-            }`}
-          >
-            {isSaving ? (
-              <>
-                <Spinner size={3} />
-                Saving…
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-                Save
-              </>
-            )}
-          </button>
-
-          {/* Run backtest */}
-          <button
-            type="button"
-            disabled={isBacktestDisabled}
-            title={cooldownSecondsLeft > 0 && !isRunning ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest` : undefined}
-            onClick={() => setShowRunModal(true)}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer ${
-              isBacktestDisabled
-                ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-                : 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border-emerald-500/30 hover:border-emerald-500/50 text-white hover:-translate-y-0.5'
-            }`}
-          >
-            {isRunning ? (
-              <>
-                <Spinner size={3} />
-                Running…
-              </>
-            ) : cooldownSecondsLeft > 0 ? (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Wait {cooldownSecondsLeft}s
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Run Backtest
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Body: split layout */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left panel */}
-        <div className="w-64 shrink-0 bg-slate-900/50">
-          <LeftPanel
-            algorithm={algorithm}
-            submissions={submissions}
-            onCancel={(publicId) => cancelBacktest({ publicId })}
-            onOpenExamples={() => setShowExamples(true)}
-          />
-        </div>
-
-        {/* Divider */}
-        <div className="w-px bg-white/[0.07] shrink-0" />
-
-        {/* Editor panel */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Editor header */}
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.07] bg-slate-900/30 shrink-0">
-            <span className="text-xs text-white/30 font-mono">
-              {algorithm.name.replaceAll(' ', '_')}.{getExtension(algorithm.language as SupportedLanguage)}
+          {/* Right: actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Language pill */}
+            <span className="text-xs text-white/40 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg font-mono">
+              {LANG_LABEL[algorithm.language] ?? algorithm.language}
             </span>
-          </div>
 
-          {/* Monaco editor */}
-          <div className="flex-1">
-            <Editor
-              height="100%"
-              language={MONACO_LANG[algorithm.language as SupportedLanguage] ?? 'javascript'}
-              value={code}
-              path={monacoPath}
-              onChange={(value) => setCode(value ?? '')}
-              theme="vs-dark"
-              beforeMount={(monaco) => {
-                // Inject ./utils type declarations for TypeScript and JavaScript
-                monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-                  target: monaco.languages.typescript.ScriptTarget.ESNext,
-                  module: monaco.languages.typescript.ModuleKind.ESNext,
-                  moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-                  strict: false,
-                  noUnusedLocals: false,
-                  noUnusedParameters: false,
-                  allowJs: true,
-                });
-                monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-                  target: monaco.languages.typescript.ScriptTarget.ESNext,
-                  module: monaco.languages.typescript.ModuleKind.CommonJS,
-                  moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-                  allowJs: true,
-                  checkJs: false,
-                });
-                monaco.languages.typescript.typescriptDefaults.addExtraLib(
-                  UTILS_TYPE_DECLARATION,
-                  'file:///utils.d.ts',
-                );
-                monaco.languages.typescript.javascriptDefaults.addExtraLib(
-                  UTILS_TYPE_DECLARATION,
-                  'file:///utils.d.ts',
-                );
+            {/* Save */}
+            <button
+              type="button"
+              disabled={!isDirty || isSaving}
+              onClick={() => saveCode({ code, id: algorithm.id })}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer ${
+                isDirty && !isSaving
+                  ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-500/40 text-white hover:-translate-y-0.5'
+                  : 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+              }`}
+            >
+              {isSaving ? (
+                <>
+                  <Spinner size={3} />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                    />
+                  </svg>
+                  Save
+                </>
+              )}
+            </button>
+
+            {/* Run backtest */}
+            <button
+              type="button"
+              disabled={isBacktestDisabled}
+              title={
+                cooldownSecondsLeft > 0 && !isRunning
+                  ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest`
+                  : undefined
+              }
+              onClick={() => setShowRunModal(true)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer ${
+                isBacktestDisabled
+                  ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border-emerald-500/30 hover:border-emerald-500/50 text-white hover:-translate-y-0.5'
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Spinner size={3} />
+                  Running...
+                </>
+              ) : cooldownSecondsLeft > 0 ? (
+                <>
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Wait {cooldownSecondsLeft}s
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Run Backtest
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Body: split layout */}
+        <div className="flex flex-1 min-h-0">
+          {/* Left panel */}
+          <div className="w-64 shrink-0 bg-slate-900/50">
+            <LeftPanel
+              algorithm={algorithm}
+              indicators={indicators}
+              submissions={submissions}
+              onCancel={(publicId) => cancelBacktest({ publicId })}
+              onOpenExamples={() => openExamples()}
+              onOpenIndicatorDocs={(id) => {
+                const ind = INDICATORS_REF.find((i) => i.id === id);
+                if (ind) setActiveIndicator(ind);
               }}
-              options={{
-                fontSize: 14,
-                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                fontLigatures: true,
-                lineNumbers: 'on',
-                minimap: { enabled: false },
-                padding: { top: 16, bottom: 16 },
-                renderLineHighlight: 'line',
-                scrollBeyondLastLine: false,
-                smoothScrolling: true,
-                tabSize: 2,
-                wordWrap: 'on',
-              }}
+              onAddIndicator={handleAddIndicator}
+              onRemoveIndicator={handleRemoveIndicator}
             />
           </div>
+
+          {/* Divider */}
+          <div className="w-px bg-white/[0.07] shrink-0" />
+
+          {/* Editor panel */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Editor header */}
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.07] bg-slate-900/30 shrink-0">
+              <span className="text-xs text-white/30 font-mono">
+                {algorithm.name.replaceAll(' ', '_')}.
+                {getExtension(algorithm.language as SupportedLanguage)}
+              </span>
+            </div>
+
+            {/* Monaco editor */}
+            <div className="flex-1">
+              <Editor
+                height="100%"
+                language={MONACO_LANG[algorithm.language as SupportedLanguage] ?? 'javascript'}
+                value={code}
+                path={monacoPath}
+                onChange={(value) => setCode(value ?? '')}
+                theme="vs-dark"
+                beforeMount={(monaco) => {
+                  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                    allowJs: true,
+                    module: monaco.languages.typescript.ModuleKind.ESNext,
+                    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                    noUnusedLocals: false,
+                    noUnusedParameters: false,
+                    strict: false,
+                    target: monaco.languages.typescript.ScriptTarget.ESNext,
+                  });
+                  monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                    allowJs: true,
+                    checkJs: false,
+                    module: monaco.languages.typescript.ModuleKind.CommonJS,
+                    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                    target: monaco.languages.typescript.ScriptTarget.ESNext,
+                  });
+                  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+                    UTILS_TYPE_DECLARATION,
+                    'file:///utils.d.ts',
+                  );
+                  monaco.languages.typescript.javascriptDefaults.addExtraLib(
+                    UTILS_TYPE_DECLARATION,
+                    'file:///utils.d.ts',
+                  );
+                }}
+                options={{
+                  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                  fontLigatures: true,
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  minimap: { enabled: false },
+                  padding: { top: 16, bottom: 16 },
+                  renderLineHighlight: 'line',
+                  scrollBeyondLastLine: false,
+                  smoothScrolling: true,
+                  tabSize: 2,
+                  wordWrap: 'on',
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    {showRunModal && (
-      <RunBacktestModal
-        algorithms={[{ id: algorithm.id, name: algorithm.name }]}
-        onConfirm={(algorithmIds, timespan, name) => {
-          void runBacktest(algorithmIds, timespan, name);
-          setShowRunModal(false);
-        }}
-        onClose={() => setShowRunModal(false)}
-      />
-    )}
+      {showRunModal && (
+        <RunBacktestModal
+          algorithms={[{ id: algorithm.id, name: algorithm.name }]}
+          onConfirm={(algorithmIds, timespan, name) => {
+            void runBacktest(algorithmIds, timespan, name);
+            setShowRunModal(false);
+          }}
+          onClose={() => setShowRunModal(false)}
+        />
+      )}
 
-    {showExamples && (
-      <ExamplesModal
-        algorithmType={algorithm.type as 0 | 1 | 2}
-        language={algorithm.language as SupportedLanguage}
-        onLoad={(exampleCode) => {
-          setCode(exampleCode.trim());
-          setShowExamples(false);
-          toast.success('Example loaded — remember to save when ready');
-        }}
-        onClose={() => setShowExamples(false)}
-      />
-    )}
+      {activeIndicator != null && (
+        <IndicatorDetailModal
+          indicator={activeIndicator}
+          language={algorithm.language as SupportedLanguage}
+          onClose={() => setActiveIndicator(null)}
+          onSeeExample={(exampleId) => {
+            setActiveIndicator(null);
+            openExamples(exampleId);
+          }}
+        />
+      )}
+
+      {showExamples && (
+        <ExamplesModal
+          language={algorithm.language as SupportedLanguage}
+          initialExampleId={examplesInitialId}
+          onCreateFromExample={(example, lang) => {
+            setShowExamples(false);
+            void handleCreateFromExample(example, lang);
+          }}
+          onClose={() => setShowExamples(false)}
+        />
+      )}
+
+      {pendingCreate != null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setPendingCreate(null)}
+          />
+          <div
+            className="relative w-full max-w-sm rounded-2xl bg-slate-900 border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.5)] p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <svg
+                className="w-4 h-4 text-amber-400 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <h3 className="text-sm font-bold text-white">Name already taken</h3>
+            </div>
+            <p className="text-sm text-white/50 leading-relaxed mb-5">
+              You already have an algorithm called{' '}
+              <span className="text-white/80 font-medium">"{pendingCreate.example.name}"</span>.
+              Replacing it will permanently delete that algorithm and all its backtest history.
+            </p>
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingCreate(null)}
+                className="px-4 py-2 rounded-xl text-sm border border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isCreating}
+                onClick={() => {
+                  const p = pendingCreate;
+                  setPendingCreate(null);
+                  void doCreateFromExample(p.example, p.lang, p.conflictId);
+                }}
+                className="px-4 py-2 rounded-xl text-sm border border-red-500/40 bg-red-500/15 text-red-300 hover:bg-red-500/25 hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Replace it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

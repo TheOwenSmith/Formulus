@@ -2,3 +2,4 @@
 export interface IndicatorMetadataParts {}
 
 export type IndicatorMetadata = IndicatorMetadataParts;
+export type IndicatorMetadataKey = keyof IndicatorMetadataParts;

@@ -5,13 +5,17 @@ import {
   getAlgorithmByIdForCreator,
   getAlgorithmsByCreatorId,
   updateAlgorithmCode,
+  updateAlgorithmIndicators,
   uploadAlgorithm,
 } from '@api/repository/db-algorithm';
-import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
 import { getResultAccessInfo } from '@api/repository/db-sharing';
+import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
 import { badRequest } from '@api/utils/error-handling';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
+import { MAX_INDICATORS_COUNT } from '@shared/trading-constants';
 import {
+  indicatorSchema,
+  indicatorsValidationForContextLength,
   userAlgorithmSchema,
   userSimpleAlgorithmSchema,
   userTopKAlgorithmSchema,
@@ -48,7 +52,7 @@ export function algorithmsRouter(
         // Verify copy access: owner or explicit share with allowCopy
         const accessResult = await getResultAccessInfo(resultPublicId, user.id);
         if (accessResult.isErr()) throw accessResult.error;
-        if (accessResult.value == null || !accessResult.value.canCopy) {
+        if (!accessResult.value?.canCopy) {
           throw badRequest('You do not have permission to copy algorithms from this result');
         }
 
@@ -108,6 +112,41 @@ export function algorithmsRouter(
           code: input.code,
           creatorId: ctx.user.id,
           id: input.id,
+        });
+        if (result.isErr()) throw result.error;
+      }),
+
+    updateAlgorithmIndicators: authProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          indicators: z
+            .array(indicatorSchema)
+            .max(MAX_INDICATORS_COUNT)
+            .superRefine((indicators, ctx) => {
+              if (new Set(indicators).size !== indicators.length) {
+                ctx.addIssue({
+                  code: 'custom',
+                  input: indicators,
+                  message: `Indicators must be distinct`,
+                });
+              }
+            }),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const algorithmResult = await getAlgorithmByIdForCreator(input.id, ctx.user.id);
+        if (algorithmResult.isErr()) throw algorithmResult.error;
+        if (algorithmResult.value == null) throw badRequest('Algorithm not found');
+        const { contextLength } = algorithmResult.value;
+
+        const parseResult = indicatorsValidationForContextLength(input.indicators, contextLength);
+        if (parseResult.isErr()) throw parseResult.error;
+
+        const result = await updateAlgorithmIndicators({
+          creatorId: ctx.user.id,
+          id: input.id,
+          indicators: input.indicators,
         });
         if (result.isErr()) throw result.error;
       }),

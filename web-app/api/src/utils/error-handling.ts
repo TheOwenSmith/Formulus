@@ -1,5 +1,6 @@
 import type { TRPC_ERROR_CODE_KEY } from '@trpc/server';
 import { ok, Result, ResultAsync } from 'neverthrow';
+import z from 'zod';
 
 export const fromThrowable = <T>(
   fn: () => T,
@@ -16,6 +17,24 @@ export type AppError = {
   error?: unknown;
   code: TRPC_ERROR_CODE_KEY;
 };
+
+export const appErrorSchema = z
+  .object({
+    message: z.string().optional(),
+    error: z.unknown().optional(),
+    code: z.string(),
+  })
+  .strict();
+
+export function isAppError(cause: unknown): cause is AppError {
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    typeof (cause as { code: unknown }).code === 'string' &&
+    !('stack' in cause)
+  );
+}
 
 export function internal(error: unknown, message?: string): AppError {
   return {

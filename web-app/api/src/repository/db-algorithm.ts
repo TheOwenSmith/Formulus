@@ -193,6 +193,28 @@ export async function getAlgorithmsByCreatorId(
   return ok(getDbAlgorithmsResult.value.map(dbAlgorithmToUserAlgorithm));
 }
 
+export async function updateAlgorithmIndicators({
+  id,
+  indicators,
+  creatorId,
+}: {
+  id: string;
+  indicators: Indicator[];
+  creatorId: string;
+}): Promise<Result<void, AppError>> {
+  const updateResult = await fromThrowableAsync(
+    () =>
+      prisma.algorithm.updateMany({
+        data: { indicators },
+        where: { creatorId, id },
+      }),
+    (e) => internal(e, 'Failed to update algorithm indicators'),
+  );
+  if (updateResult.isErr()) return err(updateResult.error);
+  if (updateResult.value.count === 0) return err(badRequest('Algorithm not found'));
+  return ok(undefined);
+}
+
 export async function deleteAlgorithmByIdForCreator({
   id,
   creatorId,

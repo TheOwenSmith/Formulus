@@ -1,3 +1,7 @@
+export {
+  indicatorSchema,
+  indicatorsValidationForContextLength,
+} from '@worker/core/algorithms/indicators/indicator';
 export type { Indicator } from '@worker/core/algorithms/indicators/indicator';
 export { AlgorithmType, userAlgorithmSchema } from '@worker/core/algorithms/user-algorithm';
 export type { AnyUserAlgorithmType, UserAlgorithm } from '@worker/core/algorithms/user-algorithm';

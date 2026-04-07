@@ -717,8 +717,8 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     code: NO_MONDAYS_CODE,
   },
   {
-    id: 'top-k-rsi',
-    name: 'Top-K RSI (Most Oversold)',
+    id: 'top-k-most_oversold',
+    name: 'Top-K Most Oversold',
     description: 'Score tickers by inverted RSI. The most oversold K tickers are held.',
     algorithmType: 2,
     indicators: ['RSI(14)'],
