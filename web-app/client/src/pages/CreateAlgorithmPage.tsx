@@ -1,3 +1,4 @@
+import { ExamplesModal } from '@client/components/ExamplesModal';
 import { Tooltip } from '@client/components/Tooltip';
 import { CheckIcon, NormalIcon, SimpleIcon, Spinner, TopKIcon } from '@client/icons';
 import { getDefaultImplementationCode } from '@client/lib/defaultAlgorithmCode';
@@ -10,8 +11,9 @@ import {
   type TickerValue,
 } from '@shared/api';
 import { ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@shared/constants';
+import type { AlgorithmExample } from '@shared/examples';
 import { tickers as TICKERS, type Timestamp } from '@shared/trading-constants';
-import type { AnyUserAlgorithmType, SupportedLanguage } from '@shared/worker';
+import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/worker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -126,6 +128,7 @@ export function CreateAlgorithmPage() {
   const [shakeContextLength, setShakeContextLength] = useState(false);
   const [shakeMaxHolding, setShakeMaxHolding] = useState(false);
   const [shakeK, setShakeK] = useState(false);
+  const [showExamplesModal, setShowExamplesModal] = useState(false);
 
   const maxK = state.selectedTickers.length || 1;
   const MAX_CONTEXT_LENGTH = 9999;
@@ -175,6 +178,33 @@ export function CreateAlgorithmPage() {
       },
     }),
   );
+
+  async function handleCreateFromExample(example: AlgorithmExample, lang: SupportedLanguage) {
+    setShowExamplesModal(false);
+    const base = {
+      aggregate: example.aggregate as Timestamp,
+      contextLength: example.contextLength,
+      indicators: example.indicators as Indicator[],
+      language: lang,
+      name: example.name,
+      userAlgorithmImplementationCode: example.code[lang].trimStart(),
+    };
+    let payload: AnyUserAlgorithmType;
+    if (example.algorithmType === AlgorithmType.SIMPLE) {
+      payload = { ...base, ticker: example.ticker! as TickerValue, type: AlgorithmType.SIMPLE };
+    } else if (example.algorithmType === AlgorithmType.TOP_K) {
+      payload = { ...base, k: example.k!, tickers: example.tickers! as TickerValue[], type: AlgorithmType.TOP_K };
+    } else {
+      payload = { ...base, tickers: example.tickers! as TickerValue[], type: AlgorithmType.NORMAL };
+    }
+    try {
+      const result = await createAlgorithm(payload);
+      toast.success('Algorithm created');
+      navigate(`/algorithms/${result.id}`);
+    } catch {
+      // error handled in onError
+    }
+  }
 
   function buildPayload(): AnyUserAlgorithmType {
     const defaultCode = getDefaultImplementationCode(
@@ -320,6 +350,17 @@ export function CreateAlgorithmPage() {
           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-white/25 outline-none text-base"
         />
         {nameError && <p className="mt-1 text-xs text-red-400">{nameError}</p>}
+      </div>
+      <div className="flex items-center gap-3 w-full">
+        <div className="h-px flex-1 bg-white/[0.07]" />
+        <button
+          type="button"
+          onClick={() => setShowExamplesModal(true)}
+          className="text-xs text-white/35 hover:text-white/65 transition-colors cursor-pointer"
+        >
+          or browse examples
+        </button>
+        <div className="h-px flex-1 bg-white/[0.07]" />
       </div>
     </div>
   );
@@ -581,6 +622,7 @@ export function CreateAlgorithmPage() {
   );
 
   return (
+    <>
     <div
       className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col font-sans text-white overflow-hidden"
       style={{
@@ -706,5 +748,14 @@ export function CreateAlgorithmPage() {
         </div>
       </div>
     </div>
+
+    {showExamplesModal && (
+      <ExamplesModal
+        language={state.language ?? 'typescript'}
+        onCreateFromExample={(example, lang) => { void handleCreateFromExample(example, lang); }}
+        onClose={() => setShowExamplesModal(false)}
+      />
+    )}
+    </>
   );
 }

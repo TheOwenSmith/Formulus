@@ -1,6 +1,12 @@
 import type { UserTicker } from '@api/fetch/types';
 import { prisma } from '@api/lib/prisma';
-import { badRequest, fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
+import {
+  badRequest,
+  fromThrowableAsync,
+  internal,
+  isPrismaUniqueConstraintError,
+  type AppError,
+} from '@api/utils/error-handling';
 import {
   convertAlgorithmTypeToDbAlgorithmType,
   convertDbAlgorithmTypeToAlgorithmType,
@@ -113,7 +119,10 @@ export async function uploadAlgorithm({
           userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
         },
       }),
-    (e) => internal(e),
+    (e) =>
+      isPrismaUniqueConstraintError(e)
+        ? badRequest('An algorithm with that name already exists')
+        : internal(e),
   );
   return createAlgorithmResult;
 }

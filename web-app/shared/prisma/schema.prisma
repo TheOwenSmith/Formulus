@@ -168,7 +168,7 @@ model BacktestingResults {
   createdAt DateTime @default(now())
 
   isPublic Boolean @default(false)
-  name String? @db.VarChar(64)
+  name String @db.VarChar(64)
 
   algorithmGraphs AlgorithmGraph[] @relation("BacktestingResultsAlgorithmGraph")
   tickerPlots TickerPlot[] @relation("BacktestingResultsTickerPlot")

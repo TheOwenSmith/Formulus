@@ -14,7 +14,7 @@ globalThis.pgPool ??= new Pool({
 
 globalThis.prisma ??= new PrismaClient({
   adapter: new PrismaPg(globalThis.pgPool),
-  log: ['warn', 'error'],
+  log: [],
 });
 
 export const prisma = globalThis.prisma;

@@ -1,11 +1,14 @@
+import { ExamplesModal } from '@client/components/ExamplesModal';
 import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { Tooltip } from '@client/components/Tooltip';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
-import { AlgorithmType, MAX_ALGORITHMS_TO_COMPARE } from '@shared/api';
 import { trpcCredentials } from '@client/lib/trpc';
-import type { AnyUserAlgorithmType } from '@shared/worker';
-import { useEffect, useState } from 'react';
+import { AlgorithmType, MAX_ALGORITHMS_TO_COMPARE, type TickerValue } from '@shared/api';
+import type { AlgorithmExample } from '@shared/examples';
+import type { Timestamp } from '@shared/trading-constants';
+import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/worker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { useLoaderData, useNavigate, useRevalidator } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -286,6 +289,7 @@ export function AlgorithmsPage() {
   const [runModalAlgorithms, setRunModalAlgorithms] = useState<{ id: string; name: string }[] | null>(null);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showExamplesModal, setShowExamplesModal] = useState(false);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -316,6 +320,46 @@ export function AlgorithmsPage() {
 
   function openRunModal(algos: { id: string; name: string }[]) {
     setRunModalAlgorithms(algos);
+  }
+
+  const { mutateAsync: createAlgorithm } = useMutation(
+    trpcCredentials.algorithms.createAlgorithm.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to create algorithm');
+      },
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpcCredentials.algorithms.getAlgorithms.queryKey(),
+        });
+      },
+    }),
+  );
+
+  async function handleCreateFromExample(example: AlgorithmExample, lang: SupportedLanguage) {
+    setShowExamplesModal(false);
+    const base = {
+      aggregate: example.aggregate as Timestamp,
+      contextLength: example.contextLength,
+      indicators: example.indicators as Indicator[],
+      language: lang,
+      name: example.name,
+      userAlgorithmImplementationCode: example.code[lang].trimStart(),
+    };
+    let payload: AnyUserAlgorithmType;
+    if (example.algorithmType === AlgorithmType.SIMPLE) {
+      payload = { ...base, ticker: example.ticker! as TickerValue, type: AlgorithmType.SIMPLE };
+    } else if (example.algorithmType === AlgorithmType.TOP_K) {
+      payload = { ...base, k: example.k!, tickers: example.tickers! as TickerValue[], type: AlgorithmType.TOP_K };
+    } else {
+      payload = { ...base, tickers: example.tickers! as TickerValue[], type: AlgorithmType.NORMAL };
+    }
+    try {
+      const result = await createAlgorithm(payload);
+      toast.success('Algorithm created');
+      navigate(`/algorithms/${result.id}`);
+    } catch {
+      // error handled in onError
+    }
   }
 
   const { mutateAsync: deleteAlgorithm } = useMutation(
@@ -448,6 +492,17 @@ export function AlgorithmsPage() {
             >
               Create your first algorithm
             </button>
+            <div className="flex items-center gap-3 w-48">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-white/30 text-xs">or</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+            <button
+              onClick={() => setShowExamplesModal(true)}
+              className="px-6 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white"
+            >
+              Load in an example
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -470,6 +525,15 @@ export function AlgorithmsPage() {
         )}
       </div>
     </div>
+
+    {/* Examples modal */}
+    {showExamplesModal && (
+      <ExamplesModal
+        language="typescript"
+        onCreateFromExample={(example, lang) => { void handleCreateFromExample(example, lang); }}
+        onClose={() => setShowExamplesModal(false)}
+      />
+    )}
 
     {/* Run backtest modal */}
     {runModalAlgorithms && (
