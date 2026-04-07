@@ -78,6 +78,7 @@ function AlgorithmCard({
   cooldownSecondsLeft,
   isDeleting,
   isSelected,
+  isIncompatible,
   onClick,
 }: {
   algorithm: AlgorithmWithId;
@@ -89,6 +90,7 @@ function AlgorithmCard({
   cooldownSecondsLeft: number;
   isDeleting: boolean;
   isSelected: boolean;
+  isIncompatible: boolean;
   onClick: () => void;
 }) {
   const tickers = getTickers(algorithm);
@@ -121,8 +123,11 @@ function AlgorithmCard({
 
   const handleCardClick = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
-    if (isCompareMode) onToggleSelect(algorithm.id);
-    else onClick();
+    if (isCompareMode) {
+      if (!isIncompatible) onToggleSelect(algorithm.id);
+    } else {
+      onClick();
+    }
   };
 
   return (
@@ -133,7 +138,9 @@ function AlgorithmCard({
       onClick={handleCardClick}
       onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(e); }}
       className={`relative bg-slate-900/60 rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px] flex flex-col gap-3.5 cursor-pointer transition-all duration-300 group ${
-        isSelected
+        isIncompatible
+          ? 'opacity-30 cursor-not-allowed'
+          : isSelected
           ? 'shadow-[0_20px_60px_rgba(0,0,0,0.4),0_0_0_2px_rgba(59,130,246,0.5)] -translate-y-0.5 bg-blue-950/30'
           : isCompareMode
           ? 'hover:shadow-[0_20px_60px_rgba(0,0,0,0.4),0_0_0_1px_rgba(59,130,246,0.2)] hover:-translate-y-0.5'
@@ -291,15 +298,33 @@ export function AlgorithmsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showExamplesModal, setShowExamplesModal] = useState(false);
 
+  const selectedLanguage: SupportedLanguage | null =
+    selectedIds.size > 0
+      ? (algorithms.find((a) => selectedIds.has(a.id))?.language ?? null)
+      : null;
+
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
-      if (!prev.has(id) && prev.size >= MAX_ALGORITHMS_TO_COMPARE) {
+      if (prev.has(id)) {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+      const alg = algorithms.find((a) => a.id === id);
+      if (!alg) return prev;
+      if (prev.size > 0) {
+        const lockedLang = algorithms.find((a) => prev.has(a.id))?.language;
+        if (lockedLang && alg.language !== lockedLang) {
+          toast.error(`All selected algorithms must use the same language (${LANG_LABEL[lockedLang] ?? lockedLang})`);
+          return prev;
+        }
+      }
+      if (prev.size >= MAX_ALGORITHMS_TO_COMPARE) {
         toast.error(`You can compare at most ${MAX_ALGORITHMS_TO_COMPARE} algorithms at once`);
         return prev;
       }
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.add(id);
       return next;
     });
   }
@@ -428,15 +453,19 @@ export function AlgorithmsPage() {
                 {/* Select All / Clear All */}
                 <button
                   onClick={() => {
-                    if (selectedIds.size === Math.min(algorithms.length, MAX_ALGORITHMS_TO_COMPARE)) {
+                    const eligible = selectedLanguage
+                      ? algorithms.filter((a) => a.language === selectedLanguage)
+                      : algorithms;
+                    const cap = Math.min(eligible.length, MAX_ALGORITHMS_TO_COMPARE);
+                    if (selectedIds.size === cap) {
                       setSelectedIds(new Set());
                     } else {
-                      setSelectedIds(new Set(algorithms.slice(0, MAX_ALGORITHMS_TO_COMPARE).map((a) => a.id)));
+                      setSelectedIds(new Set(eligible.slice(0, cap).map((a) => a.id)));
                     }
                   }}
                   className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white"
                 >
-                  {selectedIds.size === algorithms.length ? 'Deselect All' : 'Select All'}
+                  {selectedIds.size > 0 && selectedIds.size === Math.min((selectedLanguage ? algorithms.filter((a) => a.language === selectedLanguage) : algorithms).length, MAX_ALGORITHMS_TO_COMPARE) ? 'Deselect All' : 'Select All'}
                 </button>
                 {/* Exit compare mode */}
                 <button
@@ -518,6 +547,7 @@ export function AlgorithmsPage() {
                 cooldownSecondsLeft={cooldownSecondsLeft}
                 isDeleting={deletingId === algorithm.id}
                 isSelected={selectedIds.has(algorithm.id)}
+                isIncompatible={isCompareMode && selectedLanguage !== null && algorithm.language !== selectedLanguage}
                 onClick={() => navigate(`/algorithms/${algorithm.id}`)}
               />
             ))}

@@ -19,7 +19,7 @@ export * from './social';
 export * from './common';
 
 // Algorithm type icons (onboarding workflow)
-export { NormalIcon, SimpleIcon, TopKIcon } from './algorithm-types';
+export { ExamplesIcon, NormalIcon, SimpleIcon, TopKIcon } from './algorithm-types';
 
 // Status icon components (check, spinner)
 export { CheckIcon, Spinner } from './status-components';
