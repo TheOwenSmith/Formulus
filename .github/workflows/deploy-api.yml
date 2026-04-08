@@ -36,6 +36,8 @@ jobs:
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
       COHERE_MODEL: ${{ secrets.COHERE_MODEL }}
+      ACTIONS_STEP_DEBUG: "true"
+      ACTIONS_RUNNER_DEBUG: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
