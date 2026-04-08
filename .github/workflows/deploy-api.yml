@@ -1,3 +1,9 @@
+# OIDC: IAM role trust policy must allow GitHub's token. Use audience sts.amazonaws.com.
+# For this workflow (branch api-prod), the JWT `sub` looks like:
+#   repo:<owner>/<repo>:ref:refs/heads/api-prod
+# Trust policy: StringLike on token.actions.githubusercontent.com:sub with repo:OWNER/REPO:*
+# or an exact ref. If sub does not match, STS returns Not authorized to perform sts:AssumeRoleWithWebIdentity.
+
 name: Deploy API
 
 on:
@@ -51,6 +57,7 @@ jobs:
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          audience: sts.amazonaws.com
 
       - name: Install infra deps
         working-directory: web-app/infra
