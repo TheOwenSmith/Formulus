@@ -37,7 +37,7 @@ export class ComputeStack extends cdk.Stack {
 
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       vpc: this.vpc,
-      clusterName: 'phoenixtrader-backtest',
+      clusterName: 'formulus-backtest',
     });
 
     // ECS on EC2 because the worker uses dockerode (requires a Docker daemon).
@@ -60,7 +60,7 @@ export class ComputeStack extends cdk.Stack {
     );
 
     const logGroup = new logs.LogGroup(this, 'WorkerLogGroup', {
-      logGroupName: '/phoenixtrader/worker',
+      logGroupName: '/formulus/worker',
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -76,7 +76,7 @@ export class ComputeStack extends cdk.Stack {
       }),
     );
 
-    const container = this.taskDefinition.addContainer('WorkerContainer', {
+    this.taskDefinition.addContainer('WorkerContainer', {
       image: ecs.ContainerImage.fromEcrRepository(props.workerImageRepo, 'latest'),
       memoryReservationMiB: 1024,
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),

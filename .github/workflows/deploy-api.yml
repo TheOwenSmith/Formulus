@@ -1,20 +1,21 @@
-# Full CDK app (all stacks). Prefer component branches: client-prod, api-prod, worker-prod.
-name: Deploy Infra (CDK full stack)
+# Deploy API Lambda + dependencies (Queue) when `api-prod` moves forward.
+# Prerequisites: GitHub OIDC to AWS (AWS_ROLE_TO_ASSUME), secrets below.
+#
+# Set repository secrets matching Lambda env keys (see `LAMBDA_ENV_KEYS` in web-app/infra/bin/app.ts).
+# Optional: repository variables API_DOMAIN_NAME + API_SUB_DOMAIN for custom API domain.
+
+name: Deploy API (CDK)
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - 'web-app/infra/**'
-      - '.github/workflows/deploy-infra.yml'
+    branches: [api-prod]
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: cdk-deploy-${{ github.ref }}
+  group: deploy-api-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -64,11 +65,7 @@ jobs:
         working-directory: web-app/infra
         run: pnpm run build
 
-      - name: CDK synth
-        working-directory: web-app/infra
-        run: npx cdk synth
-
-      - name: CDK deploy
+      - name: CDK deploy API stack
         working-directory: web-app/infra
         env:
           API_DOMAIN_NAME: ${{ vars.API_DOMAIN_NAME }}
@@ -79,5 +76,4 @@ jobs:
           if [ -n "${API_DOMAIN_NAME:-}" ] && [ -n "${API_SUB_DOMAIN:-}" ]; then
             EXTRA+=( -c "apiDomainName=${API_DOMAIN_NAME}" -c "apiSubDomain=${API_SUB_DOMAIN}" )
           fi
-          npx cdk deploy --all --require-approval never "${EXTRA[@]}"
-
+          npx cdk deploy FormulusApi --require-approval never "${EXTRA[@]}"

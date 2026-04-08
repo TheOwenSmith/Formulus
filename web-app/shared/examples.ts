@@ -663,7 +663,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
   },
   {
     id: 'long-short',
-    name: 'Long-Short (SPY / SH)',
+    name: 'Long-Short (SPY-SH)',
     description: 'Uses RSI on SPY to switch between the market (SPY) and its inverse ETF (SH).',
     algorithmType: 0,
     indicators: ['RSI(14)'],

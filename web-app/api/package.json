@@ -8,6 +8,7 @@
     "build": "node ./esbuild.config.mjs",
     "dev": "concurrently \"node ./esbuild.config.mjs --watch\" \"nodemon --watch ./dist/index.js --exec \\\"node ./dist/index.js\\\"\"",
     "preview": "node ./dist/index.js",
+    "build:lambda": "node ./esbuild.lambda.config.mjs",
     "console": "node ./src/scripts/esbuild-console.config.mjs && node ./dist/console.js",
     "prettier:write": "prettier \"**/*.{ts,js}\" --write",
     "prettier:check": "prettier \"**/*.{ts,js}\" --check",
@@ -32,7 +33,6 @@
     "eslint-plugin-sort-keys": "^2.3.5",
     "nodemon": "^3.1.11",
     "prisma": "^7.4.0",
-    "source-map-support": "^0.5.21",
     "typescript-eslint": "^8.46.4"
   },
   "peerDependencies": {
@@ -41,6 +41,7 @@
   "dependencies": {
     "@ai-sdk/cohere": "^3.0.28",
     "@aws-sdk/client-sqs": "^3.985.0",
+    "@codegenie/serverless-express": "^4.17.1",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^7.4.2",
     "@trpc/server": "^11.8.1",
@@ -52,6 +53,7 @@
     "nanoid": "^5.1.6",
     "neverthrow": "^8.2.0",
     "pg": "^8.16.3",
+    "source-map-support": "^0.5.21",
     "why-is-node-running": "^3.2.2",
     "zod": "^4.1.12"
   }

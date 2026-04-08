@@ -1,0 +1,40 @@
+# Triggers an Amplify Hosting build for branch `client-prod`.
+# Create the branch in the Amplify app (console or CLI) and connect this repo if needed.
+#
+# Secrets: AWS_REGION, AWS_ROLE_TO_ASSUME, AMPLIFY_APP_ID
+
+name: Deploy client (Amplify)
+
+on:
+  push:
+    branches: [client-prod]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-client-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  start-amplify:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Start Amplify build
+        env:
+          AMPLIFY_APP_ID: ${{ secrets.AMPLIFY_APP_ID }}
+        run: |
+          set -euo pipefail
+          aws amplify start-job \
+            --app-id "$AMPLIFY_APP_ID" \
+            --branch-name client-prod \
+            --job-type RELEASE

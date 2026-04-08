@@ -9,7 +9,7 @@ export class EcrStack extends cdk.Stack {
     super(scope, id, props);
 
     this.workerRepo = new ecr.Repository(this, 'WorkerRepo', {
-      repositoryName: 'phoenixtrader-worker',
+      repositoryName: 'formulus-worker',
       imageScanOnPush: true,
       encryption: ecr.RepositoryEncryption.AES_256,
       removalPolicy: cdk.RemovalPolicy.RETAIN,

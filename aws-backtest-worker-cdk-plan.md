@@ -202,6 +202,57 @@ Record the chosen pattern in this doc when you decide.
 
 ---
 
+## Full application cloud readiness (not only the worker)
+
+These items are **outside** the SQS → dispatcher → Fargate worker pipeline but are required for the product to work end-to-end on AWS. They complement §4 (API) and should be tracked in the same deployment plan.
+
+### Client (Amplify Hosting / Vite)
+
+- **Build-time URL:** Vite exposes only variables prefixed with `VITE_*`. Set the public API base (for tRPC and any absolute calls) in Amplify environment variables so production builds point at **API Gateway**, not `localhost`.
+- **SPA routing:** Ensure the host serves `index.html` for client-side routes (Amplify custom rules / 404 → 200 pattern).
+
+### CORS, cookies, and origins
+
+- **Browser security:** If the SPA uses **cookies or `credentials: 'include'`** for Better Auth, CORS cannot use `*` for `Access-Control-Allow-Origin`. The API must allow the **exact Amplify app URL(s)** (and any preview branch URLs you use).
+- **Code alignment:** `CORS_ORIGIN` (or equivalent) and Better Auth **`trustedOrigins`** must list those same origins. Staging and production need separate values if hostnames differ.
+
+### Authentication (Better Auth / OAuth)
+
+- **Public base URL:** Production **`baseURL`** (if configured) must match the **API’s public URL** (API Gateway custom domain or default execute-api URL), not the Amplify URL alone, for server-side redirects and cookie paths as designed.
+- **OAuth consoles:** Register redirect/callback URLs for **Google (or other) OAuth** with the API’s `/api/auth/...` routes on the deployed API hostname.
+
+### API on Lambda + HTTP API Gateway
+
+- **Integration timeout:** API Gateway HTTP APIs have a **maximum integration timeout (~29 seconds)**. Any tRPC procedure or route that can run longer must be redesigned (async job + poll, Step Functions, etc.) or moved off API Gateway.
+- **VPC:** If **RDS is in private subnets**, the API Lambda usually needs **VPC configuration** (subnets + security group) and often **RDS Proxy** or another pooler so concurrent Lambdas do not exhaust PostgreSQL connections.
+- **Cold start / provisioned concurrency:** Optional tuning if latency matters; not required for correctness.
+- **Prisma binary targets:** Lambda runs Linux (`rhel-openssl-3.0.x` or similar); `schema.prisma` `binaryTargets` must include the Lambda engine in addition to local dev targets.
+
+### SQS from the API
+
+- **IAM:** The API execution role needs **`sqs:SendMessage`** on the job queue (already assumed in §4).
+- **Configuration:** `QUEUE_URL` (and region) must be set in Lambda environment or pulled from SSM/Secrets Manager — same contract as local, different values.
+
+### Secrets and configuration hygiene
+
+- **No secrets in CDK context for production:** Prefer **Secrets Manager** or **SSM Parameter Store (SecureString)** for `DATABASE_URL`, OAuth client secrets, and queue URLs if you treat them as sensitive. Avoid logging full `apiEnvJson` in CI output.
+
+### CDK bundling (Prisma + monorepo)
+
+- **Host OS:** `aws-lambda-nodejs` Docker bundling may run **`prisma generate`** inside the container; on **Windows** hosts, path handling has been fragile. Prefer **`cdk synth` / `cdk deploy` on Linux** (GitHub Actions) or **WSL** for local synth until you standardize on a container image build for the API.
+- **Generated client:** If `shared/generated` is gitignored, CI must run **`prisma generate`** before synth or rely on the bundler step that generates inside Docker successfully on Linux.
+
+### IAM hardening (dispatcher)
+
+- Scope **`iam:PassRole`** (and any `ecs:RunTask` resources) to the **specific task execution role** and task definition ARNs instead of `*` where possible.
+
+### Observability and operations
+
+- **Alarms:** DLQ depth, Lambda errors (API + dispatcher), ECS task failures, RDS connections (optional).
+- **Logs:** CloudWatch log groups for API Lambda, dispatcher, ECS tasks; retain per compliance needs.
+
+---
+
 ## CDK implementation order
 
 1. VPC/subnets/SG (or reference existing).
@@ -209,17 +260,21 @@ Record the chosen pattern in this doc when you decide.
 3. ECS cluster + task definition + IAM + logs.
 4. SQS + DLQ.
 5. Lambda dispatcher + `RunTask` + event source mapping.
-6. Wire API `QUEUE_URL` + IAM `SendMessage`.
-7. Alarms + runbook for DLQ.
+6. Wire API `QUEUE_URL` + IAM `SendMessage`; API Lambda env (`CORS_ORIGIN`, secrets, optional VPC for private RDS). See **Full application cloud readiness**.
+7. Client hosting (for example Amplify): `VITE_*` API URL, SPA rewrite rules; keep allowed origins in sync with step 6.
+8. Better Auth / OAuth: production `baseURL`, redirect/callback URLs for the API hostname.
+9. Alarms + runbook (DLQ, API Lambda, dispatcher, ECS).
 
 ---
 
 ## Open decisions (fill in before build)
 
-1. **RDS:** New vs existing? Same VPC as Fargate?
+1. **RDS:** New vs existing? Same VPC as Fargate **and** API Lambda?
 2. **Outbound internet:** Public IP for tasks vs NAT?
 3. **Reliability:** Delete SQS message on `RunTask` success only vs Step Functions?
 4. **Peak concurrency:** Max concurrent Fargate tasks (RDS connection limit, Docker on host constraints).
+5. **API Gateway:** Any tRPC or HTTP routes that can exceed **~29s** — async pattern vs redesign?
+6. **Connection pooling:** RDS Proxy (or equivalent) for **Lambda + Fargate** concurrency vs RDS `max_connections`?
 
 ---
 

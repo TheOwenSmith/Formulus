@@ -10,13 +10,13 @@ export class QueueStack extends cdk.Stack {
     super(scope, id, props);
 
     this.dlq = new sqs.Queue(this, 'BacktestJobsDLQ', {
-      queueName: 'phoenixtrader-backtest-jobs-dlq',
+      queueName: 'formulus-backtest-jobs-dlq',
       retentionPeriod: cdk.Duration.days(14),
       encryption: sqs.QueueEncryption.SQS_MANAGED,
     });
 
     this.queue = new sqs.Queue(this, 'BacktestJobsQueue', {
-      queueName: 'phoenixtrader-backtest-jobs',
+      queueName: 'formulus-backtest-jobs',
       visibilityTimeout: cdk.Duration.hours(6),
       retentionPeriod: cdk.Duration.days(4),
       encryption: sqs.QueueEncryption.SQS_MANAGED,

@@ -27,6 +27,10 @@ app.use(
   }),
 );
 
-app.listen(config.port!, () => {
-  console.log(`Server is running on port ${config.port!}`);
-});
+if (config.env === 'dev') {
+  app.listen(config.port!, () => {
+    console.log(`Server is running on port ${config.port!}`);
+  });
+}
+
+export { app };

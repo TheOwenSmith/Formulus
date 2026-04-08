@@ -1,6 +1,9 @@
 import { config as dotenvConfig } from 'dotenv';
-import { validateEnvVars } from './validate-env-vars';
+import { validateEnvVars } from './validate-env-vars.js';
 dotenvConfig();
+
+/** In GitHub Actions only `bin/app.ts` reads account/region; Lambda env is passed via `-c apiEnvJson`. */
+const envVarsCdkOnly = ['CDK_DEFAULT_ACCOUNT', 'CDK_DEFAULT_REGION'] as const satisfies string[];
 
 const envVarsAll = [
   'ALPHA_VANTAGE_API_KEY',
@@ -18,6 +21,8 @@ const envVarsAll = [
   'AWS_SECRET_ACCESS_KEY',
   'COHERE_API_KEY',
   'COHERE_MODEL',
+  'CDK_DEFAULT_ACCOUNT',
+  'CDK_DEFAULT_REGION',
 ] as const satisfies string[];
 
 /** Lambda uses the execution role for AWS APIs; LocalStack uses explicit keys + endpoint. */
@@ -33,7 +38,10 @@ type EnvVar = (typeof envVarsAll)[number];
 
 class Config {
   private constructor() {
-    validateEnvVars(process.env['AWS_EXECUTION_ENV'] != null ? envVarsLambda : envVarsAll);
+    const inLambda = process.env['AWS_EXECUTION_ENV'] != null;
+    const inGithubCi = process.env['GITHUB_ACTIONS'] === 'true';
+    const toValidate = inLambda ? envVarsLambda : inGithubCi ? envVarsCdkOnly : envVarsAll;
+    validateEnvVars(toValidate);
   }
 
   static #instance: Config | null = null;
