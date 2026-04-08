@@ -18,6 +18,7 @@ concurrency:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    environment: production
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       ECR_REPO: formulus-worker

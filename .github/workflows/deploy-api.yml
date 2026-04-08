@@ -1,8 +1,9 @@
 # Deploy API Lambda + dependencies (Queue) when `api-prod` moves forward.
 # Prerequisites: GitHub OIDC to AWS (AWS_ROLE_TO_ASSUME), secrets below.
 #
-# Set repository secrets matching Lambda env keys (see `LAMBDA_ENV_KEYS` in web-app/infra/bin/app.ts).
-# Optional: repository variables API_DOMAIN_NAME + API_SUB_DOMAIN for custom API domain.
+# Secrets/vars can live on a GitHub Environment (e.g. production): set `environment` below to match.
+# Lambda env keys: see `LAMBDA_ENV_KEYS` in web-app/infra/bin/app.ts.
+# Optional: API_DOMAIN_NAME + API_SUB_DOMAIN (repo or environment variables).
 
 name: Deploy API (CDK)
 
@@ -21,6 +22,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
