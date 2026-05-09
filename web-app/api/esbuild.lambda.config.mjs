@@ -1,5 +1,4 @@
 import { build } from 'esbuild';
-import { nodeExternalsPlugin } from 'esbuild-node-externals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,8 +16,7 @@ await build({
   outfile: path.join(__dirname, 'dist/lambda.js'),
   minify: true,
   sourcemap: true,
-  external: ['node:*', ...prismaExternals],
-  plugins: [nodeExternalsPlugin()],
+  external: ['node:*', '../shared/node_modules/*', ...prismaExternals],
   alias: {
     '@api': path.join(__dirname, 'src'),
     '@shared': path.join(__dirname, '..', 'shared'),
