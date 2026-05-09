@@ -4,8 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Contain native code and cannot be bundled
+/** Native/binary only — everything else is bundled into lambda.js. */
 const prismaExternals = ['@prisma/client', '@prisma/client/*', '@prisma/adapter-pg', 'pg'];
+
+/**
+ * Imports under ../worker/src walk up for node_modules and never reach ../api/node_modules.
+ * nodePaths adds api/node_modules so zod, neverthrow, etc. resolve and are inlined by esbuild.
+ */
+const apiNodeModules = path.join(__dirname, 'node_modules');
 
 await build({
   entryPoints: [path.join(__dirname, 'src/lambda.ts')],
@@ -17,9 +23,11 @@ await build({
   minify: true,
   sourcemap: true,
   external: ['node:*', '../shared/node_modules/*', ...prismaExternals],
+  nodePaths: [apiNodeModules],
   alias: {
     '@api': path.join(__dirname, 'src'),
     '@shared': path.join(__dirname, '..', 'shared'),
+    '@worker': path.join(__dirname, '..', 'worker', 'src'),
   },
   logLevel: 'info',
 });
