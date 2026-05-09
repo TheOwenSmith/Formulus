@@ -7,6 +7,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
+import { PNPM_VERSION } from './pnpm-version.js';
 
 /** Paths under `codeRoot` (must be `web-app/`: siblings `api/` + `shared/`). */
 export type FormulusApiBundlingPaths = {
@@ -49,7 +50,7 @@ export function formulusApiLambdaBundlingShell(
     'export CI=1',
     `rm -rf ${apiDir}/node_modules ${sharedDir}/node_modules`,
     'corepack enable',
-    'corepack prepare pnpm@9.15.4 --activate',
+    `corepack prepare pnpm@${PNPM_VERSION} --activate`,
     `cd ${apiDir}`,
     'pnpm install --frozen-lockfile --config.node-linker=hoisted',
     `pnpm exec prisma generate --schema=../${sharedRel}/prisma/schema.prisma`,
