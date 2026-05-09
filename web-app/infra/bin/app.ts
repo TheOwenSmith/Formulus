@@ -19,7 +19,7 @@ const env = {
   region: config.getKey('CDK_DEFAULT_REGION'),
 };
 
-/** Matches `envVarsLambda` in `web-app/api/src/lib/config.ts` (exclude `QUEUE_URL`, set by CDK). */
+/** Matches `envVarsLambda` in `web-app/api/src/lib/config.ts` (exclude `QUEUE_URL`, set by CDK; exclude `AWS_REGION`, reserved by Lambda). */
 const LAMBDA_ENV_KEYS = [
   'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
@@ -28,7 +28,6 @@ const LAMBDA_ENV_KEYS = [
   'BETTER_AUTH_SECRET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'AWS_REGION',
   'COHERE_API_KEY',
   'COHERE_MODEL',
 ] as const;
