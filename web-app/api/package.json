@@ -26,7 +26,6 @@
     "@types/pg": "^8.16.0",
     "concurrently": "^9.2.1",
     "esbuild": "^0.27.2",
-    "esbuild-node-externals": "^1.20.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -55,7 +54,6 @@
     "neverthrow": "^8.2.0",
     "pg": "^8.16.3",
     "source-map-support": "^0.5.21",
-    "why-is-node-running": "^3.2.2",
     "zod": "^4.1.12"
   }
 }
