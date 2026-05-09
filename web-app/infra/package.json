@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && tsc-alias",
     "synth": "cdk synth",
     "diff": "cdk diff",
     "deploy": "cdk deploy",
@@ -28,7 +28,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-sort-keys": "^2.3.5",
-    "tsconfig-paths": "^4.2.0",
+    "tsc-alias": "^1.8.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.58.0"
   }
