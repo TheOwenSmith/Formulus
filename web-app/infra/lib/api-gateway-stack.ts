@@ -103,6 +103,13 @@ export class ApiGatewayStack extends cdk.Stack {
     const stageName = props.stageName ?? 'prod';
     const allowWildcardOrigin = props.corsOrigins.includes('*');
 
+    const databaseUrl = process.env['DATABASE_URL']?.trim();
+    if (databaseUrl == null || databaseUrl === '') {
+      throw new Error(
+        'DATABASE_URL must be set when synthesizing or deploying the API stack (Prisma runs during Lambda asset bundling). On CI, ensure the deploy job sets DATABASE_URL (e.g. from secrets). Locally, set it in the environment or web-app/infra/.env before running CDK.',
+      );
+    }
+
     const apiFunction = new lambda.Function(this, `${id}-lambda-function`, {
       runtime: lambda.Runtime.NODEJS_24_X,
       handler: props.handler,
@@ -111,6 +118,9 @@ export class ApiGatewayStack extends cdk.Stack {
           image: lambda.Runtime.NODEJS_24_X.bundlingImage,
           user: 'root',
           command: props.bundlingCommand,
+          environment: {
+            DATABASE_URL: databaseUrl,
+          },
         },
       }),
       environment: props.lambdaEnvironment,
