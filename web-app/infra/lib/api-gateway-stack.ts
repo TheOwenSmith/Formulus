@@ -37,6 +37,10 @@ export const defaultApiCorsHeaders = [
 /**
  * Docker bundling script for the API Lambda. `codeRoot` must be **`web-app/`** so the container
  * sees **`api/`** and **`shared/`** as siblings (`api` imports `@shared/*`; Prisma uses `shared/prisma`).
+ *
+ * Prisma: temporarily patch `binaryTargets` to Linux-only for this image, then restore schema (trap).
+ * Runtime deps: `install-lambda-runtime-deps.mjs` installs only `pg` + `@prisma/client` without editing
+ * api/package.json or pnpm-lock.yaml (avoids CI frozen-lockfile errors).
  */
 export function formulusApiLambdaBundlingShell(
   paths: FormulusApiBundlingPaths = {},
@@ -48,18 +52,20 @@ export function formulusApiLambdaBundlingShell(
   const parts = [
     'set -euo pipefail',
     'export CI=1',
-    `rm -rf ${apiDir}/node_modules ${sharedDir}/node_modules`,
+    `rm -rf ${apiDir}/node_modules ${sharedDir}/node_modules ${apiDir}/.lambda-runtime-deps`,
     'corepack enable',
     `corepack prepare pnpm@${PNPM_VERSION} --activate`,
     `cd ${apiDir}`,
     'pnpm install --frozen-lockfile --config.node-linker=hoisted',
+    `trap 'mv -f ${sharedDir}/prisma/schema.prisma.bak ${sharedDir}/prisma/schema.prisma 2>/dev/null || true' EXIT`,
+    `cp ${sharedDir}/prisma/schema.prisma ${sharedDir}/prisma/schema.prisma.bak`,
+    `sed -i 's|binaryTargets = \\["native", "rhel-openssl-3.0.x"\\]|binaryTargets = ["rhel-openssl-3.0.x"]|' ${sharedDir}/prisma/schema.prisma`,
     `pnpm exec prisma generate --schema=../${sharedRel}/prisma/schema.prisma`,
     'node esbuild.lambda.config.mjs',
-    'pnpm prune --prod',
+    'node scripts/install-lambda-runtime-deps.mjs',
     'cp dist/lambda.js /asset-output/',
     'if [ -f dist/lambda.js.map ]; then cp dist/lambda.js.map /asset-output/; fi',
-    // Lambda loads `lambda.js` as CommonJS; repo `package.json` has `"type":"module"`.
-    `node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.type='commonjs';fs.writeFileSync('/asset-output/package.json',JSON.stringify(p,null,2));"`,
+    `node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const d=p.dependencies||{};fs.writeFileSync('/asset-output/package.json',JSON.stringify({name:'api',private:true,type:'commonjs',dependencies:{'@prisma/client':d['@prisma/client'],pg:d.pg}},null,2));"`,
     'cp -rL node_modules /asset-output/',
   ];
   const post = paths.bundlingPostCommand;

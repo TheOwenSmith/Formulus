@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Native/binary only — everything else is bundled into lambda.js. */
-const prismaExternals = ['@prisma/client', '@prisma/client/*', '@prisma/adapter-pg', 'pg'];
+/** Native/binary only — `@prisma/adapter-pg` is bundled (pure JS). */
+const prismaExternals = ['@prisma/client', '@prisma/client/*', 'pg'];
 
 /**
  * Imports under ../worker/src walk up for node_modules and never reach ../api/node_modules.
