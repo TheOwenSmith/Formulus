@@ -64,6 +64,7 @@ jobs:
           cache-dependency-path: |
             web-app/pnpm-lock.yaml
             web-app/api/pnpm-lock.yaml
+            web-app/infra/pnpm-lock.yaml
 
       # Skip install / prisma / lint only for manual prod deploy with bypass (never on push).
       - name: Install API dependencies
@@ -85,7 +86,7 @@ jobs:
       - name: Prettier
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
         continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
-        working-directory: web-app
+        working-directory: web-app/api
         run: pnpm run prettier:check
 
       - name: ESLint
