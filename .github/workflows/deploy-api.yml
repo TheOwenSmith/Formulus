@@ -1,8 +1,21 @@
+# Deploy API Lambda + API Gateway (staging + production).
+#
+# - Push api-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
+# - Push api-prod: environment production; Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is api-prod and
+#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
 name: Deploy API
 
 on:
   push:
-    branches: [api-prod]
+    branches: [api-prod, api-staging]
+  workflow_dispatch:
+    inputs:
+      skip_quality_checks:
+        description: Skip Prettier and ESLint (manual runs on api-prod only; push never skips)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -14,17 +27,17 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/api-prod' && 'production' || 'staging' }}
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
       GITHUB_ACTIONS: "true"
 
       # API Lambda environment (see LAMBDA_ENV_KEYS in web-app/infra/bin/app.ts)
       ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-      NODE_ENV: ${{ secrets.NODE_ENV }}
-      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+      NODE_ENV: ${{ vars.NODE_ENV }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -46,7 +59,42 @@ jobs:
         with:
           node-version: "24"
           cache: "pnpm"
-          cache-dependency-path: web-app/infra/pnpm-lock.yaml
+          cache-dependency-path: |
+            web-app/pnpm-lock.yaml
+            web-app/api/pnpm-lock.yaml
+
+      # Skip install / prisma / lint only for manual prod deploy with bypass (never on push).
+      - name: Install API dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app/api
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client (for ESLint)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app/api
+        run: pnpm run prisma:generate
+
+      # Prettier CLI + .prettierrc.json live under web-app/
+      - name: Install web-app dependencies (Prettier)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
+        working-directory: web-app
+        run: pnpm run prettier:check:api
+
+      - name: ESLint
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
+        working-directory: web-app/api
+        run: pnpm run lint
+
+      - name: Quality checks skipped
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks }}
+        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on api-prod only)."
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
