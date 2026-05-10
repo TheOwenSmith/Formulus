@@ -74,8 +74,12 @@ export function usersRouter(
       if (getProfileStatsResponse.isErr()) {
         throw getProfileStatsResponse.error;
       }
-      const [numberOfAlgorithms, numberOfBacktestingResults, numberOfBacktestingShares, numberOfBacktestingSharesSent] =
-        getProfileStatsResponse.value;
+      const [
+        numberOfAlgorithms,
+        numberOfBacktestingResults,
+        numberOfBacktestingShares,
+        numberOfBacktestingSharesSent,
+      ] = getProfileStatsResponse.value;
 
       return {
         numberOfAlgorithms,

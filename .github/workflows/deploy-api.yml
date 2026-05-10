@@ -29,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.ref == 'refs/heads/api-prod' && 'production' || 'staging' }}
     env:
+      # Opt into Node.js 24 for JS actions until defaults roll forward (see GH changelog).
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}

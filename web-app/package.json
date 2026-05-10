@@ -1,9 +1,5 @@
 {
 	"packageManager": "pnpm@9.15.4",
-	"scripts": {
-		"prettier:check:api": "prettier \"api/**/*.{ts,js}\" --check",
-		"prettier:write:api": "prettier \"api/**/*.{ts,js}\" --write"
-	},
 	"devDependencies": {
 		"prettier": "^3.7.4",
 		"prettier-plugin-organize-imports": "^4.3.0"

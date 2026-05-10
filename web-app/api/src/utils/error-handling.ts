@@ -48,10 +48,7 @@ export function badRequest(message: string, error?: unknown): AppError {
 
 export function isPrismaUniqueConstraintError(e: unknown): boolean {
   return (
-    typeof e === 'object' &&
-    e != null &&
-    'code' in e &&
-    (e as { code: unknown }).code === 'P2002'
+    typeof e === 'object' && e != null && 'code' in e && (e as { code: unknown }).code === 'P2002'
   );
 }
 

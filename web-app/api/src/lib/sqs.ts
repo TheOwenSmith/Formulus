@@ -10,7 +10,5 @@ const secretAccessKey = process.env['AWS_SECRET_ACCESS_KEY'];
 export const sqs = new SQSClient({
   region,
   ...(endpoint ? { endpoint } : {}),
-  ...(accessKeyId && secretAccessKey
-    ? { credentials: { accessKeyId, secretAccessKey } }
-    : {}),
+  ...(accessKeyId && secretAccessKey ? { credentials: { accessKeyId, secretAccessKey } } : {}),
 });

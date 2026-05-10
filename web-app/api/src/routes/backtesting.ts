@@ -166,7 +166,7 @@ export function backtestingRouter(
       .query(async ({ ctx, input }) => {
         const accessResult = await getResultAccessInfo(input.publicId, ctx.user.id);
         if (accessResult.isErr()) throw accessResult.error;
-        if (accessResult.value == null || !accessResult.value.canCopy) return [];
+        if (!accessResult.value?.canCopy) return [];
         const result = await getAlgorithmVersionsByResultPublicId(input.publicId);
         if (result.isErr()) throw result.error;
         return result.value;
