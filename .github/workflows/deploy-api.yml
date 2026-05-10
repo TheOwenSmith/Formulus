@@ -86,7 +86,7 @@ jobs:
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
         continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
         working-directory: web-app
-        run: pnpm run prettier:check:api
+        run: pnpm run prettier:check
 
       - name: ESLint
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
