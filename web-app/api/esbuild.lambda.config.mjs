@@ -16,18 +16,21 @@ const apiNodeModules = path.join(__dirname, 'node_modules');
 await build({
   entryPoints: [path.join(__dirname, 'src/lambda.ts')],
   bundle: true,
-  platform: 'node',
-  target: 'node24',
-  format: 'cjs',
-  outfile: path.join(__dirname, 'dist/lambda.js'),
   minify: true,
-  sourcemap: true,
+  sourcemap: 'inline',
+  outfile: path.join(__dirname, 'dist/lambda.js'),
   external: ['node:*', '../shared/node_modules/*', ...prismaExternals],
+  banner: {
+    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+  },
   nodePaths: [apiNodeModules],
+  logLevel: 'info',
   alias: {
     '@api': path.join(__dirname, 'src'),
     '@shared': path.join(__dirname, '..', 'shared'),
     '@worker': path.join(__dirname, '..', 'worker', 'src'),
   },
-  logLevel: 'info',
+  platform: 'node',
+  target: 'node24',
+  format: 'esm',
 });

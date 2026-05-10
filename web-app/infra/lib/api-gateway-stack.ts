@@ -65,7 +65,8 @@ export function formulusApiLambdaBundlingShell(
     'node scripts/install-lambda-runtime-deps.mjs',
     'cp dist/lambda.js /asset-output/',
     'if [ -f dist/lambda.js.map ]; then cp dist/lambda.js.map /asset-output/; fi',
-    `node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const d=p.dependencies||{};fs.writeFileSync('/asset-output/package.json',JSON.stringify({name:'api',private:true,type:'commonjs',dependencies:{'@prisma/client':d['@prisma/client'],pg:d.pg}},null,2));"`,
+    // `esbuild.lambda.config.mjs` emits ESM; Lambda loads handler from `lambda.js` as ESM when type is module.
+    `node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const d=p.dependencies||{};fs.writeFileSync('/asset-output/package.json',JSON.stringify({name:'api',private:true,type:'module',dependencies:{'@prisma/client':d['@prisma/client'],pg:d.pg}},null,2));"`,
     'cp -rL node_modules /asset-output/',
   ];
   const post = paths.bundlingPostCommand;
