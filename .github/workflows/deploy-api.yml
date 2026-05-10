@@ -81,13 +81,15 @@ jobs:
       - name: Install web-app dependencies (Prettier)
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
         working-directory: web-app
+        env:
+          CI: "true"
         run: pnpm install --frozen-lockfile
 
       - name: Prettier
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
         continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
         working-directory: web-app/api
-        run: pnpm run prettier:check
+        run: pnpm -C .. exec prettier "api/src/**/*.{ts,js}" --check
 
       - name: ESLint
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
