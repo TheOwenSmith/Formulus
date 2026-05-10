@@ -93,6 +93,8 @@ export type ApiGatewayStackProps = cdk.StackProps & {
   /** When set with `subDomain`, provisions ACM + custom domain + Route53 alias. */
   domainName?: string;
   subDomain?: string;
+  /** API Gateway name in AWS console (unique per account/region). */
+  restApiDisplayName?: string;
   /** API Gateway stage name (default `prod`). */
   stageName?: string;
   lambdaMemorySize?: number;
@@ -147,9 +149,11 @@ export class ApiGatewayStack extends cdk.Stack {
 
     this.apiFunction = apiFunction;
 
+    const restApiName = props.restApiDisplayName ?? 'formulus-api';
+
     this.api = new apigateway.RestApi(this, `${id}-api`, {
-      restApiName: 'formulus-api',
-      description: 'Formulus API (REST)',
+      restApiName,
+      description: `Formulus API (REST) - ${restApiName}`,
       defaultCorsPreflightOptions: {
         allowOrigins: props.corsOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,

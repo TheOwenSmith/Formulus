@@ -56,6 +56,8 @@ const corsOrigins = corsOriginEnv
 
 const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
 const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
+const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as string | undefined;
+const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
 
 const ecr = new EcrStack(app, 'FormulusEcr', { env });
 const queue = new QueueStack(app, 'FormulusQueue', { env });
@@ -91,6 +93,26 @@ const api = new ApiGatewayStack(app, 'FormulusApi', {
     apiSubDomain != null && {
       domainName: apiDomainName,
       subDomain: apiSubDomain,
+    }),
+});
+
+new ApiGatewayStack(app, 'FormulusApiStaging', {
+  env,
+  codeRoot: WEB_APP_ROOT,
+  bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+  corsHeaders: defaultApiCorsHeaders,
+  corsOrigins,
+  handler: 'lambda.handler',
+  restApiDisplayName: 'formulus-api-staging',
+  lambdaEnvironment: {
+    ...baseApiEnv,
+    QUEUE_URL: queue.queue.queueUrl,
+  },
+  backtestQueueArn: queue.queue.queueArn,
+  ...(apiStagingDomainName != null &&
+    apiStagingSubDomain != null && {
+      domainName: apiStagingDomainName,
+      subDomain: apiStagingSubDomain,
     }),
 });
 
