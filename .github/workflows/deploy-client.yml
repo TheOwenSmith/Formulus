@@ -1,14 +1,22 @@
-# Deploy client to Amplify Hosting.
+# Deploy client to Amplify Hosting (staging + production).
 #
-# 1. Quality checks  - Prettier, ESLint, TypeScript/Vite build
-# 2. CDK deploy      - creates/updates Amplify app + branch
-# 3. Upload          - zips dist/ and deploys to Amplify via create-deployment
+# - Push client-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
+# - Push client-prod: environment production; Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is client-prod and
+#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
 
 name: Deploy Client
 
 on:
   push:
-    branches: [client-prod]
+    branches: [client-prod, client-staging]
+  workflow_dispatch:
+    inputs:
+      skip_quality_checks:
+        description: Skip Prettier and ESLint (manual runs on client-prod only; push never skips)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -20,7 +28,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/client-prod' && 'production' || 'staging' }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       CI: "true"
@@ -54,10 +62,13 @@ jobs:
       # --- Quality checks ---
 
       - name: Install web-app dependencies (Prettier)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
         working-directory: web-app
         run: pnpm install --frozen-lockfile
 
       - name: Prettier
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
         working-directory: web-app
         run: pnpm exec prettier "client/src/**/*.{ts,js}" --check
 
@@ -66,6 +77,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: ESLint
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
         working-directory: web-app/client
         run: pnpm run lint
 
@@ -91,6 +104,10 @@ jobs:
         working-directory: web-app/client
         run: pnpm run build
 
+      - name: Quality checks skipped
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks }}
+        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on client-prod only)."
+
       # --- Deploy ---
 
       - name: Configure AWS credentials
@@ -110,21 +127,37 @@ jobs:
 
       - name: CDK deploy Amplify stack
         working-directory: web-app/infra
-        run: npx cdk deploy FormulusAmplify --require-approval never -c amplifyOnly=true
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref }}" = "refs/heads/client-staging" ]; then
+            STACK=FormulusAmplifyStaging
+            BRANCH=client-staging
+          else
+            STACK=FormulusAmplify
+            BRANCH=client-prod
+          fi
+          npx cdk deploy "$STACK" --require-approval never -c amplifyOnly=true
 
       - name: Deploy to Amplify
         run: |
           set -euo pipefail
+          if [ "${{ github.ref }}" = "refs/heads/client-staging" ]; then
+            STACK=FormulusAmplifyStaging
+            BRANCH=client-staging
+          else
+            STACK=FormulusAmplify
+            BRANCH=client-prod
+          fi
 
           APP_ID=$(aws cloudformation describe-stacks \
-            --stack-name FormulusAmplify \
+            --stack-name "$STACK" \
             --query "Stacks[0].Outputs[?OutputKey=='AmplifyAppId'].OutputValue" \
             --output text)
           echo "Amplify App ID: $APP_ID"
 
           DEPLOY=$(aws amplify create-deployment \
             --app-id "$APP_ID" \
-            --branch-name client-prod)
+            --branch-name "$BRANCH")
           JOB_ID=$(echo "$DEPLOY" | jq -r '.jobId')
           UPLOAD_URL=$(echo "$DEPLOY" | jq -r '.zipUploadUrl')
           echo "Job ID: $JOB_ID"
@@ -136,7 +169,7 @@ jobs:
 
           aws amplify start-deployment \
             --app-id "$APP_ID" \
-            --branch-name client-prod \
+            --branch-name "$BRANCH" \
             --job-id "$JOB_ID"
 
           echo "Deployment started successfully"

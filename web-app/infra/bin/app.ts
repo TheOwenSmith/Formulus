@@ -130,8 +130,26 @@ const viteServerUrl = amplifyOnly
   ? config.getKey<ClientEnvVar>('VITE_SERVER_URL')
   : `${apiUrl!.replace(/\/$/, '')}/trpc`;
 
-new AmplifyStack(app, 'FormulusAmplify', {
-  branchName: 'client-prod',
-  env,
-  viteServerUrl,
-});
+for (const client of [
+  {
+    id: 'FormulusAmplify',
+    branchName: 'client-prod',
+    subDomain: 'prod',
+    mapRootDomain: true,
+  },
+  {
+    id: 'FormulusAmplifyStaging',
+    branchName: 'client-staging',
+    subDomain: 'staging',
+    mapRootDomain: false,
+  },
+]) {
+  new AmplifyStack(app, client.id, {
+    branchName: client.branchName,
+    domainName: 'formulus.ai',
+    env,
+    mapRootDomain: client.mapRootDomain,
+    subDomain: client.subDomain,
+    viteServerUrl,
+  });
+}
