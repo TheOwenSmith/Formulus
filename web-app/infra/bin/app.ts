@@ -75,27 +75,27 @@ if (!amplifyOnly) {
   });
 
   new DispatcherStack(app, 'FormulusDispatcher', {
+    cluster: compute.cluster,
+    deadLetterQueue: queue.dlq,
     env,
     queue: queue.queue,
-    deadLetterQueue: queue.dlq,
-    cluster: compute.cluster,
     taskDefinition: compute.taskDefinition,
-    taskSubnets: compute.taskSubnets,
     taskSecurityGroups: compute.taskSecurityGroups,
+    taskSubnets: compute.taskSubnets,
   });
 
   const api = new ApiGatewayStack(app, 'FormulusApi', {
-    env,
-    codeRoot: WEB_APP_ROOT,
+    backtestQueueArn: queue.queue.queueArn,
     bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+    codeRoot: WEB_APP_ROOT,
     corsHeaders: defaultApiCorsHeaders,
     corsOrigins,
+    env,
     handler: 'lambda.handler',
     lambdaEnvironment: {
       ...baseApiEnv,
       QUEUE_URL: queue.queue.queueUrl,
     },
-    backtestQueueArn: queue.queue.queueArn,
     ...(apiDomainName != null &&
       apiSubDomain != null && {
         domainName: apiDomainName,
@@ -104,18 +104,18 @@ if (!amplifyOnly) {
   });
 
   new ApiGatewayStack(app, 'FormulusApiStaging', {
-    env,
-    codeRoot: WEB_APP_ROOT,
+    backtestQueueArn: queue.queue.queueArn,
     bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+    codeRoot: WEB_APP_ROOT,
     corsHeaders: defaultApiCorsHeaders,
     corsOrigins,
+    env,
     handler: 'lambda.handler',
-    restApiDisplayName: 'formulus-api-staging',
     lambdaEnvironment: {
       ...baseApiEnv,
       QUEUE_URL: queue.queue.queueUrl,
     },
-    backtestQueueArn: queue.queue.queueArn,
+    restApiDisplayName: 'formulus-api-staging',
     ...(apiStagingDomainName != null &&
       apiStagingSubDomain != null && {
         domainName: apiStagingDomainName,
@@ -126,16 +126,15 @@ if (!amplifyOnly) {
   apiUrl = api.apiUrl;
 }
 
-const amplifyRepository = app.node.tryGetContext('amplifyRepository') as string | undefined;
-const amplifyAccessToken = app.node.tryGetContext('amplifyAccessToken') as string | undefined;
-
 const viteServerUrl = amplifyOnly
   ? config.getKey<ClientEnvVar>('VITE_SERVER_URL')
   : `${apiUrl!.replace(/\/$/, '')}/trpc`;
 
 new AmplifyStack(app, 'FormulusAmplify', {
+  branchName: 'client-prod',
   env,
+  patGithub: config.getKey<ClientEnvVar>('PAT_GITHUB'),
+  repositoryName: 'PhoenixTrader',
+  repositoryOwner: 'TheOwenSmith',
   viteServerUrl,
-  repository: amplifyRepository,
-  accessToken: amplifyAccessToken,
 });

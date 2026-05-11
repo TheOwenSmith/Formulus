@@ -9,7 +9,7 @@ const envVarsCdk = [
   'AWS_SECRET_ACCESS_KEY',
   'AWS_REGION',
 ] as const;
-const envVarsClient = [...envVarsCdk, 'VITE_SERVER_URL'] as const;
+const envVarsClient = [...envVarsCdk, 'VITE_SERVER_URL', 'PAT_GITHUB'] as const;
 
 const envVarsApi = [
   ...envVarsCdk,

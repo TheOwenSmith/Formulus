@@ -1,8 +1,8 @@
 # Deploy client to Amplify Hosting via CDK.
 #
-# 1. quality   - Prettier + ESLint + TypeScript/Vite build
-# 2. deploy    - CDK deploy FormulusAmplify (creates/updates Amplify app + branch),
-#                then triggers an Amplify build via start-job.
+# 1. Quality checks   - Prettier, ESLint, TypeScript/Vite build
+# 2. CDK deploy       - creates/updates Amplify app + branch (connected to GitHub repo)
+# 3. Start job        - triggers Amplify to pull from repo and build
 
 name: Deploy Client
 
@@ -18,13 +18,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  quality:
+  deploy:
     runs-on: ubuntu-latest
     environment: production
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       CI: "true"
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
+      CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
       VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
+      PAT_GITHUB: ${{ secrets.PAT_GITHUB }}
+      DEPLOY_TARGET: client
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,6 +50,9 @@ jobs:
             web-app/api/pnpm-lock.yaml
             web-app/worker/pnpm-lock.yaml
             web-app/shared/pnpm-lock.yaml
+            web-app/infra/pnpm-lock.yaml
+
+      # --- Quality checks ---
 
       - name: Install web-app dependencies (Prettier)
         working-directory: web-app
@@ -84,32 +92,7 @@ jobs:
         working-directory: web-app/client
         run: pnpm run build
 
-  deploy:
-    needs: quality
-    runs-on: ubuntu-latest
-    environment: production
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
-      CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
-      VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
-      DEPLOY_TARGET: client
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "pnpm"
-          cache-dependency-path: web-app/infra/pnpm-lock.yaml
+      # --- Deploy ---
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

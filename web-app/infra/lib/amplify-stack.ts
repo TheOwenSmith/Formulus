@@ -1,72 +1,88 @@
-import * as amplify from 'aws-cdk-lib/aws-amplify';
+import { App, CustomRule, GitHubSourceCodeProvider, Platform } from '@aws-cdk/aws-amplify-alpha';
 import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
+import { SecretValue } from 'aws-cdk-lib';
+import { BuildSpec } from 'aws-cdk-lib/aws-codebuild';
+import { ManagedPolicy, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import type { Construct } from 'constructs';
 
-export type AmplifyStackProps = cdk.StackProps & {
-  /** Full tRPC HTTP URL, e.g. `https://xxx.execute-api.region.amazonaws.com/trpc` */
+export interface AmplifyStackProps extends cdk.StackProps {
   viteServerUrl: string;
-  /** Optional Git repository URL (HTTPS). If omitted, connect a repo in the Amplify console. */
-  repository?: string;
-  /** GitHub / GitLab OAuth or personal access token for cloning `repository`. */
-  accessToken?: string;
-};
+  repositoryOwner: string;
+  repositoryName: string;
+  patGithub: string;
+  branchName: string;
+}
 
 export class AmplifyStack extends cdk.Stack {
-  readonly app: amplify.CfnApp;
+  readonly amplifyApp: App;
 
   constructor(scope: Construct, id: string, props: AmplifyStackProps) {
     super(scope, id, props);
 
-    const buildSpec = [
-      'version: 1',
-      'frontend:',
-      '  phases:',
-      '    preBuild:',
-      '      commands:',
-      '        - corepack enable',
-      '        - cd web-app/client && pnpm install --frozen-lockfile',
-      '    build:',
-      '      commands:',
-      '        - cd web-app/client && pnpm run build',
-      '  artifacts:',
-      '    baseDirectory: web-app/client/dist',
-      '    files:',
-      '      - "**/*"',
-      '  cache:',
-      '    paths:',
-      '      - web-app/client/node_modules/**/*',
-    ].join('\n');
+    const role = new Role(this, 'AmplifyRole', {
+      assumedBy: new ServicePrincipal('amplify.amazonaws.com'),
+      managedPolicies: [ManagedPolicy.fromAwsManagedPolicyName('AdministratorAccess-Amplify')],
+    });
 
-    this.app = new amplify.CfnApp(this, 'Web', {
-      name: 'formulus-web',
+    this.amplifyApp = new App(this, 'Web', {
+      appName: 'formulus-web',
       description: 'Formulus Vite client (Amplify Hosting)',
-      platform: 'WEB',
-      buildSpec,
-      ...(props.repository != null && props.repository !== ''
-        ? { oauthToken: props.accessToken, repository: props.repository }
-        : {}),
-      environmentVariables: [
-        { name: 'VITE_SERVER_URL', value: props.viteServerUrl },
-        { name: 'NODE_OPTIONS', value: '--max-old-space-size=4096' },
-      ],
-      customRules: [
-        {
-          source: '/<*>',
-          target: '/index.html',
-          status: '404-200',
-        },
-      ],
+      role,
+      platform: Platform.WEB,
+      sourceCodeProvider: new GitHubSourceCodeProvider({
+        oauthToken: SecretValue.unsafePlainText(props.patGithub),
+        owner: props.repositoryOwner,
+        repository: props.repositoryName,
+      }),
+      environmentVariables: {
+        AMPLIFY_MONOREPO_APP_ROOT: 'web-app/client',
+        VITE_SERVER_URL: props.viteServerUrl,
+        NODE_OPTIONS: '--max-old-space-size=4096',
+      },
+      customRules: [CustomRule.SINGLE_PAGE_APPLICATION_REDIRECT],
+      buildSpec: BuildSpec.fromObjectToYaml({
+        version: '1.0',
+        applications: [
+          {
+            appRoot: 'web-app/client',
+            frontend: {
+              phases: {
+                preBuild: {
+                  commands: [
+                    'corepack enable',
+                    'corepack prepare pnpm@9.15.4 --activate',
+                    'cd ../shared && pnpm install --frozen-lockfile',
+                    'cd ../api && pnpm install --frozen-lockfile',
+                    'cd ../api && pnpm run prisma:generate',
+                    'cd ../worker && pnpm install --frozen-lockfile',
+                    'cd ../client && pnpm install --frozen-lockfile',
+                  ],
+                },
+                build: {
+                  commands: ['pnpm run build'],
+                },
+              },
+              artifacts: {
+                baseDirectory: 'dist',
+                files: ['**/*'],
+              },
+              cache: {
+                paths: ['node_modules/**/*'],
+              },
+            },
+          },
+        ],
+      }),
     });
 
-    new amplify.CfnBranch(this, 'ProdBranch', {
-      appId: this.app.attrAppId,
-      branchName: 'client-prod',
-      enableAutoBuild: false,
-      stage: 'PRODUCTION',
+    const branch = this.amplifyApp.addBranch('ProdBranch', {
+      branchName: props.branchName,
+      autoBuild: false,
     });
+    branch.node.addDependency(this.amplifyApp);
 
     new cdk.CfnOutput(this, 'AmplifyAppId', {
-      value: this.app.attrAppId,
+      value: this.amplifyApp.appId,
       description: 'Amplify app ID (used by CI to trigger builds)',
       exportName: 'FormulusAmplifyAppId',
     });
