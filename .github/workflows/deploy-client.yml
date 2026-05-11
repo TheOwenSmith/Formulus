@@ -1,8 +1,8 @@
-# Deploy client to Amplify Hosting via CDK.
+# Deploy client to Amplify Hosting.
 #
-# 1. Quality checks   - Prettier, ESLint, TypeScript/Vite build
-# 2. CDK deploy       - creates/updates Amplify app + branch (connected to GitHub repo)
-# 3. Start job        - triggers Amplify to pull from repo and build
+# 1. Quality checks  - Prettier, ESLint, TypeScript/Vite build
+# 2. CDK deploy      - creates/updates Amplify app + branch
+# 3. Upload          - zips dist/ and deploys to Amplify via create-deployment
 
 name: Deploy Client
 
@@ -28,7 +28,6 @@ jobs:
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
       VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
-      PAT_GITHUB: ${{ secrets.PAT_GITHUB }}
       DEPLOY_TARGET: client
     steps:
       - name: Checkout
@@ -113,15 +112,31 @@ jobs:
         working-directory: web-app/infra
         run: npx cdk deploy FormulusAmplify --require-approval never -c amplifyOnly=true
 
-      - name: Start Amplify build
+      - name: Deploy to Amplify
         run: |
           set -euo pipefail
+
           APP_ID=$(aws cloudformation describe-stacks \
             --stack-name FormulusAmplify \
             --query "Stacks[0].Outputs[?OutputKey=='AmplifyAppId'].OutputValue" \
             --output text)
           echo "Amplify App ID: $APP_ID"
-          aws amplify start-job \
+
+          DEPLOY=$(aws amplify create-deployment \
+            --app-id "$APP_ID" \
+            --branch-name client-prod)
+          JOB_ID=$(echo "$DEPLOY" | jq -r '.jobId')
+          UPLOAD_URL=$(echo "$DEPLOY" | jq -r '.zipUploadUrl')
+          echo "Job ID: $JOB_ID"
+
+          cd web-app/client/dist
+          zip -r /tmp/client-dist.zip .
+
+          curl --fail --silent --show-error -T /tmp/client-dist.zip "$UPLOAD_URL"
+
+          aws amplify start-deployment \
             --app-id "$APP_ID" \
             --branch-name client-prod \
-            --job-type RELEASE
+            --job-id "$JOB_ID"
+
+          echo "Deployment started successfully"

@@ -133,8 +133,5 @@ const viteServerUrl = amplifyOnly
 new AmplifyStack(app, 'FormulusAmplify', {
   branchName: 'client-prod',
   env,
-  patGithub: config.getKey<ClientEnvVar>('PAT_GITHUB'),
-  repositoryName: 'PhoenixTrader',
-  repositoryOwner: 'TheOwenSmith',
   viteServerUrl,
 });
