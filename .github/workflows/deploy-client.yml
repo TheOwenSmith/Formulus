@@ -2,6 +2,9 @@
 # Create the branch in the Amplify app (console or CLI) and connect this repo if needed.
 #
 # Secrets: AWS_REGION, AWS_ROLE_TO_ASSUME, AMPLIFY_APP_ID
+#
+# Quality: Prettier + ESLint + TypeScript/Vite build run in CI before Amplify is started.
+# Prettier CLI and config live under web-app/ (same pattern as deploy-api.yml).
 
 # Need to add staging
 name: Deploy client (Amplify)
@@ -19,11 +22,57 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      CI: "true"
+      # Build-time placeholder; Amplify injects the real URL for hosted builds.
+      VITE_SERVER_URL: "https://api.example.invalid"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: |
+            web-app/pnpm-lock.yaml
+            web-app/client/pnpm-lock.yaml
+
+      - name: Install web-app dependencies (Prettier)
+        working-directory: web-app
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier (client)
+        working-directory: web-app
+        run: pnpm exec prettier "client/src/**/*.{ts,js}" --check
+
+      - name: Install client dependencies
+        working-directory: web-app/client
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint (client)
+        working-directory: web-app/client
+        run: pnpm run lint
+
+      - name: Build (client)
+        working-directory: web-app/client
+        run: pnpm run build
+
   start-amplify:
+    needs: quality
     runs-on: ubuntu-latest
     environment: production
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
