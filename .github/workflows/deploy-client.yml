@@ -3,13 +3,8 @@
 # 1. quality   - Prettier + ESLint + TypeScript/Vite build
 # 2. deploy    - CDK deploy FormulusAmplify (creates/updates Amplify app + branch),
 #                then triggers an Amplify build via start-job.
-#
-# Secrets (production environment): AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-#   CDK_DEFAULT_ACCOUNT, CDK_DEFAULT_REGION.
-# Vars: AWS_REGION.
 
-# Need to add staging
-name: Deploy client (Amplify)
+name: Deploy client
 
 on:
   push:
