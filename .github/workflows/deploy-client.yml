@@ -93,7 +93,8 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
-      GITHUB_ACTIONS: "true"
+      VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
+      DEPLOY_TARGET: client
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -127,7 +128,7 @@ jobs:
 
       - name: CDK deploy Amplify stack
         working-directory: web-app/infra
-        run: npx cdk deploy FormulusAmplify --require-approval never
+        run: npx cdk deploy FormulusAmplify --require-approval never -c amplifyOnly=true
 
       - name: Start Amplify build
         run: |

@@ -34,7 +34,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
-      GITHUB_ACTIONS: "true"
+      DEPLOY_TARGET: api
 
       # API Lambda environment (see LAMBDA_ENV_KEYS in web-app/infra/bin/app.ts)
       ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
