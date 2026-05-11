@@ -20,6 +20,7 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    environment: production
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       CI: "true"
@@ -66,6 +67,8 @@ jobs:
 
       - name: Generate Prisma client
         working-directory: web-app/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pnpm run prisma:generate
 
       - name: Install worker dependencies
