@@ -16,4 +16,5 @@ export type {
 export { getAggregateDataIterator } from '@worker/core/backtesting/read-data';
 export type { DescriptionMetrics, ProfitLossRatio } from '@worker/core/backtesting/statistics';
 export { getTickers } from '@worker/core/backtesting/ticker-utils';
-export type { SupportedLanguage } from './trading-constants';
+export type { SupportedLanguage, Timestamp } from './trading-constants';
+export type { Ticker } from '@api/fetch/types';

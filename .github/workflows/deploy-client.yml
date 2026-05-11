@@ -44,6 +44,7 @@ jobs:
             web-app/client/pnpm-lock.yaml
             web-app/api/pnpm-lock.yaml
             web-app/worker/pnpm-lock.yaml
+            web-app/shared/pnpm-lock.yaml
 
       - name: Install web-app dependencies (Prettier)
         working-directory: web-app
@@ -60,6 +61,10 @@ jobs:
       - name: ESLint
         working-directory: web-app/client
         run: pnpm run lint
+
+      - name: Install shared dependencies
+        working-directory: web-app/shared
+        run: pnpm install --frozen-lockfile
 
       - name: Install API dependencies
         working-directory: web-app/api

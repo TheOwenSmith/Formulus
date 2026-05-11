@@ -6,7 +6,6 @@
     "useDefineForClassFields": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": ["vite/client"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -26,11 +25,18 @@
     "noUncheckedIndexedAccess": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noUncheckedSideEffectImports": true,
 
     "rootDir": "..",
   },
   "include": ["./src/**/*", "../shared/**/*"],
-  "exclude": ["node_modules", "*.config.ts", "*.config.js", "*.config.mjs", "../api"]
+  "exclude": [
+    "node_modules",
+    "*.config.ts",
+    "*.config.js",
+    "*.config.mjs",
+    "../api",
+    "../shared/prisma.config.ts",
+    "../shared/db/**/*"
+  ]
 }
