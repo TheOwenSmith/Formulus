@@ -1,10 +1,12 @@
-# Triggers an Amplify Hosting build for branch `client-prod`.
-# Create the branch in the Amplify app (console or CLI) and connect this repo if needed.
+# Deploy client to Amplify Hosting via CDK.
 #
-# Secrets: AWS_REGION, AWS_ROLE_TO_ASSUME, AMPLIFY_APP_ID
+# 1. quality   - Prettier + ESLint + TypeScript/Vite build
+# 2. deploy    - CDK deploy FormulusAmplify (creates/updates Amplify app + branch),
+#                then triggers an Amplify build via start-job.
 #
-# Quality: Prettier + ESLint + TypeScript/Vite build run in CI before Amplify is started.
-# Prettier CLI and config live under web-app/ (same pattern as deploy-api.yml).
+# Secrets (production environment): AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+#   CDK_DEFAULT_ACCOUNT, CDK_DEFAULT_REGION.
+# Vars: AWS_REGION.
 
 # Need to add staging
 name: Deploy client (Amplify)
@@ -14,7 +16,6 @@ on:
     branches: [client-prod]
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -27,8 +28,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       CI: "true"
-      # Build-time placeholder; Amplify injects the real URL for hosted builds.
-      VITE_SERVER_URL: "https://api.example.invalid"
+      VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,25 +67,60 @@ jobs:
         working-directory: web-app/client
         run: pnpm run build
 
-  start-amplify:
+  deploy:
     needs: quality
     runs-on: ubuntu-latest
     environment: production
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       AWS_REGION: ${{ vars.AWS_REGION }}
+      CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
+      CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
+      GITHUB_ACTIONS: "true"
     steps:
-      - name: Configure AWS credentials (OIDC)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: web-app/infra/pnpm-lock.yaml
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Install infra deps
+        working-directory: web-app/infra
+        run: pnpm install --frozen-lockfile
+
+      - name: Build infra
+        working-directory: web-app/infra
+        run: pnpm run build
+
+      - name: CDK deploy Amplify stack
+        working-directory: web-app/infra
+        run: npx cdk deploy FormulusAmplify --require-approval never
 
       - name: Start Amplify build
-        env:
-          AMPLIFY_APP_ID: ${{ secrets.AMPLIFY_APP_ID }}
         run: |
           set -euo pipefail
+          APP_ID=$(aws cloudformation describe-stacks \
+            --stack-name FormulusAmplify \
+            --query "Stacks[0].Outputs[?OutputKey=='AmplifyAppId'].OutputValue" \
+            --output text)
+          echo "Amplify App ID: $APP_ID"
           aws amplify start-job \
-            --app-id "$AMPLIFY_APP_ID" \
+            --app-id "$APP_ID" \
             --branch-name client-prod \
             --job-type RELEASE

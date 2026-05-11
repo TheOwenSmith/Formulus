@@ -58,9 +58,17 @@ export class AmplifyStack extends cdk.Stack {
       ],
     });
 
+    new amplify.CfnBranch(this, 'ProdBranch', {
+      appId: this.app.attrAppId,
+      branchName: 'client-prod',
+      enableAutoBuild: false,
+      stage: 'PRODUCTION',
+    });
+
     new cdk.CfnOutput(this, 'AmplifyAppId', {
       value: this.app.attrAppId,
-      description: 'Amplify app ID (use in console or CLI to add branches)',
+      description: 'Amplify app ID (used by CI to trigger builds)',
+      exportName: 'FormulusAmplifyAppId',
     });
   }
 }
