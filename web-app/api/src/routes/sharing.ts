@@ -4,8 +4,8 @@ import {
   dismissShare,
   getResultAccessInfo,
   getResultRow,
-  getSharesForResult,
   getSharedWithMe,
+  getSharesForResult,
   removeShare,
   searchUserByEmail,
   setResultPublic,
@@ -19,13 +19,13 @@ export function sharingRouter(
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
 ) {
   return router({
-    // Search for a user by email — used to confirm recipient before sharing
-    searchUser: authProcedure
-      .input(z.object({ email: z.string().email() }))
-      .query(async ({ ctx, input }) => {
-        const result = await searchUserByEmail(input.email, ctx.user.id);
+    // Recipient dismisses a result from their shared list
+    dismissShare: authProcedure
+      .input(z.object({ publicId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await dismissShare(ctx.user.id, input.publicId);
         if (result.isErr()) throw result.error;
-        return result.value; // null if not found or is self
+        return { dismissed: true };
       }),
 
     // Get the current user's access level for a result
@@ -34,18 +34,9 @@ export function sharingRouter(
       .query(async ({ ctx, input }) => {
         const result = await getResultAccessInfo(input.publicId, ctx.user.id);
         if (result.isErr()) throw result.error;
-        if (result.value == null || !result.value.hasAccess) {
+        if (!result.value?.hasAccess) {
           throw badRequest('Result not found');
         }
-        return result.value;
-      }),
-
-    // Get all shares for a result (owner only)
-    getSharesForResult: authProcedure
-      .input(z.object({ publicId: z.string() }))
-      .query(async ({ ctx, input }) => {
-        const result = await getSharesForResult(input.publicId, ctx.user.id);
-        if (result.isErr()) throw result.error;
         return result.value;
       }),
 
@@ -56,55 +47,13 @@ export function sharingRouter(
       return result.value;
     }),
 
-    // Share a result with a user by email
-    shareResult: authProcedure
-      .input(
-        z.object({
-          publicId: z.string(),
-          email: z.string().email(),
-          allowCopy: z.boolean(),
-        }),
-      )
-      .mutation(async ({ ctx, input }) => {
-        const { publicId, email, allowCopy } = input;
-
-        const rowResult = await getResultRow(publicId);
-        if (rowResult.isErr()) throw rowResult.error;
-        if (rowResult.value == null || rowResult.value.creatorId !== ctx.user.id) {
-          throw badRequest('Result not found');
-        }
-        const { id: backtestingResultsId } = rowResult.value;
-
-        const recipientResult = await searchUserByEmail(email, ctx.user.id);
-        if (recipientResult.isErr()) throw recipientResult.error;
-        if (recipientResult.value == null) throw badRequest('User not found');
-
-        const shareResult = await upsertShare(backtestingResultsId, recipientResult.value.id, allowCopy);
-        if (shareResult.isErr()) throw shareResult.error;
-        return { shared: true };
-      }),
-
-    // Update share permissions
-    updateShare: authProcedure
-      .input(
-        z.object({
-          publicId: z.string(),
-          recipientUserId: z.string(),
-          allowCopy: z.boolean(),
-        }),
-      )
-      .mutation(async ({ ctx, input }) => {
-        const { publicId, recipientUserId, allowCopy } = input;
-
-        const rowResult = await getResultRow(publicId);
-        if (rowResult.isErr()) throw rowResult.error;
-        if (rowResult.value == null || rowResult.value.creatorId !== ctx.user.id) {
-          throw badRequest('Result not found');
-        }
-
-        const shareResult = await upsertShare(rowResult.value.id, recipientUserId, allowCopy);
-        if (shareResult.isErr()) throw shareResult.error;
-        return { updated: true };
+    // Get all shares for a result (owner only)
+    getSharesForResult: authProcedure
+      .input(z.object({ publicId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const result = await getSharesForResult(input.publicId, ctx.user.id);
+        if (result.isErr()) throw result.error;
+        return result.value;
       }),
 
     // Remove a share (owner revokes access)
@@ -115,7 +64,7 @@ export function sharingRouter(
 
         const rowResult = await getResultRow(publicId);
         if (rowResult.isErr()) throw rowResult.error;
-        if (rowResult.value == null || rowResult.value.creatorId !== ctx.user.id) {
+        if (rowResult.value?.creatorId !== ctx.user.id) {
           throw badRequest('Result not found');
         }
 
@@ -124,13 +73,13 @@ export function sharingRouter(
         return { removed: true };
       }),
 
-    // Recipient dismisses a result from their shared list
-    dismissShare: authProcedure
-      .input(z.object({ publicId: z.string() }))
-      .mutation(async ({ ctx, input }) => {
-        const result = await dismissShare(ctx.user.id, input.publicId);
+    // Search for a user by email: used to confirm recipient before sharing
+    searchUser: authProcedure
+      .input(z.object({ email: z.string().email() }))
+      .query(async ({ ctx, input }) => {
+        const result = await searchUserByEmail(input.email, ctx.user.id);
         if (result.isErr()) throw result.error;
-        return { dismissed: true };
+        return result.value;
       }),
 
     // Toggle public visibility (owner only)
@@ -141,6 +90,61 @@ export function sharingRouter(
         if (result.isErr()) throw result.error;
         if (!result.value) throw badRequest('Result not found');
         return { isPublic: input.isPublic };
+      }),
+
+    // Share a result with a user by email
+    shareResult: authProcedure
+      .input(
+        z.object({
+          allowCopy: z.boolean(),
+          email: z.string().email(),
+          publicId: z.string(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { allowCopy, email, publicId } = input;
+
+        const rowResult = await getResultRow(publicId);
+        if (rowResult.isErr()) throw rowResult.error;
+        if (rowResult.value?.creatorId !== ctx.user.id) {
+          throw badRequest('Result not found');
+        }
+        const { id: backtestingResultsId } = rowResult.value;
+
+        const recipientResult = await searchUserByEmail(email, ctx.user.id);
+        if (recipientResult.isErr()) throw recipientResult.error;
+        if (recipientResult.value == null) throw badRequest('User not found');
+
+        const shareResult = await upsertShare(
+          backtestingResultsId,
+          recipientResult.value.id,
+          allowCopy,
+        );
+        if (shareResult.isErr()) throw shareResult.error;
+        return { shared: true };
+      }),
+
+    // Update share permissions
+    updateShare: authProcedure
+      .input(
+        z.object({
+          allowCopy: z.boolean(),
+          publicId: z.string(),
+          recipientUserId: z.string(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { allowCopy, publicId, recipientUserId } = input;
+
+        const rowResult = await getResultRow(publicId);
+        if (rowResult.isErr()) throw rowResult.error;
+        if (rowResult.value?.creatorId !== ctx.user.id) {
+          throw badRequest('Result not found');
+        }
+
+        const shareResult = await upsertShare(rowResult.value.id, recipientUserId, allowCopy);
+        if (shareResult.isErr()) throw shareResult.error;
+        return { updated: true };
       }),
   });
 }

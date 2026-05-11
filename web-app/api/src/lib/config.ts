@@ -2,7 +2,7 @@ import { config as dotenvConfig } from 'dotenv';
 import { validateEnvVars } from './validate-env-vars';
 dotenvConfig();
 
-const envVars = [
+const envVarsAll = [
   'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
   'PORT',
@@ -19,11 +19,21 @@ const envVars = [
   'COHERE_API_KEY',
   'COHERE_MODEL',
 ] as const satisfies string[];
-type EnvVar = (typeof envVars)[number];
+
+/** Lambda uses the execution role for AWS APIs; LocalStack uses explicit keys + endpoint. */
+const envVarsLambda = envVarsAll.filter(
+  (k) =>
+    k !== 'PORT' &&
+    k !== 'AWS_ENDPOINT_URL' &&
+    k !== 'AWS_ACCESS_KEY_ID' &&
+    k !== 'AWS_SECRET_ACCESS_KEY',
+) as readonly (typeof envVarsAll)[number][];
+
+type EnvVar = (typeof envVarsAll)[number];
 
 class Config {
   private constructor() {
-    validateEnvVars(envVars);
+    validateEnvVars(process.env['AWS_EXECUTION_ENV'] != null ? envVarsLambda : envVarsAll);
   }
 
   static #instance: Config | null = null;

@@ -58,10 +58,18 @@ export function useRunBacktest() {
     trpcCredentials.backtesting.backtestAlgorithms.mutationOptions(),
   );
 
-  async function runBacktest(algorithmIds: string | string[], timespan?: [string | null, string | null], name?: string) {
+  async function runBacktest(
+    algorithmIds: string | string[],
+    timespan?: [string | null, string | null],
+    name?: string,
+  ) {
     const ids = Array.isArray(algorithmIds) ? algorithmIds : [algorithmIds];
     try {
-      const { publicId } = await backtestAlgorithms({ algorithms: ids.map((id) => ({ id })), timespan, name });
+      const { publicId } = await backtestAlgorithms({
+        algorithms: ids.map((id) => ({ id })),
+        timespan,
+        name,
+      });
       setPending(ids, publicId);
       startCooldown();
     } catch (e) {

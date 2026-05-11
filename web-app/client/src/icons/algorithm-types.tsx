@@ -6,6 +6,37 @@
 const VIEW_BOX = '0 0 48 48';
 const DEFAULT_CLASS = 'w-10 h-10';
 
+export function ExamplesIcon({ className = DEFAULT_CLASS }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox={VIEW_BOX}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Top-left card */}
+      <rect x="5" y="5" width="17" height="17" rx="3" />
+      <line x1="9" y1="10.5" x2="18" y2="10.5" strokeWidth={1.5} />
+      <line x1="9" y1="14.5" x2="14.5" y2="14.5" strokeWidth={1.5} />
+      {/* Top-right card */}
+      <rect x="26" y="5" width="17" height="17" rx="3" />
+      <line x1="30" y1="10.5" x2="39" y2="10.5" strokeWidth={1.5} />
+      <line x1="30" y1="14.5" x2="35.5" y2="14.5" strokeWidth={1.5} />
+      {/* Bottom-left card */}
+      <rect x="5" y="26" width="17" height="17" rx="3" />
+      <line x1="9" y1="31.5" x2="18" y2="31.5" strokeWidth={1.5} />
+      <line x1="9" y1="35.5" x2="14.5" y2="35.5" strokeWidth={1.5} />
+      {/* Bottom-right card - highlighted with fill dot */}
+      <rect x="26" y="26" width="17" height="17" rx="3" />
+      <line x1="30" y1="31.5" x2="39" y2="31.5" strokeWidth={1.5} />
+      <line x1="30" y1="35.5" x2="35.5" y2="35.5" strokeWidth={1.5} />
+    </svg>
+  );
+}
+
 export function NormalIcon({ className = DEFAULT_CLASS }: { className?: string }) {
   return (
     <svg

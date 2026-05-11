@@ -1,5 +1,6 @@
 # dependencies (bun install)
 node_modules
+.lambda-runtime-deps
 
 # output
 out

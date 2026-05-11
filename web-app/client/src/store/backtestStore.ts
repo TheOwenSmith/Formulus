@@ -10,6 +10,7 @@ interface BacktestStore {
 export const useBacktestStore = create<BacktestStore>((set) => ({
   pendingAlgorithmIds: [],
   pendingPublicId: null,
-  setPending: (algorithmIds, publicId) => set({ pendingAlgorithmIds: algorithmIds, pendingPublicId: publicId }),
+  setPending: (algorithmIds, publicId) =>
+    set({ pendingAlgorithmIds: algorithmIds, pendingPublicId: publicId }),
   clearPending: () => set({ pendingAlgorithmIds: [], pendingPublicId: null }),
 }));

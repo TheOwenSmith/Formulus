@@ -1,5 +1,6 @@
 import { prisma } from '@api/lib/prisma';
 import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
+import type { UserModel } from '@shared/generated/prisma/models';
 import { err, ok, type Result } from 'neverthrow';
 
 export type ShareEntry = {
@@ -33,12 +34,12 @@ export type ResultAccessInfo = {
 export async function searchUserByEmail(
   email: string,
   requestingUserId: string,
-): Promise<Result<{ id: string; name: string; email: string; image: string | null } | null, AppError>> {
+): Promise<Result<Omit<UserModel, 'emailVerified'> | null, AppError>> {
   const result = await fromThrowableAsync(
     () =>
       prisma.user.findUnique({
         where: { email },
-        select: { id: true, name: true, email: true, image: true },
+        omit: { emailVerified: true },
       }),
     (e) => internal(e, 'Failed to search user'),
   );
@@ -111,7 +112,7 @@ export async function getSharesForResult(
           allowCopy: true,
           createdAt: true,
           dismissedByRecipient: true,
-          user: { select: { id: true, name: true, email: true, image: true } },
+          user: { select: { email: true, id: true, image: true, name: true } },
         },
       }),
     (e) => internal(e, 'Failed to load shares'),
@@ -119,18 +120,20 @@ export async function getSharesForResult(
   if (result.isErr()) return err(result.error);
   return ok(
     result.value.map((s) => ({
-      userId: s.user.id,
-      userName: s.user.name,
-      userEmail: s.user.email,
-      userImage: s.user.image,
       allowCopy: s.allowCopy,
       dismissedByRecipient: s.dismissedByRecipient,
       sharedAt: s.createdAt,
+      userEmail: s.user.email,
+      userId: s.user.id,
+      userImage: s.user.image,
+      userName: s.user.name,
     })),
   );
 }
 
-export async function getSharedWithMe(userId: string): Promise<Result<SharedResultEntry[], AppError>> {
+export async function getSharedWithMe(
+  userId: string,
+): Promise<Result<SharedResultEntry[], AppError>> {
   const result = await fromThrowableAsync(
     () =>
       prisma.backtestingShare.findMany({
@@ -141,15 +144,15 @@ export async function getSharedWithMe(userId: string): Promise<Result<SharedResu
           createdAt: true,
           backtestingResults: {
             select: {
-              publicId: true,
+              algorithms: { orderBy: { name: 'asc' }, select: { name: true } },
+              creator: { select: { image: true, name: true } },
               isPublic: true,
-              algorithms: { select: { name: true }, orderBy: { name: 'asc' } },
+              publicId: true,
               submissions: {
-                take: 1,
                 orderBy: { createdAt: 'desc' },
                 select: { name: true },
+                take: 1,
               },
-              creator: { select: { name: true, image: true } },
             },
           },
         },
@@ -159,13 +162,13 @@ export async function getSharedWithMe(userId: string): Promise<Result<SharedResu
   if (result.isErr()) return err(result.error);
   return ok(
     result.value.map((s) => ({
-      publicId: s.backtestingResults.publicId,
-      name: s.backtestingResults.submissions[0]?.name ?? null,
-      isPublic: s.backtestingResults.isPublic,
       algorithmNames: s.backtestingResults.algorithms.map((a) => a.name),
-      creatorName: s.backtestingResults.creator?.name ?? 'Deleted User',
-      creatorImage: s.backtestingResults.creator?.image ?? null,
       allowCopy: s.allowCopy,
+      creatorImage: s.backtestingResults.creator?.image ?? null,
+      creatorName: s.backtestingResults.creator?.name ?? 'Deleted User',
+      isPublic: s.backtestingResults.isPublic,
+      name: s.backtestingResults.submissions[0]?.name ?? null,
+      publicId: s.backtestingResults.publicId,
       sharedAt: s.createdAt,
     })),
   );
@@ -229,8 +232,9 @@ export async function getResultAccessInfo(
   const { creatorId, isPublic, shares } = result.value;
   const isOwner = creatorId === userId;
   const shareEntry = shares[0];
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- okay to just use || here
   const hasAccess = isOwner || isPublic || shareEntry != null;
-  const canCopy = isOwner || (shareEntry?.allowCopy ?? false);
+  const canCopy = isOwner ? true : (shareEntry?.allowCopy ?? false);
 
   return ok({ hasAccess, isOwner, canCopy, isPublic });
 }

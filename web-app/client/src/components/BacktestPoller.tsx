@@ -61,7 +61,7 @@ export function BacktestPoller() {
     return () => {
       cancelledRef.current = true;
     };
-  }, [pendingPublicId]);
+  }, [pendingPublicId, clearPending, navigate]);
 
   return null;
 }

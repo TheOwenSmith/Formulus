@@ -1,0 +1,139 @@
+# Deploy API Lambda + API Gateway (staging + production).
+#
+# - Push api-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
+# - Push api-prod: environment production; Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is api-prod and
+#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
+name: Deploy API
+
+on:
+  push:
+    branches: [api-prod, api-staging]
+  workflow_dispatch:
+    inputs:
+      skip_quality_checks:
+        description: Skip Prettier and ESLint (manual runs on api-prod only; push never skips)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/api-prod' && 'production' || 'staging' }}
+    env:
+      # Opt into Node.js 24 for JS actions until defaults roll forward (see GH changelog).
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
+      CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
+      DEPLOY_TARGET: api
+
+      # API Lambda environment (see LAMBDA_ENV_KEYS in web-app/infra/bin/app.ts)
+      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      NODE_ENV: ${{ vars.NODE_ENV }}
+      CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      COHERE_MODEL: ${{ secrets.COHERE_MODEL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: |
+            web-app/pnpm-lock.yaml
+            web-app/api/pnpm-lock.yaml
+            web-app/infra/pnpm-lock.yaml
+
+      # Skip install / prisma / lint only for manual prod deploy with bypass (never on push).
+      - name: Install API dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app/api
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client (for ESLint)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app/api
+        run: pnpm run prisma:generate
+
+      # Prettier CLI + .prettierrc.json live under web-app/
+      - name: Install web-app dependencies (Prettier)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app
+        env:
+          CI: "true"
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
+        working-directory: web-app/api
+        run: pnpm -C .. exec prettier "api/src/**/*.{ts,js}" --check
+
+      - name: ESLint
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
+        working-directory: web-app/api
+        run: pnpm run lint
+
+      - name: Quality checks skipped
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks }}
+        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on api-prod only)."
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install infra deps
+        working-directory: web-app/infra
+        run: pnpm install --frozen-lockfile
+
+      - name: Build infra
+        working-directory: web-app/infra
+        run: pnpm run build
+
+      - name: CDK deploy API stack
+        working-directory: web-app/infra
+        env:
+          API_DOMAIN_NAME: ${{ vars.API_DOMAIN_NAME }}
+          API_SUB_DOMAIN: ${{ vars.API_SUB_DOMAIN }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref }}" = "refs/heads/api-staging" ]; then
+            STACK=FormulusApiStaging
+            EXTRA=()
+            if [ -n "${API_DOMAIN_NAME:-}" ] && [ -n "${API_SUB_DOMAIN:-}" ]; then
+              EXTRA+=( -c "apiStagingDomainName=${API_DOMAIN_NAME}" -c "apiStagingSubDomain=${API_SUB_DOMAIN}" )
+            fi
+          else
+            STACK=FormulusApi
+            EXTRA=()
+            if [ -n "${API_DOMAIN_NAME:-}" ] && [ -n "${API_SUB_DOMAIN:-}" ]; then
+              EXTRA+=( -c "apiDomainName=${API_DOMAIN_NAME}" -c "apiSubDomain=${API_SUB_DOMAIN}" )
+            fi
+          fi
+          npx cdk deploy "$STACK" --require-approval never "${EXTRA[@]}"

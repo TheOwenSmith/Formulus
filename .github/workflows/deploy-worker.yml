@@ -1,0 +1,49 @@
+# Build and push the backtest worker image to ECR (repository `formulus-worker`, tag `latest`).
+# ECS tasks started after this push pull the new image on the next run (same tag).
+
+name: Deploy worker (ECR)
+
+on:
+  push:
+    branches: [worker-prod]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-worker-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ECR_REPO: formulus-worker
+      IMAGE_TAG: latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image
+        run: |
+          docker build \
+            -f web-app/worker/Dockerfile \
+            -t "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}" \
+            .
+
+      - name: Push image
+        run: |
+          docker push "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"

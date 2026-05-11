@@ -1,6 +1,6 @@
 import { ExamplesModal } from '@client/components/ExamplesModal';
 import { Tooltip } from '@client/components/Tooltip';
-import { CheckIcon, NormalIcon, SimpleIcon, Spinner, TopKIcon } from '@client/icons';
+import { CheckIcon, ExamplesIcon, NormalIcon, SimpleIcon, Spinner, TopKIcon } from '@client/icons';
 import { getDefaultImplementationCode } from '@client/lib/defaultAlgorithmCode';
 import { trpcCredentials } from '@client/lib/trpc';
 import {
@@ -15,7 +15,7 @@ import type { AlgorithmExample } from '@shared/examples';
 import { tickers as TICKERS, type Timestamp } from '@shared/trading-constants';
 import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/worker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -110,6 +110,14 @@ const HEADER_OFFSET = '4rem'; // match app header height
 /** Fixed height for content so the distance between step tracker and Cancel/Continue stays the same */
 const STEP_CONTENT_HEIGHT = 320;
 
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-white/50 text-sm mb-2 uppercase tracking-wider font-semibold">
+      {children}
+    </p>
+  );
+}
+
 export function CreateAlgorithmPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -134,12 +142,10 @@ export function CreateAlgorithmPage() {
   const MAX_CONTEXT_LENGTH = 9999;
   const MAX_MAX_HOLDING_INPUT_DIGITS = 6;
 
-  useEffect(() => {
-    if (state.k > maxK) {
-      setState((s) => ({ ...s, k: maxK }));
-      setKInputStr('');
-    }
-  }, [maxK, state.k]);
+  if (state.k > maxK) {
+    setState((s) => ({ ...s, k: maxK }));
+    setKInputStr('');
+  }
 
   function triggerShake(setter: (v: boolean) => void) {
     setter(true);
@@ -257,6 +263,8 @@ export function CreateAlgorithmPage() {
         'Trade across multiple stocks at once without worrying about position sizing, allowing you to focus on strategy.',
       glow: 'shadow-[0_0_30px_rgba(59,130,246,0.12)]',
       gradient: 'from-blue-500/20 to-cyan-500/20',
+      hoverBorder: 'hover:border-blue-500/40',
+      hoverGradient: 'hover:from-blue-500/10 hover:to-cyan-500/10',
       Icon: NormalIcon,
       iconColor: 'text-blue-400',
       label: 'Normal',
@@ -268,6 +276,8 @@ export function CreateAlgorithmPage() {
       description: 'Trade on a single ticker. Great for getting started.',
       glow: 'shadow-[0_0_30px_rgba(16,185,129,0.12)]',
       gradient: 'from-emerald-500/20 to-teal-500/20',
+      hoverBorder: 'hover:border-emerald-500/40',
+      hoverGradient: 'hover:from-emerald-500/10 hover:to-teal-500/10',
       Icon: SimpleIcon,
       iconColor: 'text-emerald-400',
       label: 'Simple',
@@ -280,6 +290,8 @@ export function CreateAlgorithmPage() {
         'Warning: Can generate alpha if used properly. Rank each ticker and buy the K best.',
       glow: 'shadow-[0_0_30px_rgba(168,85,247,0.12)]',
       gradient: 'from-purple-500/20 to-pink-500/20',
+      hoverBorder: 'hover:border-purple-500/40',
+      hoverGradient: 'hover:from-purple-500/10 hover:to-pink-500/10',
       Icon: TopKIcon,
       iconColor: 'text-purple-400',
       label: 'Top-K',
@@ -288,22 +300,14 @@ export function CreateAlgorithmPage() {
     },
   ] as const;
 
-  function SectionLabel({ children }: { children: React.ReactNode }) {
-    return (
-      <p className="text-white/50 text-sm mb-2 uppercase tracking-wider font-semibold">
-        {children}
-      </p>
-    );
-  }
-
   // Step 1: Type + name — content fills available space, centered
   const step1 = (
     <div className="flex flex-col items-center gap-6 w-full">
       <div className="w-full">
         <SectionLabel>Strategy type</SectionLabel>
-        <div className="grid grid-cols-3 gap-4 w-full">
+        <div className="grid grid-cols-4 gap-4 w-full">
           {ALGO_TYPES.map(
-            ({ type, label, tagline, description, Icon, gradient, border, iconColor, glow }) => {
+            ({ type, label, tagline, description, Icon, gradient, border, iconColor, glow, hoverBorder, hoverGradient }) => {
               const isSelected = state.algorithmType === type;
               return (
                 <Tooltip key={label} content={description}>
@@ -313,7 +317,7 @@ export function CreateAlgorithmPage() {
                     className={`relative w-full h-[168px] p-5 rounded-xl border text-left cursor-pointer transition-all group flex flex-col ${
                       isSelected
                         ? `bg-gradient-to-br ${gradient} ${border} ${glow}`
-                        : 'bg-white/[0.03] border-white/10 hover:border-white/20'
+                        : `bg-white/[0.03] border-white/10 hover:bg-gradient-to-br ${hoverGradient} ${hoverBorder}`
                     }`}
                   >
                     {isSelected && (
@@ -337,6 +341,21 @@ export function CreateAlgorithmPage() {
               );
             },
           )}
+          <Tooltip content="Browse ready-to-run example strategies and load one directly into the editor.">
+            <button
+              type="button"
+              onClick={() => setShowExamplesModal(true)}
+              className="relative w-full h-[168px] p-5 rounded-xl border text-left cursor-pointer transition-all group flex flex-col bg-white/[0.03] border-white/10 hover:border-amber-500/40 hover:bg-gradient-to-br hover:from-amber-500/10 hover:to-orange-500/10 hover:shadow-[0_0_30px_rgba(245,158,11,0.08)]"
+            >
+              <div className="mb-2 text-white/40 group-hover:text-amber-400 transition-colors">
+                <ExamplesIcon className="w-14 h-14" />
+              </div>
+              <div className="font-bold text-white text-lg">Example</div>
+              <div className="text-sm min-h-[2.5rem] text-white/40 group-hover:text-amber-400/80 transition-colors">
+                Start from a working strategy
+              </div>
+            </button>
+          </Tooltip>
         </div>
       </div>
       <div className="w-full">
@@ -350,17 +369,6 @@ export function CreateAlgorithmPage() {
           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-white/25 outline-none text-base"
         />
         {nameError && <p className="mt-1 text-xs text-red-400">{nameError}</p>}
-      </div>
-      <div className="flex items-center gap-3 w-full">
-        <div className="h-px flex-1 bg-white/[0.07]" />
-        <button
-          type="button"
-          onClick={() => setShowExamplesModal(true)}
-          className="text-xs text-white/35 hover:text-white/65 transition-colors cursor-pointer"
-        >
-          or browse examples
-        </button>
-        <div className="h-px flex-1 bg-white/[0.07]" />
       </div>
     </div>
   );
@@ -643,7 +651,7 @@ export function CreateAlgorithmPage() {
 
       {/* Centered block: step tracker + content (fixed height) + buttons — distance between header and footer unchanged */}
       <div className="flex-1 flex items-center justify-center px-6 py-6 min-h-0 overflow-hidden">
-        <div className="w-full max-w-2xl flex flex-col items-center gap-6 shrink-0">
+        <div className="w-full max-w-3xl flex flex-col items-center gap-6 shrink-0">
           <StepIndicator step={step} />
           <div
             className="w-full overflow-hidden flex flex-col"

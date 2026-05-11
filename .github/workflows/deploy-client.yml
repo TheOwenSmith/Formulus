@@ -1,0 +1,175 @@
+# Deploy client to Amplify Hosting (staging + production).
+#
+# - Push client-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
+# - Push client-prod: environment production; Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is client-prod and
+#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
+
+name: Deploy Client
+
+on:
+  push:
+    branches: [client-prod, client-staging]
+  workflow_dispatch:
+    inputs:
+      skip_quality_checks:
+        description: Skip Prettier and ESLint (manual runs on client-prod only; push never skips)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-client-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/client-prod' && 'production' || 'staging' }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      CI: "true"
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
+      CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
+      VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
+      DEPLOY_TARGET: client
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: |
+            web-app/pnpm-lock.yaml
+            web-app/client/pnpm-lock.yaml
+            web-app/api/pnpm-lock.yaml
+            web-app/worker/pnpm-lock.yaml
+            web-app/shared/pnpm-lock.yaml
+            web-app/infra/pnpm-lock.yaml
+
+      # --- Quality checks ---
+
+      - name: Install web-app dependencies (Prettier)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
+        working-directory: web-app
+        run: pnpm exec prettier "client/src/**/*.{ts,js}" --check
+
+      - name: Install client dependencies
+        working-directory: web-app/client
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
+        working-directory: web-app/client
+        run: pnpm run lint
+
+      - name: Install shared dependencies
+        working-directory: web-app/shared
+        run: pnpm install --frozen-lockfile
+
+      - name: Install API dependencies
+        working-directory: web-app/api
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: web-app/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm run prisma:generate
+
+      - name: Install worker dependencies
+        working-directory: web-app/worker
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: web-app/client
+        run: pnpm run build
+
+      - name: Quality checks skipped
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks }}
+        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on client-prod only)."
+
+      # --- Deploy ---
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install infra deps
+        working-directory: web-app/infra
+        run: pnpm install --frozen-lockfile
+
+      - name: Build infra
+        working-directory: web-app/infra
+        run: pnpm run build
+
+      - name: CDK deploy Amplify stack
+        working-directory: web-app/infra
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref }}" = "refs/heads/client-staging" ]; then
+            STACK=FormulusAmplifyStaging
+            BRANCH=client-staging
+          else
+            STACK=FormulusAmplify
+            BRANCH=client-prod
+          fi
+          npx cdk deploy "$STACK" --require-approval never -c amplifyOnly=true
+
+      - name: Deploy to Amplify
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref }}" = "refs/heads/client-staging" ]; then
+            STACK=FormulusAmplifyStaging
+            BRANCH=client-staging
+          else
+            STACK=FormulusAmplify
+            BRANCH=client-prod
+          fi
+
+          APP_ID=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --query "Stacks[0].Outputs[?OutputKey=='AmplifyAppId'].OutputValue" \
+            --output text)
+          echo "Amplify App ID: $APP_ID"
+
+          DEPLOY=$(aws amplify create-deployment \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH")
+          JOB_ID=$(echo "$DEPLOY" | jq -r '.jobId')
+          UPLOAD_URL=$(echo "$DEPLOY" | jq -r '.zipUploadUrl')
+          echo "Job ID: $JOB_ID"
+
+          cd web-app/client/dist
+          zip -r /tmp/client-dist.zip .
+
+          curl --fail --silent --show-error -T /tmp/client-dist.zip "$UPLOAD_URL"
+
+          aws amplify start-deployment \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH" \
+            --job-id "$JOB_ID"
+
+          echo "Deployment started successfully"

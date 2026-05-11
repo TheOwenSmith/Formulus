@@ -14,7 +14,7 @@ export const enum SearchIndexType {
 export async function createSearchIndex(
   ticker: Ticker,
   timestamp: Timestamp,
-  type: SearchIndexType,
+  _type: SearchIndexType,
 ): Promise<Result<undefined, AppError>> {
   console.log(`Creating search index for '${ticker}' (${timestamp})...`);
   const readFile = `../worker/data/cleaned/${ticker}_${timestamp}.csv`;

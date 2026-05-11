@@ -1,0 +1,37 @@
+{
+  "name": "infra",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc-alias",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy",
+    "prettier:write": "prettier \"**/*.{ts,js}\" --write",
+    "prettier:check": "prettier \"**/*.{ts,js}\" --check",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@aws-cdk/aws-amplify-alpha": "2.253.1-alpha.0",
+    "@aws-sdk/client-ecs": "^3.1045.0",
+    "aws-cdk-lib": "^2.253.1",
+    "constructs": "^10.6.0",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.19.18",
+    "aws-cdk": "^2.1121.0",
+    "esbuild": "^0.27.7",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-sort-keys": "^2.3.5",
+    "tsc-alias": "^1.8.17",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.2"
+  }
+}

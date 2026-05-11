@@ -123,7 +123,7 @@ type AlgorithmVersionSnapshot = {
   indicators: string[];
   algorithmMaxHoldingProportion: number | null;
   userAlgorithmImplementationCode: string;
-  algorithmId: string;
+  algorithmId: string | null;
 };
 
 function CopyAlgorithmModal({

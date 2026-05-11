@@ -1,8 +1,10 @@
 import { build, context } from 'esbuild';
-import { nodeExternalsPlugin } from 'esbuild-node-externals';
 
 const args = process.argv.slice(2);
 const isWatch = args.includes('--watch');
+
+// Contain native code and cannot be bundled
+const prismaExternals = ['@prisma/client', '@prisma/client/*', '@prisma/adapter-pg', 'pg'];
 
 const options = {
   entryPoints: ['src/index.ts'],
@@ -10,8 +12,10 @@ const options = {
   minify: true,
   sourcemap: 'inline',
   outfile: 'dist/index.js',
-  external: ['node:*', '../shared/node_modules/*', '@prisma/client'],
-  plugins: [nodeExternalsPlugin()],
+  external: ['node:*', '../shared/node_modules/*', ...prismaExternals],
+  banner: {
+    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+  },
   platform: 'node',
   target: 'node24',
   format: 'esm',
