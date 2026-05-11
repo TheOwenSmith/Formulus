@@ -413,7 +413,7 @@ export function AlgorithmsPage() {
     <>
     <div
       className="bg-slate-900 font-sans text-white overflow-hidden flex flex-col"
-      style={{ position: 'fixed', top: HEADER_OFFSET, left: 0, right: 0, bottom: 0 }}
+      style={{ bottom: 0, left: 0, position: 'fixed', right: 0, top: HEADER_OFFSET }}
     >
       <div
         className="max-w-[1400px] w-full mx-auto px-8 pt-6 pb-12 flex-1 min-h-0 overflow-auto animate-[fadeInUp_0.8s_ease-out]"

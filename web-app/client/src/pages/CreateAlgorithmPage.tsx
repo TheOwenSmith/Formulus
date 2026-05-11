@@ -15,7 +15,7 @@ import type { AlgorithmExample } from '@shared/examples';
 import { tickers as TICKERS, type Timestamp } from '@shared/trading-constants';
 import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/worker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -110,6 +110,14 @@ const HEADER_OFFSET = '4rem'; // match app header height
 /** Fixed height for content so the distance between step tracker and Cancel/Continue stays the same */
 const STEP_CONTENT_HEIGHT = 320;
 
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-white/50 text-sm mb-2 uppercase tracking-wider font-semibold">
+      {children}
+    </p>
+  );
+}
+
 export function CreateAlgorithmPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -134,12 +142,10 @@ export function CreateAlgorithmPage() {
   const MAX_CONTEXT_LENGTH = 9999;
   const MAX_MAX_HOLDING_INPUT_DIGITS = 6;
 
-  useEffect(() => {
-    if (state.k > maxK) {
-      setState((s) => ({ ...s, k: maxK }));
-      setKInputStr('');
-    }
-  }, [maxK, state.k]);
+  if (state.k > maxK) {
+    setState((s) => ({ ...s, k: maxK }));
+    setKInputStr('');
+  }
 
   function triggerShake(setter: (v: boolean) => void) {
     setter(true);
@@ -293,14 +299,6 @@ export function CreateAlgorithmPage() {
       type: AlgorithmType.TOP_K,
     },
   ] as const;
-
-  function SectionLabel({ children }: { children: React.ReactNode }) {
-    return (
-      <p className="text-white/50 text-sm mb-2 uppercase tracking-wider font-semibold">
-        {children}
-      </p>
-    );
-  }
 
   // Step 1: Type + name — content fills available space, centered
   const step1 = (

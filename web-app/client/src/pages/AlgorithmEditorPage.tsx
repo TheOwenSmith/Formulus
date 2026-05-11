@@ -3,7 +3,7 @@ import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { trpcCredentials } from '@client/lib/trpc';
 import Editor from '@monaco-editor/react';
-import { AlgorithmType } from '@shared/api';
+import { AlgorithmType, type UserTicker } from '@shared/api';
 import { ALGORITHM_EXAMPLES, type AlgorithmExample } from '@shared/examples';
 import {
   maxPeriodByIndicatorByContextLength,
@@ -578,10 +578,11 @@ function ParamStepper({
   max?: number;
 }) {
   const [localValue, setLocalValue] = useState(value == null ? '' : String(value));
-
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (prevValue !== value) {
+    setPrevValue(value);
     setLocalValue(value == null ? '' : String(value));
-  }, [value]);
+  }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -655,13 +656,13 @@ function ParamStepper({
 }
 
 function IndicatorAddRow({
-  ref: indicatorRef,
+  indicator: indicatorRef,
   existingIndicators,
   contextLength,
   onAdd,
   onOpenDocs,
 }: {
-  ref: IndicatorRef;
+  indicator: IndicatorRef;
   existingIndicators: string[];
   contextLength: number;
   onAdd: (indicatorString: string) => void;
@@ -997,14 +998,14 @@ function LeftPanel({
 
         {/* Inline add rows */}
         <div className="flex flex-col">
-          {INDICATORS_REF.map((ref) => (
+          {INDICATORS_REF.map((ind) => (
             <IndicatorAddRow
-              key={ref.id}
-              ref={ref}
+              key={ind.id}
+              indicator={ind}
               existingIndicators={indicators}
               contextLength={algorithm.contextLength}
               onAdd={onAddIndicator}
-              onOpenDocs={() => onOpenIndicatorDocs(ref.id)}
+              onOpenDocs={() => onOpenIndicatorDocs(ind.id)}
             />
           ))}
         </div>
@@ -1231,18 +1232,18 @@ export function AlgorithmEditorPage() {
     if (example.algorithmType === 1) {
       input = {
         ...base,
-        ticker: example.ticker! as any,
+        ticker: example.ticker! as UserTicker,
         type: 1 as const,
       };
     } else if (example.algorithmType === 2) {
       input = {
         ...base,
-        tickers: example.tickers! as any,
+        tickers: example.tickers! as UserTicker[],
         k: example.k!,
         type: 2 as const,
       };
     } else {
-      input = { ...base, tickers: example.tickers! as any, type: 0 as const };
+      input = { ...base, tickers: example.tickers! as UserTicker[], type: 0 as const };
     }
     if (overwriteId) deleteAlgorithm({ id: overwriteId });
     const result = await createAlgorithm(input);

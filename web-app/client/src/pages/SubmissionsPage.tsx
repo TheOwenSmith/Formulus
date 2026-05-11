@@ -93,33 +93,30 @@ function RunningETA({ createdAt, pct }: { createdAt: string; pct: number }) {
 
   // Record the wall-clock time when pct first becomes > 0. The worker emits pct=0 the moment
   // preparation (Docker startup, compilation) is done and actual backtesting begins. Using this
-  // timestamp — rather than createdAt — means preparation time is excluded from ETA estimates.
-  const backtestStartRef = useRef<number | null>(null);
-  if (pct > 0 && backtestStartRef.current == null) {
-    backtestStartRef.current = Date.now();
+  // timestamp rather than createdAt means preparation time is excluded from ETA estimates.
+  //
+  // snapshotAt/etaAtSnapshot: wall-clock time when the ETA was calculated and the ms remaining.
+  // Both update together each time pct changes; the per-second tick then counts down from there.
+  const [etaState, setEtaState] = useState<{
+    backtestStart: number | null;
+    snapshotAt: number;
+    etaAtSnapshot: number;
+  } | null>(null);
+  const [prevPct, setPrevPct] = useState(pct);
+  if (prevPct !== pct) {
+    setPrevPct(pct);
+    setEtaState((prev) => {
+      const start = prev?.backtestStart ?? (pct > 0 ? Date.now() : null);
+      if (pct < 5 || start == null) return null;
+      const elapsed = Date.now() - start;
+      const remaining = (elapsed * (100 - pct)) / pct;
+      if (remaining <= 0) return null;
+      return { backtestStart: start, snapshotAt: Date.now(), etaAtSnapshot: remaining };
+    });
   }
 
-  // snapshotAt: wall-clock time when this ETA estimate was calculated
-  // etaAtSnapshot: the estimated ms remaining at that moment
-  // Both are set together on each pct update; the per-second tick then counts down from there.
-  const [etaSnapshot, setEtaSnapshot] = useState<{ snapshotAt: number; etaAtSnapshot: number } | null>(null);
-  useEffect(() => {
-    if (pct < 5 || backtestStartRef.current == null) {
-      setEtaSnapshot(null);
-      return;
-    }
-    const elapsed = Date.now() - backtestStartRef.current;
-    const remaining = (elapsed * (100 - pct)) / pct;
-    if (remaining > 0) {
-      setEtaSnapshot({ snapshotAt: Date.now(), etaAtSnapshot: remaining });
-    } else {
-      setEtaSnapshot(null);
-    }
-  }, [pct]);
-
-  // Count down from the snapshot by 1s per second; floor at 1s so it never reads "0s left"
-  const etaMs = etaSnapshot != null
-    ? Math.max(1000, etaSnapshot.etaAtSnapshot - (now - etaSnapshot.snapshotAt))
+  const etaMs = etaState != null
+    ? Math.max(1000, etaState.etaAtSnapshot - (now - etaState.snapshotAt))
     : null;
 
   const elapsed = now - new Date(createdAt).getTime();

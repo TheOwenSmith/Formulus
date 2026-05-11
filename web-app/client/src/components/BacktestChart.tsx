@@ -782,7 +782,9 @@ export function BacktestChart({
     };
   }, [
     algorithmPlot,
+    availableTickers,
     dimensions,
+    isSideBySideMode,
     zoomDomain,
     onResetZoom,
     selectedTicker,
@@ -790,6 +792,9 @@ export function BacktestChart({
     algorithmColor,
     dataPoints,
     gradientColors,
+    tickerPlot.name,
+    tickerPlot.y.length,
+    timestamps,
   ]);
 
   const handleResetZoom = useCallback(() => {
