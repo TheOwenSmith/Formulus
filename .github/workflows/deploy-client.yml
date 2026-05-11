@@ -3,6 +3,7 @@
 #
 # Secrets: AWS_REGION, AWS_ROLE_TO_ASSUME, AMPLIFY_APP_ID
 
+# Need to add staging
 name: Deploy client (Amplify)
 
 on:
