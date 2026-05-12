@@ -2,10 +2,7 @@ import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-ver
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import { backtestAlgorithmsConcurrently } from '@worker/core/backtesting/backtest-algorithms-concurrently';
 import { interactiveBrokersSlippageFunction } from '@worker/core/backtesting/slippage-functions';
-import {
-  internal,
-  type AppError,
-} from '@worker/utils/error-handling';
+import { internal, type AppError } from '@worker/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 import { config } from './lib/config';
 import { createBacktestingResults } from './repository/db-backtesting-results';
