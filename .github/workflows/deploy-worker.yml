@@ -100,6 +100,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # --- CDK deploy ECR first so the repository exists before we push ---
+
+      - name: Install infra dependencies
+        working-directory: web-app/infra
+        run: pnpm install --frozen-lockfile
+
+      - name: Build infra
+        working-directory: web-app/infra
+        run: pnpm run build
+
+      - name: CDK deploy ECR stack
+        working-directory: web-app/infra
+        run: |
+          npx cdk deploy FormulusEcr \
+            --require-approval never \
+            -c workerOnly=true
+
       # --- Build and push Docker image ---
 
       - name: Login to Amazon ECR
@@ -117,19 +134,11 @@ jobs:
         run: |
           docker push "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
 
-      # --- CDK deploy worker infrastructure ---
-
-      - name: Install infra dependencies
-        working-directory: web-app/infra
-        run: pnpm install --frozen-lockfile
-
-      - name: Build infra
-        working-directory: web-app/infra
-        run: pnpm run build
+      # --- CDK deploy remaining worker infrastructure ---
 
       - name: CDK deploy worker stacks
         working-directory: web-app/infra
         run: |
-          npx cdk deploy FormulusEcr FormulusQueue FormulusCompute FormulusDispatcher \
+          npx cdk deploy FormulusQueue FormulusCompute FormulusDispatcher \
             --require-approval never \
             -c workerOnly=true
