@@ -14,8 +14,6 @@ export class DispatcherStack extends cdk.Stack {
     scope: Construct,
     id: string,
     props: cdk.StackProps & {
-      queue: sqs.IQueue;
-      deadLetterQueue: sqs.IQueue;
       cluster: ecs.ICluster;
       taskDefinition: ecs.TaskDefinition;
       taskSubnets: ec2.SubnetSelection;
@@ -24,6 +22,16 @@ export class DispatcherStack extends cdk.Stack {
     },
   ) {
     super(scope, id, props);
+
+    // Look up the queue by ARN rather than accepting it as a cross-stack CDK prop.
+    // Passing queue.queue across stacks creates a CloudFormation export in FormulusQueue
+    // that gets dropped when the app is synthesized without FormulusApi, causing
+    // CloudFormation to refuse the changeset (export still in use by FormulusApi).
+    const queue = sqs.Queue.fromQueueArn(
+      this,
+      'Queue',
+      this.formatArn({ service: 'sqs', resource: 'formulus-backtest-jobs' }),
+    );
 
     const fn = new lambdaNodejs.NodejsFunction(this, 'Dispatcher', {
       entry: path.join(process.cwd(), 'lambda', 'dispatcher.ts'),
@@ -43,7 +51,7 @@ export class DispatcherStack extends cdk.Stack {
     });
 
     fn.addEventSource(
-      new sources.SqsEventSource(props.queue, {
+      new sources.SqsEventSource(queue, {
         batchSize: 1,
         reportBatchItemFailures: false,
       }),
@@ -67,6 +75,6 @@ export class DispatcherStack extends cdk.Stack {
       }),
     );
 
-    props.queue.grantConsumeMessages(fn);
+    queue.grantConsumeMessages(fn);
   }
 }

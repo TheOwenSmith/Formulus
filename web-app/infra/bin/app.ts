@@ -55,9 +55,7 @@ if (!amplifyOnly) {
   new DispatcherStack(app, 'FormulusDispatcher', {
     capacityProviderName: compute.capacityProviderName,
     cluster: compute.cluster,
-    deadLetterQueue: queue.dlq,
     env,
-    queue: queue.queue,
     taskDefinition: compute.taskDefinition,
     taskSecurityGroups: compute.taskSecurityGroups,
     taskSubnets: compute.taskSubnets,

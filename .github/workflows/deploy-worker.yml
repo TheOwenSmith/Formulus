@@ -139,6 +139,6 @@ jobs:
       - name: CDK deploy worker stacks
         working-directory: web-app/infra
         run: |
-          npx cdk deploy FormulusQueue FormulusCompute FormulusDispatcher \
+          npx cdk deploy FormulusCompute FormulusDispatcher \
             --require-approval never \
             -c workerOnly=true

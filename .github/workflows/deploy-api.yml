@@ -140,4 +140,4 @@ jobs:
               EXTRA+=( -c "apiDomainName=${API_DOMAIN_NAME}" -c "apiSubDomain=${API_SUB_DOMAIN}" )
             fi
           fi
-          npx cdk deploy "$STACK" --require-approval never "${EXTRA[@]}"
+          npx cdk deploy FormulusQueue "$STACK" --require-approval never "${EXTRA[@]}"
