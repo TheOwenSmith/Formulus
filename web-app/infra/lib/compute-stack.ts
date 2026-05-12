@@ -43,22 +43,6 @@ export class ComputeStack extends cdk.Stack {
     });
 
     // EC2 (not Fargate): the worker uses Dockerode, which requires a Docker daemon on the host.
-    // Use an explicit LaunchTemplate so CDK emits AWS::EC2::LaunchTemplate on the ASG instead of
-    // the deprecated AWS::AutoScaling::LaunchConfiguration, which is blocked in newer AWS accounts.
-    const instanceRole = new iam.Role(this, 'WorkerInstanceRole', {
-      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
-      ],
-    });
-
-    const lt = new ec2.LaunchTemplate(this, 'WorkerLaunchTemplate', {
-      instanceType: new ec2.InstanceType('c7i.large'),
-      machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
-      requireImdsv2: true,
-      role: instanceRole,
-    });
-
     // Create the ASG directly (not via cluster.addCapacity) so that addAsgCapacityProvider
     // below is the sole caller of configureAutoScalingGroup. Using addCapacity + a separate
     // AsgCapacityProvider on the same ASG causes a duplicate 'DrainECSHook' construct error.
