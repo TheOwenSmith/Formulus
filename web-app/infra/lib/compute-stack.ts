@@ -22,6 +22,10 @@ export class ComputeStack extends cdk.Stack {
       clusterName?: string;
       imageTag?: string;
       logGroupName?: string;
+      capacityProviderName?: string;
+      taskDefinitionFamily?: string;
+      taskRoleName?: string;
+      executionRoleName?: string;
     },
   ) {
     super(scope, id, props);
@@ -85,6 +89,7 @@ export class ComputeStack extends cdk.Stack {
     // when no instances are running.
     const capacityProvider = new ecs.AsgCapacityProvider(this, 'WorkerCapacityProvider', {
       autoScalingGroup: asg,
+      ...(props.capacityProviderName != null && { capacityProviderName: props.capacityProviderName }),
       enableManagedScaling: true,
       enableManagedTerminationProtection: false,
       minimumScalingStepSize: 1,
@@ -100,15 +105,33 @@ export class ComputeStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Explicit roles with known names so app.ts can construct their ARNs as plain strings and
+    // pass them to DispatcherStack without creating CloudFormation cross-stack exports.
+    const executionRole = new iam.Role(this, 'WorkerExecutionRole', {
+      ...(props.executionRoleName != null && { roleName: props.executionRoleName }),
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
+      ],
+    });
+
+    const taskRole = new iam.Role(this, 'WorkerTaskRole', {
+      ...(props.taskRoleName != null && { roleName: props.taskRoleName }),
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+
     // HOST network mode: the task shares the EC2 instance's network stack, giving it internet
     // access through the instance's public IP without a NAT gateway. AWS_VPC mode would require
     // assignPublicIp (Fargate-only) or a NAT gateway for outbound connectivity.
     // ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true in the ASG user data enables IAM roles in this mode.
     this.taskDefinition = new ecs.Ec2TaskDefinition(this, 'WorkerTaskDef', {
       networkMode: ecs.NetworkMode.HOST,
+      ...(props.taskDefinitionFamily != null && { family: props.taskDefinitionFamily }),
+      taskRole,
+      executionRole,
     });
 
-    this.taskDefinition.addToTaskRolePolicy(
+    taskRole.addToPolicy(
       new iam.PolicyStatement({
         actions: ['secretsmanager:GetSecretValue', 'ssm:GetParameter', 'ssm:GetParameters'],
         resources: ['*'],

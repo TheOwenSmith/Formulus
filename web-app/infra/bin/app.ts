@@ -65,21 +65,39 @@ if (!amplifyOnly) {
     { suffix: '', clusterName: 'formulus-backtest', imageTag: 'latest', logGroupName: '/formulus/worker', queueBaseName: PROD_QUEUE },
     { suffix: 'Staging', clusterName: 'formulus-backtest-staging', imageTag: 'staging', logGroupName: '/formulus/worker-staging', queueBaseName: STAGING_QUEUE },
   ]) {
-    const compute = new ComputeStack(app, `FormulusCompute${suffix}`, {
+    // Derive known resource names from the cluster name so they can be passed as plain strings
+    // to both stacks, eliminating all CDK cross-stack CF exports between Compute and Dispatcher.
+    const cpName = `${clusterName}-cp`;
+    const taskDefFamily = `${clusterName}-worker`;
+    const taskRoleName = `${clusterName}-task-role`;
+    const executionRoleName = `${clusterName}-exec-role`;
+
+    const clusterArn = `arn:aws:ecs:${env.region}:${env.account}:cluster/${clusterName}`;
+    const taskDefinitionArn = `arn:aws:ecs:${env.region}:${env.account}:task-definition/${taskDefFamily}`;
+    const taskRoleArn = `arn:aws:iam::${env.account}:role/${taskRoleName}`;
+    const executionRoleArn = `arn:aws:iam::${env.account}:role/${executionRoleName}`;
+
+    new ComputeStack(app, `FormulusCompute${suffix}`, {
       env,
       clusterName,
       imageTag,
       logGroupName,
       workerEnv: workerEnvConfig,
       workerImageRepo: ecr.workerRepo,
+      capacityProviderName: cpName,
+      taskDefinitionFamily: taskDefFamily,
+      taskRoleName,
+      executionRoleName,
     });
 
     new DispatcherStack(app, `FormulusDispatcher${suffix}`, {
-      capacityProviderName: compute.capacityProviderName,
-      cluster: compute.cluster,
+      clusterArn,
+      taskDefinitionArn,
+      taskRoleArn,
+      executionRoleArn,
+      capacityProviderName: cpName,
       env,
       queueBaseName,
-      taskDefinition: compute.taskDefinition,
     });
   }
 

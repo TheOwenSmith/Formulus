@@ -1,5 +1,4 @@
 import * as cdk from 'aws-cdk-lib';
-import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -12,9 +11,14 @@ export class DispatcherStack extends cdk.Stack {
   constructor(
     scope: Construct,
     id: string,
+    // All compute-stack values are passed as plain strings — no CDK cross-stack construct
+    // references — so this stack has no Fn::ImportValue calls into FormulusCompute*.
+    // That lets the dispatcher deploy before the compute stack when breaking old CF exports.
     props: cdk.StackProps & {
-      cluster: ecs.ICluster;
-      taskDefinition: ecs.TaskDefinition;
+      clusterArn: string;
+      taskDefinitionArn: string;
+      taskRoleArn: string;
+      executionRoleArn: string;
       capacityProviderName: string;
       queueBaseName: string;
     },
@@ -38,8 +42,8 @@ export class DispatcherStack extends cdk.Stack {
       memorySize: 256,
       environment: {
         CAPACITY_PROVIDER_NAME: props.capacityProviderName,
-        CLUSTER_ARN: props.cluster.clusterArn,
-        TASK_DEFINITION_ARN: props.taskDefinition.taskDefinitionArn,
+        CLUSTER_ARN: props.clusterArn,
+        TASK_DEFINITION_ARN: props.taskDefinitionArn,
       },
     });
 
@@ -48,18 +52,15 @@ export class DispatcherStack extends cdk.Stack {
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ecs:RunTask'],
-        resources: [props.taskDefinition.taskDefinitionArn],
+        // Allow any revision of this task definition family.
+        resources: [`${props.taskDefinitionArn}:*`, props.taskDefinitionArn],
       }),
     );
 
-    const passRoleResources = [props.taskDefinition.taskRole.roleArn];
-    if (props.taskDefinition.executionRole != null) {
-      passRoleResources.push(props.taskDefinition.executionRole.roleArn);
-    }
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['iam:PassRole'],
-        resources: passRoleResources,
+        resources: [props.taskRoleArn, props.executionRoleArn],
       }),
     );
 
