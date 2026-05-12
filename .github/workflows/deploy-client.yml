@@ -93,7 +93,7 @@ jobs:
       - name: Generate Prisma client
         working-directory: web-app/api
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
         run: pnpm run prisma:generate
 
       - name: Install worker dependencies
