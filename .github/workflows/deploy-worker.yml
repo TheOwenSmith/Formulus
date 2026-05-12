@@ -139,6 +139,13 @@ jobs:
       - name: CDK deploy worker stacks
         working-directory: web-app/infra
         run: |
-          npx cdk deploy FormulusCompute FormulusDispatcher \
+          if [ "${{ github.ref }}" = "refs/heads/worker-staging" ]; then
+            COMPUTE_STACK=FormulusComputeStaging
+            DISPATCHER_STACK=FormulusDispatcherStaging
+          else
+            COMPUTE_STACK=FormulusCompute
+            DISPATCHER_STACK=FormulusDispatcher
+          fi
+          npx cdk deploy "$COMPUTE_STACK" "$DISPATCHER_STACK" \
             --require-approval never \
             -c workerOnly=true

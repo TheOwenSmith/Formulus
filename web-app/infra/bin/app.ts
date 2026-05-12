@@ -56,23 +56,32 @@ if (!amplifyOnly) {
   new QueueStack(app, 'FormulusQueue', { env, queueBaseName: PROD_QUEUE });
   new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
 
-  const compute = new ComputeStack(app, 'FormulusCompute', {
-    env,
-    workerEnv: {
-      DATABASE_URL: config.getKey<ApiEnvVar>('DATABASE_URL'),
-      NODE_ENV: config.getKey<ApiEnvVar>('NODE_ENV'),
-    },
-    workerImageRepo: ecr.workerRepo,
-  });
+  const workerEnvConfig = {
+    DATABASE_URL: config.getKey<ApiEnvVar>('DATABASE_URL'),
+    NODE_ENV: config.getKey<ApiEnvVar>('NODE_ENV'),
+  };
 
-  new DispatcherStack(app, 'FormulusDispatcher', {
-    capacityProviderName: compute.capacityProviderName,
-    cluster: compute.cluster,
-    env,
-    taskDefinition: compute.taskDefinition,
-    taskSecurityGroups: compute.taskSecurityGroups,
-    taskSubnets: compute.taskSubnets,
-  });
+  for (const { suffix, clusterName, queueBaseName } of [
+    { suffix: '', clusterName: 'formulus-backtest', queueBaseName: PROD_QUEUE },
+    { suffix: 'Staging', clusterName: 'formulus-backtest-staging', queueBaseName: STAGING_QUEUE },
+  ]) {
+    const compute = new ComputeStack(app, `FormulusCompute${suffix}`, {
+      env,
+      clusterName,
+      workerEnv: workerEnvConfig,
+      workerImageRepo: ecr.workerRepo,
+    });
+
+    new DispatcherStack(app, `FormulusDispatcher${suffix}`, {
+      capacityProviderName: compute.capacityProviderName,
+      cluster: compute.cluster,
+      env,
+      queueBaseName,
+      taskDefinition: compute.taskDefinition,
+      taskSecurityGroups: compute.taskSecurityGroups,
+      taskSubnets: compute.taskSubnets,
+    });
+  }
 
   if (!workerOnly) {
     const baseApiEnv = baseApiEnvFromApp();

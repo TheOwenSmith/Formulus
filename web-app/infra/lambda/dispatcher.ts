@@ -41,7 +41,7 @@ export async function handler(event: SqsEvent) {
         capacityProviderStrategy: [{ base: 0, capacityProvider: capacityProviderName, weight: 1 }],
         networkConfiguration: {
           awsvpcConfiguration: {
-            assignPublicIp: 'ENABLED',
+            assignPublicIp: 'DISABLED',
             securityGroups: securityGroupIds,
             subnets: subnetIds,
           },

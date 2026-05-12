@@ -21,6 +21,7 @@ export class ComputeStack extends cdk.Stack {
     props: cdk.StackProps & {
       workerImageRepo: ecr.IRepository;
       workerEnv: { DATABASE_URL: string; NODE_ENV: string };
+      clusterName?: string;
     },
   ) {
     super(scope, id, props);
@@ -39,7 +40,7 @@ export class ComputeStack extends cdk.Stack {
 
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       vpc: this.vpc,
-      clusterName: 'formulus-backtest',
+      clusterName: props.clusterName ?? 'formulus-backtest',
     });
 
     // EC2 (not Fargate): the worker uses Dockerode, which requires a Docker daemon on the host.
