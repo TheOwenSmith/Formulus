@@ -23,14 +23,19 @@ export class DispatcherStack extends cdk.Stack {
   ) {
     super(scope, id, props);
 
-    // Look up the queue by ARN rather than accepting it as a cross-stack CDK prop.
+    // Look up queues by ARN rather than accepting them as cross-stack CDK props.
     // Passing queue.queue across stacks creates a CloudFormation export in FormulusQueue
     // that gets dropped when the app is synthesized without FormulusApi, causing
     // CloudFormation to refuse the changeset (export still in use by FormulusApi).
-    const queue = sqs.Queue.fromQueueArn(
+    const prodQueue = sqs.Queue.fromQueueArn(
       this,
       'Queue',
       this.formatArn({ service: 'sqs', resource: 'formulus-backtest-jobs' }),
+    );
+    const stagingQueue = sqs.Queue.fromQueueArn(
+      this,
+      'StagingQueue',
+      this.formatArn({ service: 'sqs', resource: 'formulus-backtest-jobs-staging' }),
     );
 
     const fn = new lambdaNodejs.NodejsFunction(this, 'Dispatcher', {
@@ -50,12 +55,8 @@ export class DispatcherStack extends cdk.Stack {
       },
     });
 
-    fn.addEventSource(
-      new sources.SqsEventSource(queue, {
-        batchSize: 1,
-        reportBatchItemFailures: false,
-      }),
-    );
+    fn.addEventSource(new sources.SqsEventSource(prodQueue, { batchSize: 1, reportBatchItemFailures: false }));
+    fn.addEventSource(new sources.SqsEventSource(stagingQueue, { batchSize: 1, reportBatchItemFailures: false }));
 
     fn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -75,6 +76,7 @@ export class DispatcherStack extends cdk.Stack {
       }),
     );
 
-    queue.grantConsumeMessages(fn);
+    prodQueue.grantConsumeMessages(fn);
+    stagingQueue.grantConsumeMessages(fn);
   }
 }

@@ -37,11 +37,24 @@ function baseApiEnvFromApp(): Record<string, string> {
   return fromEnv;
 }
 
+// Construct queue URL/ARN from known names — avoids CDK cross-stack CF exports that block
+// stack deletion when one stack's exports are imported by another.
+const PROD_QUEUE = 'formulus-backtest-jobs';
+const STAGING_QUEUE = 'formulus-backtest-jobs-staging';
+
+function makeQueueArn(account: string, region: string, name: string) {
+  return `arn:aws:sqs:${region}:${account}:${name}`;
+}
+function makeQueueUrl(account: string, region: string, name: string) {
+  return `https://sqs.${region}.amazonaws.com/${account}/${name}`;
+}
+
 let apiUrl: string | undefined;
 
 if (!amplifyOnly) {
   const ecr = new EcrStack(app, 'FormulusEcr', { env });
-  const queue = new QueueStack(app, 'FormulusQueue', { env });
+  new QueueStack(app, 'FormulusQueue', { env, queueBaseName: PROD_QUEUE });
+  new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
 
   const compute = new ComputeStack(app, 'FormulusCompute', {
     env,
@@ -72,11 +85,13 @@ if (!amplifyOnly) {
 
     const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
     const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
-    const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as string | undefined;
+    const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as
+      | string
+      | undefined;
     const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
 
     const api = new ApiGatewayStack(app, 'FormulusApi', {
-      backtestQueueArn: queue.queue.queueArn,
+      backtestQueueArn: makeQueueArn(env.account, env.region, PROD_QUEUE),
       bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
       codeRoot: WEB_APP_ROOT,
       corsHeaders: defaultApiCorsHeaders,
@@ -85,7 +100,7 @@ if (!amplifyOnly) {
       handler: 'lambda.handler',
       lambdaEnvironment: {
         ...baseApiEnv,
-        QUEUE_URL: queue.queue.queueUrl,
+        QUEUE_URL: makeQueueUrl(env.account, env.region, PROD_QUEUE),
       },
       ...(apiDomainName != null &&
         apiSubDomain != null && {
@@ -95,7 +110,7 @@ if (!amplifyOnly) {
     });
 
     new ApiGatewayStack(app, 'FormulusApiStaging', {
-      backtestQueueArn: queue.queue.queueArn,
+      backtestQueueArn: makeQueueArn(env.account, env.region, STAGING_QUEUE),
       bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
       codeRoot: WEB_APP_ROOT,
       corsHeaders: defaultApiCorsHeaders,
@@ -104,7 +119,7 @@ if (!amplifyOnly) {
       handler: 'lambda.handler',
       lambdaEnvironment: {
         ...baseApiEnv,
-        QUEUE_URL: queue.queue.queueUrl,
+        QUEUE_URL: makeQueueUrl(env.account, env.region, STAGING_QUEUE),
       },
       restApiDisplayName: 'formulus-api-staging',
       ...(apiStagingDomainName != null &&

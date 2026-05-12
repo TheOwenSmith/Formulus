@@ -62,7 +62,23 @@ export class ComputeStack extends cdk.Stack {
     // Create the ASG directly (not via cluster.addCapacity) so that addAsgCapacityProvider
     // below is the sole caller of configureAutoScalingGroup. Using addCapacity + a separate
     // AsgCapacityProvider on the same ASG causes a duplicate 'DrainECSHook' construct error.
-    // Public subnets have MapPublicIpOnLaunch=true by default so no associatePublicIpAddress needed.
+    //
+    // LaunchTemplate (not LaunchConfiguration): AWS has blocked LaunchConfiguration creation
+    // in this account. requireImdsv2 on a LaunchTemplate also enforces IMDSv2.
+    const instanceRole = new iam.Role(this, 'WorkerInstanceRole', {
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
+      ],
+    });
+
+    const lt = new ec2.LaunchTemplate(this, 'WorkerLaunchTemplate', {
+      instanceType: new ec2.InstanceType('c7i.large'),
+      machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
+      requireImdsv2: true,
+      role: instanceRole,
+    });
+
     const asg = new autoscaling.AutoScalingGroup(this, 'WorkerAsg', {
       vpc: this.vpc,
       launchTemplate: lt,
