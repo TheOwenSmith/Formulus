@@ -5,7 +5,7 @@ import {
   formulusApiLambdaBundlingShell,
 } from '@/lib/api-gateway-stack.js';
 import { ComputeStack } from '@/lib/compute-stack.js';
-import { config, type ClientEnvVar } from '@/lib/config.js';
+import { config, envVarsLambda, type ApiEnvVar, type ClientEnvVar } from '@/lib/config.js';
 import { DispatcherStack } from '@/lib/dispatcher-stack.js';
 import { EcrStack } from '@/lib/ecr-stack.js';
 import { QueueStack } from '@/lib/queue-stack.js';
@@ -23,19 +23,6 @@ const env = {
 // that require DATABASE_URL and other API-only secrets).
 const amplifyOnly = app.node.tryGetContext('amplifyOnly') === 'true';
 
-/** Matches `envVarsLambda` in `web-app/api/src/lib/config.ts` (exclude `QUEUE_URL`, set by CDK; exclude `AWS_REGION`, reserved by Lambda). */
-const LAMBDA_ENV_KEYS = [
-  'ALPHA_VANTAGE_API_KEY',
-  'NODE_ENV',
-  'CORS_ORIGIN',
-  'DATABASE_URL',
-  'BETTER_AUTH_SECRET',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'COHERE_API_KEY',
-  'COHERE_MODEL',
-] as const;
-
 function baseApiEnvFromApp(): Record<string, string> {
   const ctx = app.node.tryGetContext('apiEnvJson') as unknown;
   if (ctx != null) {
@@ -43,9 +30,8 @@ function baseApiEnvFromApp(): Record<string, string> {
     return ctx as Record<string, string>;
   }
   const fromEnv: Record<string, string> = {};
-  for (const key of LAMBDA_ENV_KEYS) {
-    const v = process.env[key];
-    if (v != null && v !== '') fromEnv[key] = v;
+  for (const key of envVarsLambda) {
+    fromEnv[key] = config.getKey<ApiEnvVar>(key);
   }
   return fromEnv;
 }

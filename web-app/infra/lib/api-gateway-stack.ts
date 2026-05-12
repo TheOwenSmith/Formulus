@@ -7,6 +7,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
+import { config, type ApiEnvVar } from './config.js';
 import { PNPM_VERSION } from './pnpm-version.js';
 
 /** Paths under `codeRoot` (must be `web-app/`: siblings `api/` + `shared/`). */
@@ -42,9 +43,7 @@ export const defaultApiCorsHeaders = [
  * Runtime deps: `install-lambda-runtime-deps.mjs` installs only `pg` + `@prisma/client` without editing
  * api/package.json or pnpm-lock.yaml (avoids CI frozen-lockfile errors).
  */
-export function formulusApiLambdaBundlingShell(
-  paths: FormulusApiBundlingPaths = {},
-): string {
+export function formulusApiLambdaBundlingShell(paths: FormulusApiBundlingPaths = {}): string {
   const apiRel = paths.apiPackagePath ?? 'api';
   const sharedRel = paths.sharedPackagePath ?? 'shared';
   const apiDir = `/asset-input/${apiRel}`;
@@ -112,16 +111,9 @@ export class ApiGatewayStack extends cdk.Stack {
     const stageName = props.stageName ?? 'prod';
     const allowWildcardOrigin = props.corsOrigins.includes('*');
 
-    const databaseUrl = process.env['DATABASE_URL']?.trim();
-    if (databaseUrl == null || databaseUrl === '') {
-      throw new Error(
-        'DATABASE_URL must be set when synthesizing or deploying the API stack (Prisma runs during Lambda asset bundling). On CI, ensure the deploy job sets DATABASE_URL (e.g. from secrets). Locally, set it in the environment or web-app/infra/.env before running CDK.',
-      );
-    }
+    const databaseUrl = config.getKey<ApiEnvVar>('DATABASE_URL');
 
     const apiFunction = new lambda.Function(this, `${id}-lambda-function`, {
-      runtime: lambda.Runtime.NODEJS_24_X,
-      handler: props.handler,
       code: lambda.Code.fromAsset(props.codeRoot, {
         bundling: {
           image: lambda.Runtime.NODEJS_24_X.bundlingImage,
@@ -133,11 +125,13 @@ export class ApiGatewayStack extends cdk.Stack {
         },
       }),
       environment: props.lambdaEnvironment,
-      memorySize: props.lambdaMemorySize ?? 1024,
-      timeout: props.lambdaTimeout ?? cdk.Duration.seconds(29),
+      handler: props.handler,
       logGroup: new logs.LogGroup(this, `${id}-api-logs`, {
         retention: logs.RetentionDays.ONE_WEEK,
       }),
+      memorySize: props.lambdaMemorySize ?? 1024,
+      runtime: lambda.Runtime.NODEJS_24_X,
+      timeout: props.lambdaTimeout ?? cdk.Duration.seconds(29),
     });
 
     apiFunction.addToRolePolicy(

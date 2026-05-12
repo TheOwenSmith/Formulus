@@ -11,21 +11,19 @@ const envVarsCdk = [
 ] as const;
 const envVarsClient = [...envVarsCdk, 'VITE_SERVER_URL'] as const;
 
-const envVarsApi = [
-  ...envVarsCdk,
+export const envVarsLambda = [
   'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
-  'PORT',
   'CORS_ORIGIN',
   'DATABASE_URL',
   'BETTER_AUTH_SECRET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
-  'QUEUE_URL',
-  'AWS_ENDPOINT_URL',
   'COHERE_API_KEY',
   'COHERE_MODEL',
 ] as const satisfies string[];
+
+const envVarsApi = [...envVarsCdk, ...envVarsLambda] as const;
 
 export type ClientEnvVar = (typeof envVarsClient)[number];
 export type ApiEnvVar = (typeof envVarsApi)[number];
@@ -58,14 +56,6 @@ class Config {
 
   getKey<K extends EnvVar = EnvVar>(key: K): string {
     return process.env[key]!;
-  }
-
-  get port(): number {
-    const port = parseInt(this.getKey('PORT'));
-    if (isNaN(port)) {
-      throw new Error(`Environment variable PORT '${this.getKey('PORT')}' is not a number`);
-    }
-    return port;
   }
 
   get env(): 'dev' | 'staging' | 'prod' {
