@@ -14,6 +14,7 @@ const envVars = [
   'DATABASE_URL',
   'SUBMISSION_ID',
   'AWS_REGION',
+  'DATA_BUCKET',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 

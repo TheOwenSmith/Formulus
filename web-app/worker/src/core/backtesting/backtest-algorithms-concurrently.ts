@@ -6,6 +6,7 @@ import {
 import type { Timestamp } from '@shared/trading-constants';
 import { aggregateTimestamps } from '@shared/trading-constants';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
+import { config } from '@worker/lib/config';
 import {
   indicatorsToIndicatorResultsFunction,
   type Indicator,
@@ -26,6 +27,7 @@ import {
   getIteratorBounds,
   getTickerIteratorsByTicker,
 } from './iterator-utils';
+import { ensureDataFiles } from './ensure-data-files';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator } from './read-data';
 import {
@@ -191,6 +193,10 @@ export async function backtestAlgorithmsConcurrently({
     algorithmsByIndexByAggregate,
   );
   const allTickers: Ticker[] = getAllTickers(distinctTickersByAggregate);
+
+  // Download any missing data files from S3 before validating they exist locally.
+  const ensureResult = await ensureDataFiles(distinctTickersByAggregate, config.getKey('DATA_BUCKET'));
+  if (ensureResult.isErr()) return err(ensureResult.error);
 
   // Get filename and index by aggregate by ticker and slippage by ticker
   const getFilenameAndIndexByAggregateByTickerResponse = getFilenameAndIndexByAggregateByTicker(

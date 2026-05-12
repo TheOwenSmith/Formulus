@@ -18,7 +18,7 @@ export class ComputeStack extends cdk.Stack {
     id: string,
     props: cdk.StackProps & {
       workerImageRepo: ecr.IRepository;
-      workerEnv: { DATABASE_URL: string; NODE_ENV: string };
+      workerEnv: { DATA_BUCKET: string; DATABASE_URL: string; NODE_ENV: string };
       clusterName?: string;
       imageTag?: string;
       logGroupName?: string;
@@ -136,6 +136,13 @@ export class ComputeStack extends cdk.Stack {
       }),
     );
 
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:GetObject'],
+        resources: [`arn:aws:s3:::${props.workerEnv.DATA_BUCKET}/*`],
+      }),
+    );
+
     // Bind-mount the host Docker socket so the worker can launch user-code containers via Dockerode.
     this.taskDefinition.addVolume({
       name: 'docker-sock',
@@ -147,6 +154,7 @@ export class ComputeStack extends cdk.Stack {
       memoryReservationMiB: 1024,
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),
       environment: {
+        DATA_BUCKET: props.workerEnv.DATA_BUCKET,
         NODE_ENV: props.workerEnv.NODE_ENV,
         DATABASE_URL: props.workerEnv.DATABASE_URL,
         // SUBMISSION_ID is injected via container overrides by the dispatcher Lambda at launch time.

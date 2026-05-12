@@ -5,7 +5,7 @@ import {
   formulusApiLambdaBundlingShell,
 } from '@/lib/api-gateway-stack.js';
 import { ComputeStack } from '@/lib/compute-stack.js';
-import { config, envVarsLambda, type ApiEnvVar, type ClientEnvVar } from '@/lib/config.js';
+import { config, envVarsLambda, type ApiEnvVar, type ClientEnvVar, type WorkerCdkEnvVar } from '@/lib/config.js';
 import { WEB_APP_ROOT } from '@/lib/constants.js';
 import { DispatcherStack } from '@/lib/dispatcher-stack.js';
 import { EcrStack } from '@/lib/ecr-stack.js';
@@ -57,6 +57,7 @@ if (!amplifyOnly) {
   new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
 
   const workerEnvConfig = {
+    DATA_BUCKET: config.getKey<WorkerCdkEnvVar>('DATA_BUCKET'),
     DATABASE_URL: config.getKey<ApiEnvVar>('DATABASE_URL'),
     NODE_ENV: config.getKey<ApiEnvVar>('NODE_ENV'),
   };

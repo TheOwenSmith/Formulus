@@ -40,6 +40,7 @@ jobs:
       NODE_ENV: ${{ vars.NODE_ENV }}
       ECR_REPO: formulus-worker
       IMAGE_TAG: ${{ github.ref == 'refs/heads/worker-staging' && 'staging' || 'latest' }}
+      DATA_BUCKET: ${{ vars.DATA_BUCKET }}
 
     steps:
       - name: Checkout

@@ -27,6 +27,7 @@ const envVarsApi = [...envVarsCdk, ...envVarsLambda] as const;
 
 export const envVarsWorkerCdk = [
   ...envVarsCdk,
+  'DATA_BUCKET',
   'DATABASE_URL',
   'NODE_ENV',
 ] as const satisfies string[];
