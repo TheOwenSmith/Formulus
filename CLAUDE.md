@@ -8,6 +8,7 @@ SaaS backtesting platform. Users write stock trading algorithms (JS/TS/Python/C+
 web-app/
 ├── api/        Express + tRPC server, port 3000
 ├── client/     React + Vite frontend, port 4040
+├── infra/      AWS CDK infrastructure (Lambda, API Gateway, Amplify, SQS, ECS)
 ├── worker/     Node.js job processor (SQS → Docker containers)
 └── shared/     Shared types, Prisma schema, re-exports
 ```
@@ -27,6 +28,7 @@ web-app/
 - **Client**: React 19, Vite, TanStack Query, tRPC client, React Router v7, Tailwind CSS v4, Sonner (toasts), Zustand, D3
 - **Worker**: Node.js, Dockerode, AWS SQS (`@aws-sdk/client-sqs`)
 - **Queue**: AWS SQS — LocalStack for local dev (`docker-compose`)
+- **Infra**: AWS CDK, Lambda, API Gateway, Amplify Hosting, SQS, ECS/Fargate
 - **Error handling**: `neverthrow` (API + Worker)
 
 ## Dev Commands
@@ -51,7 +53,9 @@ pnpm prettier:write
 
 ## Prisma
 
-Schema lives at `shared/prisma/schema.prisma`. Generated client outputs to `shared/generated/prisma/` (gitignored). Always run Prisma CLI from `api/` using the package scripts — they pass the correct `--schema` flag.
+Schema lives at `shared/prisma/schema.prisma`. Generated client outputs to `shared/generated/prisma/` (gitignored). Always run Prisma CLI from `api/` using the package scripts -- they pass the correct `--schema` flag.
+
+The schema uses `engineType = "client"` (Prisma 7's pure-JS query engine). There are no native binaries. All Prisma dependencies (`@prisma/client`, `@prisma/adapter-pg`, `pg`) are bundled by esbuild into the output -- they are **not** externalized.
 
 ## Critical Import Rule
 
@@ -64,6 +68,7 @@ Schema lives at `shared/prisma/schema.prisma`. Generated client outputs to `shar
 ```ts
 import { config } from "@api/lib/config"; // in API code
 import { config } from "@worker/lib/config"; // in worker code
+import { config } from "@/lib/config"; // in infra code
 
 const value = config.getKey("MY_KEY");
 ```
@@ -79,7 +84,9 @@ Both steps are required:
 
 If parsing or casting is needed, add a getter to `Config` (e.g. `config.port`) rather than doing it at call sites.
 
-> The worker has its own `envVars` list — do not import `@api/lib/config` from worker code (see Critical Import Rule).
+> The worker has its own `envVars` list -- do not import `@api/lib/config` from worker code (see Critical Import Rule).
+
+> Infra uses a `DEPLOY_TARGET` env var (`api`, `client`, or `worker`) to validate only the relevant subset of env vars during CDK synthesis. Set `DEPLOY_TARGET` in CI workflow env.
 
 ## Error Handling
 
@@ -252,3 +259,7 @@ When suggesting architecture, always call out the cost implication explicitly an
 | `shared/prisma/schema.prisma`            | Canonical Prisma schema                                              |
 | `client/src/lib/trpc.ts`                 | tRPC client setup, `queryClient`, `trpcCredentials`, `trpcPublic`    |
 | `client/src/router.tsx`                  | React Router config, auth guards                                     |
+| `infra/bin/app.ts`                       | CDK app entry point, stack orchestration                             |
+| `infra/lib/api-gateway-stack.ts`         | API Lambda + API Gateway stack, bundling shell                       |
+| `infra/lib/amplify-stack.ts`             | Amplify Hosting stack (client deploy)                                |
+| `infra/lib/config.ts`                    | Infra `Config` singleton, `DEPLOY_TARGET`-based env validation       |
