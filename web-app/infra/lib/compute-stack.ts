@@ -22,7 +22,6 @@ export class ComputeStack extends cdk.Stack {
       clusterName?: string;
       imageTag?: string;
       logGroupName?: string;
-      capacityProviderName?: string;
       taskDefinitionFamily?: string;
       taskRoleName?: string;
       executionRoleName?: string;
@@ -89,7 +88,6 @@ export class ComputeStack extends cdk.Stack {
     // when no instances are running.
     const capacityProvider = new ecs.AsgCapacityProvider(this, 'WorkerCapacityProvider', {
       autoScalingGroup: asg,
-      ...(props.capacityProviderName != null && { capacityProviderName: props.capacityProviderName }),
       enableManagedScaling: true,
       enableManagedTerminationProtection: false,
       minimumScalingStepSize: 1,

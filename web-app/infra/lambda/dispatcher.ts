@@ -1,4 +1,4 @@
-import { ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
+import { DescribeClustersCommand, ECSClient, RunTaskCommand } from '@aws-sdk/client-ecs';
 
 type SqsRecord = {
   body: string;
@@ -19,7 +19,14 @@ function requiredEnv(name: string): string {
 export async function handler(event: SqsEvent) {
   const clusterArn = requiredEnv('CLUSTER_ARN');
   const taskDefinitionArn = requiredEnv('TASK_DEFINITION_ARN');
-  const capacityProviderName = requiredEnv('CAPACITY_PROVIDER_NAME');
+
+  // Look up the capacity provider name at runtime rather than baking it into the Lambda
+  // env at deploy time. This avoids having to rename the ECS capacity provider (which fails
+  // because AWS requires a 1-to-1 ASG↔CP relationship and rejects a new CP for an ASG that
+  // already has one).
+  const describeResult = await ecs.send(new DescribeClustersCommand({ clusters: [clusterArn] }));
+  const capacityProviderName = describeResult.clusters?.[0]?.capacityProviders?.[0];
+  if (!capacityProviderName) throw new Error(`No capacity provider found on cluster: ${clusterArn}`);
 
   for (const record of event.Records ?? []) {
     const msg = JSON.parse(record.body) as { submissionId?: string };

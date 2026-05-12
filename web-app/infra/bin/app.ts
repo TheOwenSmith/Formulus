@@ -67,7 +67,6 @@ if (!amplifyOnly) {
   ]) {
     // Derive known resource names from the cluster name so they can be passed as plain strings
     // to both stacks, eliminating all CDK cross-stack CF exports between Compute and Dispatcher.
-    const cpName = `${clusterName}-cp`;
     const taskDefFamily = `${clusterName}-worker`;
     const taskRoleName = `${clusterName}-task-role`;
     const executionRoleName = `${clusterName}-exec-role`;
@@ -84,7 +83,6 @@ if (!amplifyOnly) {
       logGroupName,
       workerEnv: workerEnvConfig,
       workerImageRepo: ecr.workerRepo,
-      capacityProviderName: cpName,
       taskDefinitionFamily: taskDefFamily,
       taskRoleName,
       executionRoleName,
@@ -95,7 +93,6 @@ if (!amplifyOnly) {
       taskDefinitionArn,
       taskRoleArn,
       executionRoleArn,
-      capacityProviderName: cpName,
       env,
       queueBaseName,
     });

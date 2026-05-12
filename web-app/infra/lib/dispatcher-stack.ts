@@ -13,13 +13,13 @@ export class DispatcherStack extends cdk.Stack {
     id: string,
     // All compute-stack values are passed as plain strings — no CDK cross-stack construct
     // references — so this stack has no Fn::ImportValue calls into FormulusCompute*.
-    // That lets the dispatcher deploy before the compute stack when breaking old CF exports.
+    // The capacity provider name is resolved at Lambda runtime via DescribeClusters rather
+    // than at deploy time, which avoids the 1-CP-per-ASG rename restriction in ECS.
     props: cdk.StackProps & {
       clusterArn: string;
       taskDefinitionArn: string;
       taskRoleArn: string;
       executionRoleArn: string;
-      capacityProviderName: string;
       queueBaseName: string;
     },
   ) {
@@ -41,13 +41,19 @@ export class DispatcherStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       environment: {
-        CAPACITY_PROVIDER_NAME: props.capacityProviderName,
         CLUSTER_ARN: props.clusterArn,
         TASK_DEFINITION_ARN: props.taskDefinitionArn,
       },
     });
 
     fn.addEventSource(new sources.SqsEventSource(queue, { batchSize: 1, reportBatchItemFailures: false }));
+
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ecs:DescribeClusters'],
+        resources: [props.clusterArn],
+      }),
+    );
 
     fn.addToRolePolicy(
       new iam.PolicyStatement({
