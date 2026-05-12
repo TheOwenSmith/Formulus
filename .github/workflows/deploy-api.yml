@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_quality_checks:
-        description: Skip Prettier and ESLint (manual runs on api-prod only; push never skips)
+        description: Skip Prettier and ESLint
         required: false
         default: false
         type: boolean
@@ -115,6 +115,10 @@ jobs:
       - name: Build infra
         working-directory: web-app/infra
         run: pnpm run build
+
+      - name: Run database migrations
+        working-directory: web-app/api
+        run: pnpm exec prisma migrate deploy --schema=../shared/prisma/schema.prisma
 
       - name: CDK deploy API stack
         working-directory: web-app/infra

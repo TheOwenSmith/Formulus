@@ -2,10 +2,17 @@ import { config as dotenvConfig } from 'dotenv';
 import { validateEnvVars } from './validate-env-vars';
 dotenvConfig();
 
+const devEnvVars = [
+  'PORT',
+  'AWS_ENDPOINT_URL',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+] as const satisfies string[];
+type DevEnvVar = (typeof devEnvVars)[number];
+
 const envVarsAll = [
   'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
-  'PORT',
   'CORS_ORIGIN',
   'DATABASE_URL',
   'BETTER_AUTH_SECRET',
@@ -13,27 +20,18 @@ const envVarsAll = [
   'GOOGLE_CLIENT_SECRET',
   'QUEUE_URL',
   'AWS_REGION',
-  'AWS_ENDPOINT_URL',
-  'AWS_ACCESS_KEY_ID',
-  'AWS_SECRET_ACCESS_KEY',
   'COHERE_API_KEY',
   'COHERE_MODEL',
 ] as const satisfies string[];
-
-/** Lambda uses the execution role for AWS APIs; LocalStack uses explicit keys + endpoint. */
-const envVarsLambda = envVarsAll.filter(
-  (k) =>
-    k !== 'PORT' &&
-    k !== 'AWS_ENDPOINT_URL' &&
-    k !== 'AWS_ACCESS_KEY_ID' &&
-    k !== 'AWS_SECRET_ACCESS_KEY',
-) as readonly (typeof envVarsAll)[number][];
 
 type EnvVar = (typeof envVarsAll)[number];
 
 class Config {
   private constructor() {
-    validateEnvVars(process.env['AWS_EXECUTION_ENV'] != null ? envVarsLambda : envVarsAll);
+    validateEnvVars(envVarsAll);
+    if (this.env === 'dev') {
+      validateEnvVars(devEnvVars);
+    }
   }
 
   static #instance: Config | null = null;
@@ -45,10 +43,14 @@ class Config {
     return process.env[key]!;
   }
 
+  getDevKey(key: DevEnvVar) {
+    return process.env[key]!;
+  }
+
   get port(): number {
-    const port = parseInt(this.getKey('PORT'));
+    const port = parseInt(this.getDevKey('PORT'));
     if (isNaN(port)) {
-      throw new Error(`Environment variable PORT '${this.getKey('PORT')}' is not a number`);
+      throw new Error(`Environment variable PORT '${this.getDevKey('PORT')}' is not a number`);
     }
     return port;
   }

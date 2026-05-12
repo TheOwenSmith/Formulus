@@ -16,6 +16,10 @@ app.use(
   }),
 );
 
+if (config.env !== 'dev') {
+  app.use(express.json());
+}
+
 // Better Auth
 app.all('/api/auth/*splat', toNodeHandler(auth));
 
