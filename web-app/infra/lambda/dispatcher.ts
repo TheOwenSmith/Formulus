@@ -19,11 +19,6 @@ function requiredEnv(name: string): string {
 export async function handler(event: SqsEvent) {
   const clusterArn = requiredEnv('CLUSTER_ARN');
   const taskDefinitionArn = requiredEnv('TASK_DEFINITION_ARN');
-  const subnetIds = requiredEnv('SUBNET_IDS').split(',').map((s) => s.trim()).filter(Boolean);
-  const securityGroupIds = requiredEnv('SECURITY_GROUP_IDS')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
   const capacityProviderName = requiredEnv('CAPACITY_PROVIDER_NAME');
 
   for (const record of event.Records ?? []) {
@@ -39,13 +34,6 @@ export async function handler(event: SqsEvent) {
         // Use the capacity provider strategy rather than launchType so ECS can scale the
         // ASG from 0 when a task arrives (launchType bypasses capacity provider scaling).
         capacityProviderStrategy: [{ base: 0, capacityProvider: capacityProviderName, weight: 1 }],
-        networkConfiguration: {
-          awsvpcConfiguration: {
-            assignPublicIp: 'DISABLED',
-            securityGroups: securityGroupIds,
-            subnets: subnetIds,
-          },
-        },
         overrides: {
           containerOverrides: [
             {

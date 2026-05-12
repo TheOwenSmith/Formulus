@@ -11,8 +11,6 @@ export class ComputeStack extends cdk.Stack {
   readonly vpc: ec2.Vpc;
   readonly cluster: ecs.Cluster;
   readonly taskDefinition: ecs.Ec2TaskDefinition;
-  readonly taskSubnets: ec2.SubnetSelection;
-  readonly taskSecurityGroups: ec2.ISecurityGroup[];
   readonly capacityProviderName: string;
 
   constructor(
@@ -22,6 +20,7 @@ export class ComputeStack extends cdk.Stack {
       workerImageRepo: ecr.IRepository;
       workerEnv: { DATABASE_URL: string; NODE_ENV: string };
       clusterName?: string;
+      imageTag?: string;
       logGroupName?: string;
     },
   ) {
@@ -101,8 +100,12 @@ export class ComputeStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // HOST network mode: the task shares the EC2 instance's network stack, giving it internet
+    // access through the instance's public IP without a NAT gateway. AWS_VPC mode would require
+    // assignPublicIp (Fargate-only) or a NAT gateway for outbound connectivity.
+    // ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true in the ASG user data enables IAM roles in this mode.
     this.taskDefinition = new ecs.Ec2TaskDefinition(this, 'WorkerTaskDef', {
-      networkMode: ecs.NetworkMode.AWS_VPC,
+      networkMode: ecs.NetworkMode.HOST,
     });
 
     this.taskDefinition.addToTaskRolePolicy(
@@ -119,7 +122,7 @@ export class ComputeStack extends cdk.Stack {
     });
 
     const container = this.taskDefinition.addContainer('WorkerContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(props.workerImageRepo, 'latest'),
+      image: ecs.ContainerImage.fromEcrRepository(props.workerImageRepo, props.imageTag ?? 'latest'),
       memoryReservationMiB: 1024,
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),
       environment: {
@@ -137,13 +140,5 @@ export class ComputeStack extends cdk.Stack {
       sourceVolume: 'docker-sock',
     });
 
-    const sg = new ec2.SecurityGroup(this, 'WorkerTaskSG', {
-      vpc: this.vpc,
-      description: 'Security group for backtest worker tasks',
-      allowAllOutbound: true,
-    });
-
-    this.taskSubnets = { subnetType: ec2.SubnetType.PUBLIC };
-    this.taskSecurityGroups = [sg];
   }
 }

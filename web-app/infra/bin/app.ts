@@ -61,13 +61,14 @@ if (!amplifyOnly) {
     NODE_ENV: config.getKey<ApiEnvVar>('NODE_ENV'),
   };
 
-  for (const { suffix, clusterName, logGroupName, queueBaseName } of [
-    { suffix: '', clusterName: 'formulus-backtest', logGroupName: '/formulus/worker', queueBaseName: PROD_QUEUE },
-    { suffix: 'Staging', clusterName: 'formulus-backtest-staging', logGroupName: '/formulus/worker-staging', queueBaseName: STAGING_QUEUE },
+  for (const { suffix, clusterName, imageTag, logGroupName, queueBaseName } of [
+    { suffix: '', clusterName: 'formulus-backtest', imageTag: 'latest', logGroupName: '/formulus/worker', queueBaseName: PROD_QUEUE },
+    { suffix: 'Staging', clusterName: 'formulus-backtest-staging', imageTag: 'staging', logGroupName: '/formulus/worker-staging', queueBaseName: STAGING_QUEUE },
   ]) {
     const compute = new ComputeStack(app, `FormulusCompute${suffix}`, {
       env,
       clusterName,
+      imageTag,
       logGroupName,
       workerEnv: workerEnvConfig,
       workerImageRepo: ecr.workerRepo,
@@ -79,8 +80,6 @@ if (!amplifyOnly) {
       env,
       queueBaseName,
       taskDefinition: compute.taskDefinition,
-      taskSecurityGroups: compute.taskSecurityGroups,
-      taskSubnets: compute.taskSubnets,
     });
   }
 

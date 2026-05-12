@@ -39,7 +39,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       NODE_ENV: ${{ vars.NODE_ENV }}
       ECR_REPO: formulus-worker
-      IMAGE_TAG: latest
+      IMAGE_TAG: ${{ github.ref == 'refs/heads/worker-staging' && 'staging' || 'latest' }}
 
     steps:
       - name: Checkout

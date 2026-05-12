@@ -1,5 +1,4 @@
 import * as cdk from 'aws-cdk-lib';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -16,8 +15,6 @@ export class DispatcherStack extends cdk.Stack {
     props: cdk.StackProps & {
       cluster: ecs.ICluster;
       taskDefinition: ecs.TaskDefinition;
-      taskSubnets: ec2.SubnetSelection;
-      taskSecurityGroups: ec2.ISecurityGroup[];
       capacityProviderName: string;
       queueBaseName: string;
     },
@@ -42,11 +39,6 @@ export class DispatcherStack extends cdk.Stack {
       environment: {
         CAPACITY_PROVIDER_NAME: props.capacityProviderName,
         CLUSTER_ARN: props.cluster.clusterArn,
-        SECURITY_GROUP_IDS: cdk.Fn.join(',', props.taskSecurityGroups.map((sg) => sg.securityGroupId)),
-        SUBNET_IDS: cdk.Fn.join(
-          ',',
-          props.cluster.vpc.selectSubnets(props.taskSubnets).subnetIds,
-        ),
         TASK_DEFINITION_ARN: props.taskDefinition.taskDefinitionArn,
       },
     });
