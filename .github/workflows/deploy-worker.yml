@@ -126,6 +126,7 @@ jobs:
       - name: Build worker image
         run: |
           docker build \
+            --build-arg NODE_ENV=${{ env.NODE_ENV }} \
             -f web-app/worker/Dockerfile \
             -t "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}" \
             .

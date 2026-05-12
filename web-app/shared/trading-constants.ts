@@ -3,6 +3,8 @@
  * Add new stocks or options here so API, worker, and client stay in sync.
  */
 
+import z from 'zod';
+
 export const tickers = [
   'SPY',
   'SSO',
@@ -25,6 +27,8 @@ export const tickers = [
 ] as const;
 
 export type TickerValue = (typeof tickers)[number];
+export const tickerSchema = z.enum(tickers);
+export type UserTicker = z.infer<typeof tickerSchema>;
 
 export const TICKER_COMPANY_NAMES: Record<TickerValue, string> = {
   AAPL: 'Apple',
@@ -47,10 +51,23 @@ export const TICKER_COMPANY_NAMES: Record<TickerValue, string> = {
   TSLA: 'Tesla',
 };
 
+// ─── Bar ─────────────────────────────────────────────────────────────────────
+
+export type Bar = [t: string, o: number, h: number, l: number, c: number, v: number];
+export const stringifiedBarSchema = z.tuple([
+  z.string(),
+  z.coerce.number(),
+  z.coerce.number(),
+  z.coerce.number(),
+  z.coerce.number(),
+  z.coerce.number(),
+]);
+
 // ─── Timestamps / timeframes ─────────────────────────────────────────────────
 
 export const aggregateTimestamps = ['1min', '5min', '15min', '30min', '60min'] as const;
 export type Timestamp = (typeof aggregateTimestamps)[number];
+export const timestampSchema = z.enum(aggregateTimestamps);
 
 /** For UI: value + label (e.g. "60 min") */
 export const TIMEFRAMES_WITH_LABELS: { value: Timestamp; label: string }[] = [
