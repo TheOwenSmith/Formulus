@@ -55,6 +55,7 @@ export class ComputeStack extends cdk.Stack {
       maxCapacity: 10,
       associatePublicIpAddress: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      requireImdsv2: true,
     });
 
     asg.addUserData(
