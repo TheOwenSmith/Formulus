@@ -1,3 +1,4 @@
+import * as autoscaling from 'aws-cdk-lib/aws-autoscaling';
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -42,13 +43,18 @@ export class ComputeStack extends cdk.Stack {
     });
 
     // EC2 (not Fargate): the worker uses Dockerode, which requires a Docker daemon on the host.
-    const asg = this.cluster.addCapacity('WorkerCapacity', {
+    // Create the ASG directly (not via cluster.addCapacity) so that addAsgCapacityProvider
+    // below is the sole caller of configureAutoScalingGroup. Using addCapacity + a separate
+    // AsgCapacityProvider on the same ASG causes a duplicate 'DrainECSHook' construct error.
+    const asg = new autoscaling.AutoScalingGroup(this, 'WorkerAsg', {
+      vpc: this.vpc,
       instanceType: new ec2.InstanceType('c7i.large'),
+      machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
       desiredCapacity: 0,
       minCapacity: 0,
       maxCapacity: 10,
       associatePublicIpAddress: true,
-      machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
     });
 
     asg.addUserData(
