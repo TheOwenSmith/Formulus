@@ -9,7 +9,7 @@ const devEnvVars = [
 ] as const satisfies string[];
 type DevEnvVar = (typeof devEnvVars)[number];
 
-const envVars = ['NODE_ENV', 'DATABASE_URL', 'AWS_REGION', 'QUEUE_URL'] as const satisfies string[];
+const envVars = ['NODE_ENV', 'DATABASE_URL', 'SUBMISSION_ID'] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 
 class Config {

@@ -1,14 +1,25 @@
-# Build and push the backtest worker image to ECR (repository `formulus-worker`, tag `latest`).
-# ECS tasks started after this push pull the new image on the next run (same tag).
+# Build the worker Docker image, push to ECR, and deploy all worker infrastructure stacks
+# (FormulusEcr, FormulusQueue, FormulusCompute, FormulusDispatcher).
+#
+# - Push worker-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
+# - Push worker-prod: environment production; Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is worker-prod and
+#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
 
-name: Deploy worker (ECR)
+name: Deploy Worker
 
 on:
   push:
-    branches: [worker-prod]
+    branches: [worker-prod, worker-staging]
+  workflow_dispatch:
+    inputs:
+      skip_quality_checks:
+        description: Skip Prettier and ESLint (manual runs on worker-prod only; push never skips)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -16,34 +27,111 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-push:
+  deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/worker-prod' && 'production' || 'staging' }}
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
+      CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
+      DEPLOY_TARGET: worker
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NODE_ENV: ${{ vars.NODE_ENV }}
       ECR_REPO: formulus-worker
       IMAGE_TAG: latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: |
+            web-app/pnpm-lock.yaml
+            web-app/worker/pnpm-lock.yaml
+            web-app/infra/pnpm-lock.yaml
+
+      # --- Quality checks ---
+
+      - name: Install web-app dependencies (Prettier)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/worker-staging' }}
+        working-directory: web-app
+        run: pnpm exec prettier "worker/src/**/*.{ts,js}" --check
+
+      - name: Install worker dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app/worker
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client (for ESLint)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        working-directory: web-app/worker
+        run: pnpm run prisma:generate
+
+      - name: ESLint
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        continue-on-error: ${{ github.ref == 'refs/heads/worker-staging' }}
+        working-directory: web-app/worker
+        run: pnpm run lint
+
+      - name: Quality checks skipped
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks }}
+        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on worker-prod only)."
+
+      # --- AWS credentials ---
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      # --- Build and push Docker image ---
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build image
+      - name: Build worker image
         run: |
           docker build \
             -f web-app/worker/Dockerfile \
             -t "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}" \
             .
 
-      - name: Push image
+      - name: Push worker image
         run: |
           docker push "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
+
+      # --- CDK deploy worker infrastructure ---
+
+      - name: Install infra dependencies
+        working-directory: web-app/infra
+        run: pnpm install --frozen-lockfile
+
+      - name: Build infra
+        working-directory: web-app/infra
+        run: pnpm run build
+
+      - name: CDK deploy worker stacks
+        working-directory: web-app/infra
+        run: |
+          npx cdk deploy FormulusEcr FormulusQueue FormulusCompute FormulusDispatcher \
+            --require-approval never \
+            -c workerOnly=true

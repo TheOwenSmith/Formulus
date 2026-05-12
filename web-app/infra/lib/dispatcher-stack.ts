@@ -17,9 +17,10 @@ export class DispatcherStack extends cdk.Stack {
       queue: sqs.IQueue;
       deadLetterQueue: sqs.IQueue;
       cluster: ecs.ICluster;
-      taskDefinition: ecs.ITaskDefinition;
+      taskDefinition: ecs.TaskDefinition;
       taskSubnets: ec2.SubnetSelection;
       taskSecurityGroups: ec2.ISecurityGroup[];
+      capacityProviderName: string;
     },
   ) {
     super(scope, id, props);
@@ -27,16 +28,17 @@ export class DispatcherStack extends cdk.Stack {
     const fn = new lambdaNodejs.NodejsFunction(this, 'Dispatcher', {
       entry: path.join(process.cwd(), 'lambda', 'dispatcher.ts'),
       runtime: lambda.Runtime.NODEJS_20_X,
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       environment: {
+        CAPACITY_PROVIDER_NAME: props.capacityProviderName,
         CLUSTER_ARN: props.cluster.clusterArn,
-        TASK_DEFINITION_ARN: props.taskDefinition.taskDefinitionArn,
+        SECURITY_GROUP_IDS: cdk.Fn.join(',', props.taskSecurityGroups.map((sg) => sg.securityGroupId)),
         SUBNET_IDS: cdk.Fn.join(
           ',',
           props.cluster.vpc.selectSubnets(props.taskSubnets).subnetIds,
         ),
-        SECURITY_GROUP_IDS: cdk.Fn.join(',', props.taskSecurityGroups.map((sg) => sg.securityGroupId)),
+        TASK_DEFINITION_ARN: props.taskDefinition.taskDefinitionArn,
       },
     });
 
@@ -53,14 +55,18 @@ export class DispatcherStack extends cdk.Stack {
         resources: [props.taskDefinition.taskDefinitionArn],
       }),
     );
+
+    const passRoleResources = [props.taskDefinition.taskRole.roleArn];
+    if (props.taskDefinition.executionRole != null) {
+      passRoleResources.push(props.taskDefinition.executionRole.roleArn);
+    }
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['iam:PassRole'],
-        resources: ['*'],
+        resources: passRoleResources,
       }),
     );
 
     props.queue.grantConsumeMessages(fn);
   }
 }
-

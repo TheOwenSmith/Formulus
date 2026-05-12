@@ -19,9 +19,10 @@ const env = {
   region: config.getKey('CDK_DEFAULT_REGION'),
 };
 
-// When true, only the Amplify stack is synthesized (skips API/compute stacks
-// that require DATABASE_URL and other API-only secrets).
+// amplifyOnly: synthesize only Amplify stacks (skips API/compute, which require DB secrets).
 const amplifyOnly = app.node.tryGetContext('amplifyOnly') === 'true';
+// workerOnly: synthesize ECR + Queue + Compute + Dispatcher only (skips API + Amplify stacks).
+const workerOnly = app.node.tryGetContext('workerOnly') === 'true';
 
 function baseApiEnvFromApp(): Record<string, string> {
   const ctx = app.node.tryGetContext('apiEnvJson') as unknown;
@@ -39,28 +40,20 @@ function baseApiEnvFromApp(): Record<string, string> {
 let apiUrl: string | undefined;
 
 if (!amplifyOnly) {
-  const baseApiEnv = baseApiEnvFromApp();
-
-  const corsOriginEnv = baseApiEnv['CORS_ORIGIN'] ?? '*';
-  const corsOrigins = corsOriginEnv
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
-  const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
-  const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as string | undefined;
-  const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
-
   const ecr = new EcrStack(app, 'FormulusEcr', { env });
   const queue = new QueueStack(app, 'FormulusQueue', { env });
 
   const compute = new ComputeStack(app, 'FormulusCompute', {
     env,
+    workerEnv: {
+      DATABASE_URL: config.getKey<ApiEnvVar>('DATABASE_URL'),
+      NODE_ENV: config.getKey<ApiEnvVar>('NODE_ENV'),
+    },
     workerImageRepo: ecr.workerRepo,
   });
 
   new DispatcherStack(app, 'FormulusDispatcher', {
+    capacityProviderName: compute.capacityProviderName,
     cluster: compute.cluster,
     deadLetterQueue: queue.dlq,
     env,
@@ -70,72 +63,89 @@ if (!amplifyOnly) {
     taskSubnets: compute.taskSubnets,
   });
 
-  const api = new ApiGatewayStack(app, 'FormulusApi', {
-    backtestQueueArn: queue.queue.queueArn,
-    bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
-    codeRoot: WEB_APP_ROOT,
-    corsHeaders: defaultApiCorsHeaders,
-    corsOrigins,
-    env,
-    handler: 'lambda.handler',
-    lambdaEnvironment: {
-      ...baseApiEnv,
-      QUEUE_URL: queue.queue.queueUrl,
-    },
-    ...(apiDomainName != null &&
-      apiSubDomain != null && {
-        domainName: apiDomainName,
-        subDomain: apiSubDomain,
-      }),
-  });
+  if (!workerOnly) {
+    const baseApiEnv = baseApiEnvFromApp();
 
-  new ApiGatewayStack(app, 'FormulusApiStaging', {
-    backtestQueueArn: queue.queue.queueArn,
-    bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
-    codeRoot: WEB_APP_ROOT,
-    corsHeaders: defaultApiCorsHeaders,
-    corsOrigins,
-    env,
-    handler: 'lambda.handler',
-    lambdaEnvironment: {
-      ...baseApiEnv,
-      QUEUE_URL: queue.queue.queueUrl,
-    },
-    restApiDisplayName: 'formulus-api-staging',
-    ...(apiStagingDomainName != null &&
-      apiStagingSubDomain != null && {
-        domainName: apiStagingDomainName,
-        subDomain: apiStagingSubDomain,
-      }),
-  });
+    const corsOriginEnv = baseApiEnv['CORS_ORIGIN'] ?? '*';
+    const corsOrigins = corsOriginEnv
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  apiUrl = api.apiUrl;
+    const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
+    const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
+    const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as string | undefined;
+    const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
+
+    const api = new ApiGatewayStack(app, 'FormulusApi', {
+      backtestQueueArn: queue.queue.queueArn,
+      bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+      codeRoot: WEB_APP_ROOT,
+      corsHeaders: defaultApiCorsHeaders,
+      corsOrigins,
+      env,
+      handler: 'lambda.handler',
+      lambdaEnvironment: {
+        ...baseApiEnv,
+        QUEUE_URL: queue.queue.queueUrl,
+      },
+      ...(apiDomainName != null &&
+        apiSubDomain != null && {
+          domainName: apiDomainName,
+          subDomain: apiSubDomain,
+        }),
+    });
+
+    new ApiGatewayStack(app, 'FormulusApiStaging', {
+      backtestQueueArn: queue.queue.queueArn,
+      bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+      codeRoot: WEB_APP_ROOT,
+      corsHeaders: defaultApiCorsHeaders,
+      corsOrigins,
+      env,
+      handler: 'lambda.handler',
+      lambdaEnvironment: {
+        ...baseApiEnv,
+        QUEUE_URL: queue.queue.queueUrl,
+      },
+      restApiDisplayName: 'formulus-api-staging',
+      ...(apiStagingDomainName != null &&
+        apiStagingSubDomain != null && {
+          domainName: apiStagingDomainName,
+          subDomain: apiStagingSubDomain,
+        }),
+    });
+
+    apiUrl = api.apiUrl;
+  }
 }
 
-const viteServerUrl = amplifyOnly
-  ? config.getKey<ClientEnvVar>('VITE_SERVER_URL')
-  : `${apiUrl!.replace(/\/$/, '')}/trpc`;
+if (!workerOnly) {
+  const viteServerUrl = amplifyOnly
+    ? config.getKey<ClientEnvVar>('VITE_SERVER_URL')
+    : `${apiUrl!.replace(/\/$/, '')}/trpc`;
 
-for (const client of [
-  {
-    id: 'FormulusAmplify',
-    branchName: 'client-prod',
-    subDomain: 'prod',
-    mapRootDomain: true,
-  },
-  {
-    id: 'FormulusAmplifyStaging',
-    branchName: 'client-staging',
-    subDomain: 'staging',
-    mapRootDomain: false,
-  },
-]) {
-  new AmplifyStack(app, client.id, {
-    branchName: client.branchName,
-    domainName: 'formulus.ai',
-    env,
-    mapRootDomain: client.mapRootDomain,
-    subDomain: client.subDomain,
-    viteServerUrl,
-  });
+  for (const client of [
+    {
+      id: 'FormulusAmplify',
+      branchName: 'client-prod',
+      subDomain: 'prod',
+      mapRootDomain: true,
+    },
+    {
+      id: 'FormulusAmplifyStaging',
+      branchName: 'client-staging',
+      subDomain: 'staging',
+      mapRootDomain: false,
+    },
+  ]) {
+    new AmplifyStack(app, client.id, {
+      branchName: client.branchName,
+      domainName: 'formulus.ai',
+      env,
+      mapRootDomain: client.mapRootDomain,
+      subDomain: client.subDomain,
+      viteServerUrl,
+    });
+  }
 }

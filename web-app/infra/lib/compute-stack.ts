@@ -12,18 +12,19 @@ export class ComputeStack extends cdk.Stack {
   readonly taskDefinition: ecs.Ec2TaskDefinition;
   readonly taskSubnets: ec2.SubnetSelection;
   readonly taskSecurityGroups: ec2.ISecurityGroup[];
+  readonly capacityProviderName: string;
 
   constructor(
     scope: Construct,
     id: string,
     props: cdk.StackProps & {
       workerImageRepo: ecr.IRepository;
+      workerEnv: { DATABASE_URL: string; NODE_ENV: string };
     },
   ) {
     super(scope, id, props);
 
-    // Cost-lean default: single-AZ, public subnets; avoid NAT by default.
-    // If you need private subnets + NAT or existing VPC/RDS integration, adapt this stack.
+    // Cost-lean default: public subnets, no NAT. Lock down SG outbound if needed later.
     this.vpc = new ec2.Vpc(this, 'Vpc', {
       maxAzs: 2,
       natGateways: 0,
@@ -40,24 +41,34 @@ export class ComputeStack extends cdk.Stack {
       clusterName: 'formulus-backtest',
     });
 
-    // ECS on EC2 because the worker uses dockerode (requires a Docker daemon).
-    // The instances can be scaled down to 0 when idle, but cold-start latency will be minutes.
+    // EC2 (not Fargate): the worker uses Dockerode, which requires a Docker daemon on the host.
     const asg = this.cluster.addCapacity('WorkerCapacity', {
       instanceType: new ec2.InstanceType('c7i.large'),
       desiredCapacity: 0,
       minCapacity: 0,
       maxCapacity: 10,
       associatePublicIpAddress: true,
-      spotPrice: undefined,
       machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
     });
 
-    // Allow the task to use the instance Docker daemon.
-    // (The worker container itself will talk to /var/run/docker.sock on the host.)
     asg.addUserData(
       'echo "ECS_ENABLE_TASK_IAM_ROLE=true" >> /etc/ecs/ecs.config',
       'echo "ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true" >> /etc/ecs/ecs.config',
     );
+
+    // Capacity provider with managed scaling allows the ASG to start from 0 when a task
+    // is dispatched, and scale back to 0 when idle. Without this, RunTask fails immediately
+    // when no instances are running.
+    const capacityProvider = new ecs.AsgCapacityProvider(this, 'WorkerCapacityProvider', {
+      autoScalingGroup: asg,
+      enableManagedScaling: true,
+      enableManagedTerminationProtection: false,
+      minimumScalingStepSize: 1,
+      maximumScalingStepSize: 5,
+      targetCapacityPercent: 100,
+    });
+    this.cluster.addAsgCapacityProvider(capacityProvider);
+    this.capacityProviderName = capacityProvider.capacityProviderName;
 
     const logGroup = new logs.LogGroup(this, 'WorkerLogGroup', {
       logGroupName: '/formulus/worker',
@@ -76,14 +87,29 @@ export class ComputeStack extends cdk.Stack {
       }),
     );
 
-    this.taskDefinition.addContainer('WorkerContainer', {
+    // Bind-mount the host Docker socket so the worker can launch user-code containers via Dockerode.
+    this.taskDefinition.addVolume({
+      name: 'docker-sock',
+      host: { sourcePath: '/var/run/docker.sock' },
+    });
+
+    const container = this.taskDefinition.addContainer('WorkerContainer', {
       image: ecs.ContainerImage.fromEcrRepository(props.workerImageRepo, 'latest'),
       memoryReservationMiB: 1024,
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),
       environment: {
-        // Worker code should read these via its config singleton; these are placeholders.
-        NODE_ENV: 'production',
+        NODE_ENV: props.workerEnv.NODE_ENV,
+        DATABASE_URL: props.workerEnv.DATABASE_URL,
+        // SUBMISSION_ID is injected via container overrides by the dispatcher Lambda at launch time.
+        AWS_REGION: cdk.Stack.of(this).region,
       },
+      privileged: true,
+    });
+
+    container.addMountPoints({
+      containerPath: '/var/run/docker.sock',
+      readOnly: false,
+      sourceVolume: 'docker-sock',
     });
 
     const sg = new ec2.SecurityGroup(this, 'WorkerTaskSG', {
@@ -96,4 +122,3 @@ export class ComputeStack extends cdk.Stack {
     this.taskSecurityGroups = [sg];
   }
 }
-

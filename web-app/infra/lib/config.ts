@@ -25,14 +25,21 @@ export const envVarsLambda = [
 
 const envVarsApi = [...envVarsCdk, ...envVarsLambda] as const;
 
+export const envVarsWorkerCdk = [
+  ...envVarsCdk,
+  'DATABASE_URL',
+  'NODE_ENV',
+] as const satisfies string[];
+
 export type ClientEnvVar = (typeof envVarsClient)[number];
 export type ApiEnvVar = (typeof envVarsApi)[number];
-export type EnvVar = ClientEnvVar | ApiEnvVar;
+export type WorkerCdkEnvVar = (typeof envVarsWorkerCdk)[number];
+export type EnvVar = ClientEnvVar | ApiEnvVar | WorkerCdkEnvVar;
 
 const environmentVariablesByDeployTarget = {
   client: envVarsClient,
   api: envVarsApi,
-  worker: envVarsApi,
+  worker: envVarsWorkerCdk,
 } as const;
 
 type DeployTarget = keyof typeof environmentVariablesByDeployTarget;
