@@ -89,6 +89,11 @@ export function usersRouter(
       };
     }),
     updateProfile: authProcedure
+      .use(async ({ ctx, next }) => {
+        // log input
+        console.log('input', ctx.req);
+        return next();
+      })
       .input(
         z.object({
           name: z.string().min(1).max(100).optional(),
