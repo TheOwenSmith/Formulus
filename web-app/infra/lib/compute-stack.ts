@@ -22,6 +22,7 @@ export class ComputeStack extends cdk.Stack {
       workerImageRepo: ecr.IRepository;
       workerEnv: { DATABASE_URL: string; NODE_ENV: string };
       clusterName?: string;
+      logGroupName?: string;
     },
   ) {
     super(scope, id, props);
@@ -95,7 +96,7 @@ export class ComputeStack extends cdk.Stack {
     this.capacityProviderName = capacityProvider.capacityProviderName;
 
     const logGroup = new logs.LogGroup(this, 'WorkerLogGroup', {
-      logGroupName: '/formulus/worker',
+      logGroupName: props.logGroupName ?? '/formulus/worker',
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
