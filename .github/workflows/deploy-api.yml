@@ -116,9 +116,10 @@ jobs:
         working-directory: web-app/infra
         run: pnpm run build
 
-      - name: Run database migrations
-        working-directory: web-app/api
-        run: pnpm exec prisma migrate deploy
+      # Neon maintenance until 2026-05-12 18:30 UTC -- uncomment after
+      # - name: Run database migrations
+      #   working-directory: web-app/api
+      #   run: pnpm exec prisma migrate deploy
 
       - name: CDK deploy API stack
         working-directory: web-app/infra
