@@ -17,6 +17,10 @@ COPY web-app/tsconfig.json web-app/tsconfig.json
 COPY web-app/shared/ web-app/shared/
 COPY web-app/worker/ web-app/worker/
 
+# Generate the Prisma client into shared/generated/prisma/ (gitignored; must be created here).
+# Mirrors how the API Lambda bundling shell runs prisma generate before esbuild.
+RUN cd web-app/worker && pnpm run prisma:generate
+
 # Build worker bundle
 RUN cd web-app/worker && pnpm run build
 
@@ -27,7 +31,7 @@ ENV NODE_ENV=production
 
 RUN corepack enable
 
-# Copy the built bundle and node_modules
+# Copy the built bundle and node_modules (node_modules needed for externalized dockerode)
 COPY --from=build /repo/web-app/worker/dist ./dist
 COPY --from=build /repo/web-app/worker/node_modules ./node_modules
 COPY --from=build /repo/web-app/worker/package.json ./package.json
