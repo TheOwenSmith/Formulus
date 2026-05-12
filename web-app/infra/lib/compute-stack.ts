@@ -56,11 +56,18 @@ export class ComputeStack extends cdk.Stack {
       ],
     });
 
+    const userData = ec2.UserData.forLinux();
+    userData.addCommands(
+      'echo "ECS_ENABLE_TASK_IAM_ROLE=true" >> /etc/ecs/ecs.config',
+      'echo "ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true" >> /etc/ecs/ecs.config',
+    );
+
     const lt = new ec2.LaunchTemplate(this, 'WorkerLaunchTemplate', {
       instanceType: new ec2.InstanceType('c7i.large'),
       machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
       requireImdsv2: true,
       role: instanceRole,
+      userData,
     });
 
     const asg = new autoscaling.AutoScalingGroup(this, 'WorkerAsg', {
@@ -71,11 +78,6 @@ export class ComputeStack extends cdk.Stack {
       maxCapacity: 10,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
     });
-
-    asg.addUserData(
-      'echo "ECS_ENABLE_TASK_IAM_ROLE=true" >> /etc/ecs/ecs.config',
-      'echo "ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true" >> /etc/ecs/ecs.config',
-    );
 
     // Capacity provider with managed scaling allows the ASG to start from 0 when a task
     // is dispatched, and scale back to 0 when idle. Without this, RunTask fails immediately
