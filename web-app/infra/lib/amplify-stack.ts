@@ -33,7 +33,7 @@ export class AmplifyStack extends cdk.Stack {
       ],
     });
 
-    new amplify.CfnBranch(this, 'Branch', {
+    const branch = new amplify.CfnBranch(this, 'Branch', {
       appId: this.app.attrAppId,
       branchName: props.branchName,
       enableAutoBuild: false,
@@ -47,12 +47,13 @@ export class AmplifyStack extends cdk.Stack {
       subDomainSettings.push({ branchName: props.branchName, prefix: '' });
     }
 
-    new amplify.CfnDomain(this, 'Domain', {
+    const domain = new amplify.CfnDomain(this, 'Domain', {
       appId: this.app.attrAppId,
       domainName: props.domainName,
       subDomainSettings,
       enableAutoSubDomain: false,
     });
+    domain.addDependency(branch);
 
     new cdk.CfnOutput(this, 'AmplifyAppId', {
       value: this.app.attrAppId,
