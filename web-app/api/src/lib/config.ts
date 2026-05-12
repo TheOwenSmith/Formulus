@@ -3,6 +3,7 @@ import { validateEnvVars } from './validate-env-vars';
 dotenvConfig();
 
 const devEnvVars = [
+  'PORT',
   'AWS_ENDPOINT_URL',
   'AWS_ACCESS_KEY_ID',
   'AWS_SECRET_ACCESS_KEY',
@@ -12,7 +13,6 @@ type DevEnvVar = (typeof devEnvVars)[number];
 const envVarsAll = [
   'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
-  'PORT',
   'CORS_ORIGIN',
   'DATABASE_URL',
   'BETTER_AUTH_SECRET',
@@ -48,9 +48,9 @@ class Config {
   }
 
   get port(): number {
-    const port = parseInt(this.getKey('PORT'));
+    const port = parseInt(this.getDevKey('PORT'));
     if (isNaN(port)) {
-      throw new Error(`Environment variable PORT '${this.getKey('PORT')}' is not a number`);
+      throw new Error(`Environment variable PORT '${this.getDevKey('PORT')}' is not a number`);
     }
     return port;
   }
