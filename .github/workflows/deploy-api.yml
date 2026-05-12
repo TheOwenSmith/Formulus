@@ -118,8 +118,6 @@ jobs:
 
       - name: Run database migrations
         working-directory: web-app/api
-        env:
-          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: pnpm exec prisma migrate deploy
 
       - name: CDK deploy API stack
