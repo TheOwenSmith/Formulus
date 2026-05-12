@@ -22,6 +22,8 @@ const envVarsAll = [
   'COHERE_API_KEY',
   'COHERE_MODEL',
   'STRIPE_API_KEY',
+  'STRIPE_PRICE_ID',
+  'STRIPE_WEBHOOK_SECRET',
 ] as const satisfies string[];
 
 type EnvVar = (typeof envVarsAll)[number];

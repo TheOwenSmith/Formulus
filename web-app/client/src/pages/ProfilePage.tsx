@@ -8,6 +8,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+function ProBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-400">
+      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </svg>
+      PRO
+    </span>
+  );
+}
+
 export function ProfilePage() {
   const navigate = useNavigate();
   const { setHasAccount } = useUserStore();
@@ -97,6 +108,33 @@ export function ProfilePage() {
 
   const handleDeleteAccountWithChoice = async (withDeleteBacktests: boolean) => {
     await deleteAccountMutation({ deleteBacktests: withDeleteBacktests });
+  };
+
+  const { mutateAsync: createCheckoutSession, isPending: checkoutIsPending } = useMutation(
+    trpcCredentials.payments.createCheckoutSession.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to start checkout. Please try again.');
+      },
+    }),
+  );
+
+  const { mutateAsync: createPortalSession, isPending: portalIsPending } = useMutation(
+    trpcCredentials.payments.createPortalSession.mutationOptions({
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Failed to open billing portal. Please try again.');
+      },
+    }),
+  );
+
+  const handleUpgradeToPro = async () => {
+    const profileUrl = `${window.location.origin}/profile`;
+    const result = await createCheckoutSession({ successUrl: profileUrl, cancelUrl: profileUrl });
+    if (result?.url) window.location.href = result.url;
+  };
+
+  const handleManageSubscription = async () => {
+    const result = await createPortalSession({ returnUrl: `${window.location.origin}/profile` });
+    if (result?.url) window.location.href = result.url;
   };
 
   // Sign out handler
@@ -344,6 +382,7 @@ export function ProfilePage() {
                       <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent leading-[1.875rem]">
                         {user?.name ?? 'User'}
                       </h2>
+                      {user?.stripePlanActive && <ProBadge />}
                       <button
                         onClick={() => setIsEditingName(true)}
                         className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 text-sm flex items-center gap-1.5"
@@ -546,6 +585,79 @@ export function ProfilePage() {
                   </p>
                 </div>
               </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pro Plan Card */}
+          <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
+            <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+              Pro Plan
+            </h2>
+            {user?.stripePlanActive ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/30">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500/20 to-yellow-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold">You are a Pro member</p>
+                    <p className="text-white/50 text-sm">$8.95/month — thank you for your support!</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => void handleManageSubscription()}
+                  disabled={portalIsPending}
+                  className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border-amber-500/30 hover:border-amber-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {portalIsPending ? (
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                  <span>Manage Subscription</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                  {[
+                    'Pro badge on your profile and shared backtests',
+                    'Support ongoing platform development',
+                  ].map((feature) => (
+                    <div key={feature} className="flex items-center gap-2 text-white/70 text-sm">
+                      <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {feature}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => void handleUpgradeToPro()}
+                  disabled={checkoutIsPending}
+                  className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border-amber-500/30 hover:border-amber-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {checkoutIsPending ? (
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  )}
+                  <span>Upgrade to Pro — $8.95/month</span>
+                </button>
               </div>
             )}
           </div>

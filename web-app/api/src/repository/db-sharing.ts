@@ -29,6 +29,7 @@ export type ResultAccessInfo = {
   isOwner: boolean;
   canCopy: boolean;
   isPublic: boolean;
+  creator: { name: string; image: string | null; isPro: boolean } | null;
 };
 
 export async function searchUserByEmail(
@@ -222,6 +223,7 @@ export async function getResultAccessInfo(
             where: { userId },
             select: { allowCopy: true },
           },
+          creator: { select: { name: true, image: true, stripePlanActive: true } },
         },
       }),
     (e) => internal(e, 'Failed to check result access'),
@@ -229,12 +231,15 @@ export async function getResultAccessInfo(
   if (result.isErr()) return err(result.error);
   if (result.value == null) return ok(null);
 
-  const { creatorId, isPublic, shares } = result.value;
+  const { creatorId, isPublic, shares, creator } = result.value;
   const isOwner = creatorId === userId;
   const shareEntry = shares[0];
 
   const hasAccess = isOwner || isPublic || shareEntry != null;
   const canCopy = isOwner ? true : (shareEntry?.allowCopy ?? false);
+  const creatorInfo = creator
+    ? { name: creator.name, image: creator.image, isPro: creator.stripePlanActive }
+    : null;
 
-  return ok({ hasAccess, isOwner, canCopy, isPublic });
+  return ok({ hasAccess, isOwner, canCopy, isPublic, creator: creatorInfo });
 }

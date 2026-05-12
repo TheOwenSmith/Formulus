@@ -32,6 +32,10 @@ model User {
   backtestingShares BacktestingShare[] @relation("UserBacktestingShare")
   backtestingSubmissions BacktestingSubmission[] @relation("UserBacktestingSubmissions")
 
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?  @unique
+  stripePlanActive     Boolean  @default(false)
+
   @@index([email])
   @@map("user")
 }

@@ -1,6 +1,7 @@
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
 import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
+import { paymentsRouter } from '@api/routes/payments';
 import { sharingRouter } from '@api/routes/sharing';
 import { usersRouter } from '@api/routes/users';
 import { isAppError } from '@api/utils/error-handling';
@@ -43,6 +44,7 @@ export const appRouter = t.router({
   backtesting: backtestingRouter(router, authProcedure),
   env: t.procedure.query(() => config.env),
   heartbeat: t.procedure.query(() => true),
+  payments: paymentsRouter(router, authProcedure),
   sharing: sharingRouter(router, authProcedure),
   thisIsAnError: t.procedure.query(() => {
     throw {

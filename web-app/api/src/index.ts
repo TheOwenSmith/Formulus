@@ -5,6 +5,7 @@ import express from 'express';
 import 'source-map-support/register.js';
 import { auth } from './lib/auth';
 import { config } from './lib/config';
+import { stripeWebhookHandler } from './lib/stripe-webhook';
 import { appRouter, createContext } from './lib/trpc';
 
 const app = express();
@@ -15,6 +16,9 @@ app.use(
     credentials: true,
   }),
 );
+
+// Stripe webhook needs raw body — register before express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
 
 if (config.env !== 'dev') {
   app.use(express.json());

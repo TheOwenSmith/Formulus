@@ -26,16 +26,12 @@ const options = {
   minify: true,
   sourcemap: 'inline',
   outfile: 'dist/index.js',
-  // dockerode has native transitive deps (ssh2, cpu-features) that cannot be bundled.
-  // It is available at runtime via the node_modules copied into the Docker runtime image.
+  // dockerode contains native code and cannot be bundled
   external: ['node:*', 'dockerode'],
-  // Without nodePaths, esbuild cannot find @prisma/client when following imports into
-  // ../shared/generated/prisma/ (which has no node_modules of its own). This mirrors the
-  // api esbuild config, which uses the same option after running pnpm with node-linker=hoisted.
-  nodePaths: ['node_modules'],
   banner: {
     js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
   },
+  nodePaths: ['node_modules'],
   platform: 'node',
   target: 'node24',
   format: 'esm',
