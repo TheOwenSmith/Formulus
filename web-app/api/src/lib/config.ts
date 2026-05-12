@@ -21,6 +21,7 @@ const envVarsAll = [
   'AWS_REGION',
   'COHERE_API_KEY',
   'COHERE_MODEL',
+  'STRIPE_API_KEY',
 ] as const satisfies string[];
 
 type EnvVar = (typeof envVarsAll)[number];
