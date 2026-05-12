@@ -18,8 +18,9 @@ COPY web-app/shared/ web-app/shared/
 COPY web-app/worker/ web-app/worker/
 
 # Generate the Prisma client into shared/generated/prisma/ (gitignored; must be created here).
-# Mirrors how the API Lambda bundling shell runs prisma generate before esbuild.
-RUN cd web-app/worker && pnpm run prisma:generate
+# DATABASE_URL is required by prisma.config.ts at load time but never used during generate
+# (no database connection is made). A dummy value satisfies the env() check.
+RUN cd web-app/worker && DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy pnpm run prisma:generate
 
 # Build worker bundle
 RUN cd web-app/worker && pnpm run build
