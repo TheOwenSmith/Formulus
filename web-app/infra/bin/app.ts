@@ -6,10 +6,10 @@ import {
 } from '@/lib/api-gateway-stack.js';
 import { ComputeStack } from '@/lib/compute-stack.js';
 import { config, envVarsLambda, type ApiEnvVar, type ClientEnvVar } from '@/lib/config.js';
+import { WEB_APP_ROOT } from '@/lib/constants.js';
 import { DispatcherStack } from '@/lib/dispatcher-stack.js';
 import { EcrStack } from '@/lib/ecr-stack.js';
 import { QueueStack } from '@/lib/queue-stack.js';
-import { WEB_APP_ROOT } from '@/lib/repo-paths.js';
 import * as cdk from 'aws-cdk-lib';
 
 const app = new cdk.App();

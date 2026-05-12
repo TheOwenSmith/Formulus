@@ -60,6 +60,8 @@ jobs:
             web-app/worker/pnpm-lock.yaml
             web-app/infra/pnpm-lock.yaml
 
+      # --- Quality checks ---
+
       - name: Install web-app dependencies (Prettier)
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
         working-directory: web-app
