@@ -118,7 +118,7 @@ jobs:
 
       - name: Run database migrations
         working-directory: web-app/api
-        run: pnpm run prisma:migrate
+        run: pnpm exec prisma migrate deploy --schema=../shared/prisma/schema.prisma
 
       - name: CDK deploy API stack
         working-directory: web-app/infra
