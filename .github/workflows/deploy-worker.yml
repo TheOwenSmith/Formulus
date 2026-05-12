@@ -147,6 +147,6 @@ jobs:
             COMPUTE_STACK=FormulusCompute
             DISPATCHER_STACK=FormulusDispatcher
           fi
-          npx cdk deploy "$COMPUTE_STACK" "$DISPATCHER_STACK" \
+          npx cdk deploy "$DISPATCHER_STACK" "$COMPUTE_STACK" \
             --require-approval never \
             -c workerOnly=true
