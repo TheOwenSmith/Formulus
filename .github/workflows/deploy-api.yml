@@ -116,6 +116,10 @@ jobs:
         working-directory: web-app/infra
         run: pnpm run build
 
+      - name: Run database migrations
+        working-directory: web-app/api
+        run: pnpm run prisma:migrate
+
       - name: CDK deploy API stack
         working-directory: web-app/infra
         env:
