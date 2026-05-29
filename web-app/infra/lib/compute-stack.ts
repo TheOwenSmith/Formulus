@@ -138,6 +138,13 @@ export class ComputeStack extends cdk.Stack {
 
     taskRole.addToPolicy(
       new iam.PolicyStatement({
+        actions: ['s3:ListBucket'],
+        resources: [`arn:aws:s3:::${props.workerEnv.DATA_BUCKET}`],
+      }),
+    );
+
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
         actions: ['s3:GetObject'],
         resources: [`arn:aws:s3:::${props.workerEnv.DATA_BUCKET}/*`],
       }),
