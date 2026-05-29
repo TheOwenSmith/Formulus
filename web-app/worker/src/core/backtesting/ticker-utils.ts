@@ -252,18 +252,22 @@ export async function downloadTickDataFromS3(
   distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
   bucket: string,
 ): Promise<Result<undefined, AppError>> {
-  for (const aggregate of aggregateTimestamps) {
-    for (const ticker of distinctTickersByAggregate[aggregate]) {
-      for (const key of [
+  const keys = [
+    ...aggregateTimestamps.flatMap((aggregate) =>
+      distinctTickersByAggregate[aggregate].flatMap((ticker) => [
         `cleaned/${ticker}_${aggregate}.csv`,
         `index/${ticker}_${aggregate}.idx`,
-      ]) {
-        const localPath = `./data/${key}`;
-        console.log(`Downloading 's3://${bucket}/${key}'`);
-        const r = await downloadToFile(bucket, key, localPath);
-        if (r.isErr()) return r;
-      }
-    }
+      ]),
+    ),
+    'slippage.jsonl',
+  ];
+  keys.push('slippage.jsonl');
+
+  for (const key of keys) {
+    const localPath = `./data/${key}`;
+    console.log(`Downloading 's3://${bucket}/${key}'`);
+    const r = await downloadToFile(bucket, key, localPath);
+    if (r.isErr()) return r;
   }
   return ok(undefined);
 }
