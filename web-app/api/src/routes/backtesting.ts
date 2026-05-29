@@ -192,7 +192,12 @@ export function backtestingRouter(
     getSubmissions: authProcedure.query(async ({ ctx }) => {
       const result = await getSubmissionsByCreatorId(ctx.user.id);
       if (result.isErr()) throw result.error;
-      return result.value;
+      if (config.env === 'dev') return result.value;
+      return result.value.map((s) =>
+        s.errorCode === 'INTERNAL_SERVER_ERROR'
+          ? { ...s, error: "An unexpected error occurred (it's not you, it's us)", errorDetail: null }
+          : s,
+      );
     }),
 
     getSubmissionStatus: authProcedure
@@ -205,7 +210,19 @@ export function backtestingRouter(
         if (statusResult.value == null) {
           throw badRequest('Submission not found');
         }
-        return statusResult.value;
+        const status = statusResult.value;
+        if (
+          status.status === 'ERROR' &&
+          status.errorCode === 'INTERNAL_SERVER_ERROR' &&
+          config.env !== 'dev'
+        ) {
+          return {
+            ...status,
+            error: "An unexpected error occurred (it's not you, it's us)",
+            errorDetail: null,
+          };
+        }
+        return status;
       }),
   });
 }

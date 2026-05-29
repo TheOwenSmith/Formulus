@@ -15,7 +15,6 @@ export type AppError = {
   message?: string;
   error?: unknown;
   code: TRPC_ERROR_CODE_KEY;
-  /** True when the error originates from executing or compiling user-submitted code. */
   isUserCode?: boolean;
 };
 
@@ -35,7 +34,6 @@ export function badRequest(message: string, error?: unknown): AppError {
   };
 }
 
-/** Error produced by running or compiling user-submitted code (shown to the user). */
 export function userCodeError(message: string, error?: unknown): AppError {
   return {
     code: 'BAD_REQUEST',
