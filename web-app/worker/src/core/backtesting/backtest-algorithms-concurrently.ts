@@ -6,7 +6,6 @@ import {
 import type { Timestamp } from '@shared/trading-constants';
 import { aggregateTimestamps } from '@shared/trading-constants';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
-import { config } from '@worker/lib/config';
 import {
   indicatorsToIndicatorResultsFunction,
   type Indicator,
@@ -14,20 +13,19 @@ import {
 } from '@worker/core/algorithms/indicators/indicator';
 import type { IndicatorMetadata } from '@worker/core/algorithms/indicators/indicator-metadata';
 import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
+import { config } from '@worker/lib/config';
 import { yearsBetween } from '@worker/utils/date-utils';
 import { badRequest, internal, safeReduce, type AppError } from '@worker/utils/error-handling';
 import { groupBy } from '@worker/utils/group-by';
 import { roundToDecimal, withCommas } from '@worker/utils/number-utils';
 import { SharpeRatioCalculator } from '@worker/utils/sharpe-ratio-calculator';
-import type { AtLeastOne } from '@worker/utils/types';
 import { err, ok, type Result } from 'neverthrow';
-import { BYTES_PROGRESS_UPDATE_INTERVAL } from './constants';
+import { BYTES_PROGRESS_UPDATE_INTERVAL, type TickerData } from './constants';
 import {
   countBytesToProcess,
   getIteratorBounds,
   getTickerIteratorsByTicker,
 } from './iterator-utils';
-import { ensureDataFiles } from './ensure-data-files';
 import { closeAllPositions, getPortfolioValue, updatePosition } from './position-utils';
 import { type AggregateDataIterator } from './read-data';
 import {
@@ -40,6 +38,7 @@ import { type SupportedLanguage } from './rpc/languages';
 import { getAlgorithmGraph, updateGraph, type DescriptionMetrics } from './statistics';
 import {
   createIndexByTicker,
+  downloadTickDataFromS3,
   emptyIndexByAggregateByTicker,
   getAllTickers,
   getDistinctTickersByAggregate,
@@ -47,14 +46,6 @@ import {
   getMarketSlippageByTicker,
   getTickers,
 } from './ticker-utils';
-
-export type TickerData = {
-  ticker: Ticker;
-  aggregate: Timestamp;
-} & AtLeastOne<{
-  filename: string;
-  index: string;
-}>;
 
 export type AlgorithmData = {
   algorithmYs: number[];
@@ -194,9 +185,14 @@ export async function backtestAlgorithmsConcurrently({
   );
   const allTickers: Ticker[] = getAllTickers(distinctTickersByAggregate);
 
-  // Download any missing data files from S3 before validating they exist locally.
-  const ensureResult = await ensureDataFiles(distinctTickersByAggregate, config.getKey('DATA_BUCKET'));
-  if (ensureResult.isErr()) return err(ensureResult.error);
+  // Download tick data files
+  if (config.env !== 'dev') {
+    const downloadTickDataResult = await downloadTickDataFromS3(
+      distinctTickersByAggregate,
+      config.getKey('DATA_BUCKET'),
+    );
+    if (downloadTickDataResult.isErr()) return err(downloadTickDataResult.error);
+  }
 
   // Get filename and index by aggregate by ticker and slippage by ticker
   const getFilenameAndIndexByAggregateByTickerResponse = getFilenameAndIndexByAggregateByTicker(

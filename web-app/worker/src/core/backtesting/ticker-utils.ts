@@ -1,19 +1,24 @@
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { tickerSchema, type Ticker } from '@shared/api';
 import type { Timestamp } from '@shared/trading-constants';
 import { aggregateTimestamps } from '@shared/trading-constants';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
+import { s3 } from '@worker/lib/s3';
 import {
   badRequest,
   fromThrowable,
+  fromThrowableAsync,
   internal,
   safeReduce,
   type AppError,
 } from '@worker/utils/error-handling';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import z from 'zod';
-import type { TickerData } from './backtest-algorithms-concurrently';
+import type { TickerData } from './constants';
 
 export type IndexedByAggregateByTicker<T> = Record<Timestamp, Record<Ticker, T>>;
 
@@ -220,4 +225,45 @@ export function getMarketSlippageByTicker(
     }
   }
   return ok(marketSlippageByTicker);
+}
+
+async function downloadToFile(
+  bucket: string,
+  key: string,
+  localPath: string,
+): Promise<Result<undefined, AppError>> {
+  const getResult = await fromThrowableAsync(
+    () => s3.send(new GetObjectCommand({ Bucket: bucket, Key: key })),
+    (e) => internal(e, `S3 GetObject failed: 's3://${bucket}/${key}'`),
+  );
+  if (getResult.isErr()) return err(getResult.error);
+
+  fs.mkdirSync(path.dirname(localPath), { recursive: true });
+
+  const writeResult = await fromThrowableAsync(
+    () => pipeline(getResult.value.Body as NodeJS.ReadableStream, fs.createWriteStream(localPath)),
+    (e) => internal(e, `Failed to write ${localPath}`),
+  );
+  if (writeResult.isErr()) return err(writeResult.error);
+  return ok(undefined);
+}
+
+export async function downloadTickDataFromS3(
+  distinctTickersByAggregate: Record<Timestamp, Ticker[]>,
+  bucket: string,
+): Promise<Result<undefined, AppError>> {
+  for (const aggregate of aggregateTimestamps) {
+    for (const ticker of distinctTickersByAggregate[aggregate]) {
+      for (const key of [
+        `cleaned/${ticker}_${aggregate}.csv`,
+        `index/${ticker}_${aggregate}.idx`,
+      ]) {
+        const localPath = `./data/${key}`;
+        console.log(`Downloading 's3://${bucket}/${key}'`);
+        const r = await downloadToFile(bucket, key, localPath);
+        if (r.isErr()) return r;
+      }
+    }
+  }
+  return ok(undefined);
 }
