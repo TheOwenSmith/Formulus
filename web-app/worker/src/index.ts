@@ -111,9 +111,13 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
       submissionId,
       BacktestingSubmissionStatus.ERROR,
       {
-        error: message ?? 'Unknown error',
+        ...(config.env === 'dev' || code !== 'INTERNAL_SERVER_ERROR'
+          ? { error: message, errorDetail: serializeErrorDetail(error) }
+          : {
+              error: "An unexpected error occurred (it's not you, it's us)",
+              errorDetail: undefined,
+            }),
         errorCode: isUserCode ? 'USER_CODE' : code,
-        errorDetail: serializeErrorDetail(error),
       },
     );
     if (markErrorResult.isErr()) {
