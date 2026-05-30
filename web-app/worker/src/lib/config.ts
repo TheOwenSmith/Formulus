@@ -6,21 +6,18 @@ const devEnvVars = [
   'AWS_ENDPOINT_URL',
   'AWS_ACCESS_KEY_ID',
   'AWS_SECRET_ACCESS_KEY',
+  'QUEUE_URL',
 ] as const satisfies string[];
 type DevEnvVar = (typeof devEnvVars)[number];
 
 const envVars = [
   'NODE_ENV',
   'DATABASE_URL',
-  'SUBMISSION_ID',
   'AWS_REGION',
-  'DATA_BUCKET',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 
-const deployEnvVars = [
-  'ECR_REGISTRY',
-] as const satisfies string[];
+const deployEnvVars = ['DATA_BUCKET', 'ECR_REGISTRY', 'SUBMISSION_ID'] as const satisfies string[];
 type DeployEnvVar = (typeof deployEnvVars)[number];
 
 class Config {

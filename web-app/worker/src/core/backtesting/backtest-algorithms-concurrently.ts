@@ -189,7 +189,7 @@ export async function backtestAlgorithmsConcurrently({
   if (config.env !== 'dev') {
     const downloadTickDataResult = await downloadTickDataFromS3(
       distinctTickersByAggregate,
-      config.getKey('DATA_BUCKET'),
+      config.getDeployKey('DATA_BUCKET'),
     );
     if (downloadTickDataResult.isErr()) return err(downloadTickDataResult.error);
   }

@@ -1,12 +1,22 @@
+import { DeleteMessageCommand, ReceiveMessageCommand } from '@aws-sdk/client-sqs';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import { backtestAlgorithmsConcurrently } from '@worker/core/backtesting/backtest-algorithms-concurrently';
-import { getImageForLanguage, type SupportedLanguage } from '@worker/core/backtesting/rpc/languages';
+import {
+  getImageForLanguage,
+  type SupportedLanguage,
+} from '@worker/core/backtesting/rpc/languages';
 import { interactiveBrokersSlippageFunction } from '@worker/core/backtesting/slippage-functions';
 import { pullImageIfAbsent } from '@worker/lib/docker';
-import { internal, type AppError } from '@worker/utils/error-handling';
+import {
+  fromThrowable,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@worker/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 import { config } from './lib/config';
+import { sqs } from './lib/sqs';
 import { createBacktestingResults } from './repository/db-backtesting-results';
 import {
   getSubmissionCurrentStatus,
@@ -160,18 +170,78 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
   return ok(undefined);
 }
 
-async function main() {
-  const submissionId = config.getKey('SUBMISSION_ID');
-  console.log('Processing submission:', submissionId);
+async function devLoop(): Promise<never> {
+  const queueUrl = config.getDevKey('QUEUE_URL');
+  console.log('Dev mode: polling SQS for submissions...');
 
-  const result = await processSubmission(submissionId);
-  if (result.isErr()) {
-    console.error(`Failed to process submission ${submissionId}:`, result.error);
-    process.exit(1);
+  while (true) {
+    const receiveResult = await fromThrowableAsync(
+      () =>
+        sqs.send(
+          new ReceiveMessageCommand({
+            MaxNumberOfMessages: 1,
+            QueueUrl: queueUrl,
+            WaitTimeSeconds: 20,
+          }),
+        ),
+      (e) => internal(e, 'Failed to receive SQS message'),
+    );
+    if (receiveResult.isErr()) {
+      console.error('SQS receive error:', receiveResult.error);
+      continue;
+    }
+
+    for (const message of receiveResult.value.Messages ?? []) {
+      const bodyResult = fromThrowable(
+        () => JSON.parse(message.Body!) as { submissionId?: string },
+        (e) => internal(e, 'Failed to parse SQS message body'),
+      );
+
+      if (bodyResult.isErr()) {
+        console.error('Malformed SQS message body:', bodyResult.error);
+      } else {
+        const { submissionId } = bodyResult.value;
+        if (submissionId == undefined) {
+          console.error('Missing submissionId in SQS message:', message.Body);
+        } else {
+          console.log(`Processing submission: '${submissionId}'`);
+          const result = await processSubmission(submissionId);
+          if (result.isErr()) {
+            console.error(`Failed to process submission '${submissionId}':`, result.error);
+          } else {
+            console.log('Submission processed successfully:', submissionId);
+          }
+        }
+      }
+
+      const deleteResult = await fromThrowableAsync(
+        () =>
+          sqs.send(
+            new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: message.ReceiptHandle! }),
+          ),
+        (e) => internal(e, 'Failed to delete SQS message'),
+      );
+      if (deleteResult.isErr()) {
+        console.error('Failed to delete SQS message:', deleteResult.error);
+      }
+    }
   }
+}
 
-  console.log('Submission processed successfully:', submissionId);
-  process.exit(0);
+async function main() {
+  if (config.env === 'dev') {
+    await devLoop();
+  } else {
+    const submissionId = config.getDeployKey('SUBMISSION_ID');
+    console.log('Processing submission:', submissionId);
+    const result = await processSubmission(submissionId);
+    if (result.isErr()) {
+      console.error(`Failed to process submission ${submissionId}:`, result.error);
+      process.exit(1);
+    }
+    console.log('Submission processed successfully:', submissionId);
+    process.exit(0);
+  }
 }
 
 main().catch((e) => {
