@@ -162,10 +162,11 @@ export class ComputeStack extends cdk.Stack {
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),
       environment: {
         DATA_BUCKET: props.workerEnv.DATA_BUCKET,
-        NODE_ENV: props.workerEnv.NODE_ENV,
         DATABASE_URL: props.workerEnv.DATABASE_URL,
         // SUBMISSION_ID is injected via container overrides by the dispatcher Lambda at launch time.
         AWS_REGION: cdk.Stack.of(this).region,
+        ECR_REGISTRY: `${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com`,
+        NODE_ENV: props.workerEnv.NODE_ENV,
       },
       privileged: true,
     });

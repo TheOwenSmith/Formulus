@@ -18,11 +18,18 @@ const envVars = [
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 
+const deployEnvVars = [
+  'ECR_REGISTRY',
+] as const satisfies string[];
+type DeployEnvVar = (typeof deployEnvVars)[number];
+
 class Config {
   private constructor() {
     validateEnvVars(envVars);
     if (this.env === 'dev') {
       validateEnvVars(devEnvVars);
+    } else {
+      validateEnvVars(deployEnvVars);
     }
   }
 
@@ -36,6 +43,10 @@ class Config {
   }
 
   getDevKey(key: DevEnvVar) {
+    return process.env[key]!;
+  }
+
+  getDeployKey(key: DeployEnvVar) {
     return process.env[key]!;
   }
 

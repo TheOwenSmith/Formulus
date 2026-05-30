@@ -3,6 +3,7 @@ import {
   SUPPORTED_LANGUAGE_VALUES,
   type SupportedLanguage,
 } from '@shared/trading-constants';
+import { config } from '@worker/lib/config';
 import z from 'zod';
 import { RUNNER_CPP_BATCHED_FROM_FILENAMES, UTILS_CPP_CODE, UTILS_CPP_HEADER } from './cpp';
 import { RUNNER_JS_BATCHED_FROM_FILENAMES, UTILS_JS_CODE } from './javascript';
@@ -17,12 +18,26 @@ export const EXTENSION_BY_LANGUAGE: Record<SupportedLanguage, string> = Object.f
   LANGUAGES.map((l) => [l.value, l.ext.replace(/^\./, '')]),
 ) as Record<SupportedLanguage, string>;
 
-export const IMAGE_BY_LANGUAGE: Record<SupportedLanguage, string> = {
-  cpp: 'formulus:cpp',
-  javascript: 'node:24-slim',
-  python: 'python:3.12-slim',
-  typescript: 'formulus:typescript',
-};
+export function getImageForLanguage(language: SupportedLanguage): string {
+  if (config.env === 'dev') {
+    const devImages: Record<SupportedLanguage, string> = {
+      cpp: 'formulus:cpp',
+      javascript: 'node:24-slim',
+      python: 'python:3.12-slim',
+      typescript: 'formulus:typescript',
+    };
+    return devImages[language];
+  }
+  const registry = config.getDeployKey('ECR_REGISTRY');
+  const tag = config.env === 'prod' ? 'latest' : 'staging';
+  const deployImages: Record<SupportedLanguage, string> = {
+    cpp: `${registry}/formulus-runner-cpp:${tag}`,
+    javascript: 'node:24-slim',
+    python: 'python:3.12-slim',
+    typescript: `${registry}/formulus-runner-typescript:${tag}`,
+  };
+  return deployImages[language];
+}
 
 export const START_COMMAND_BY_LANGUAGE: Record<SupportedLanguage, string[]> = {
   cpp: [
