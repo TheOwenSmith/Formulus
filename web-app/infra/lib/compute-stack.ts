@@ -1,8 +1,8 @@
-import * as autoscaling from 'aws-cdk-lib/aws-autoscaling';
 import * as cdk from 'aws-cdk-lib';
+import * as autoscaling from 'aws-cdk-lib/aws-autoscaling';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
@@ -56,7 +56,9 @@ export class ComputeStack extends cdk.Stack {
     const instanceRole = new iam.Role(this, 'WorkerInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          'service-role/AmazonEC2ContainerServiceforEC2Role',
+        ),
       ],
     });
 
@@ -75,11 +77,11 @@ export class ComputeStack extends cdk.Stack {
     });
 
     const asg = new autoscaling.AutoScalingGroup(this, 'WorkerAsg', {
-      vpc: this.vpc,
-      launchTemplate: lt,
       desiredCapacity: 0,
-      minCapacity: 0,
+      launchTemplate: lt,
       maxCapacity: 10,
+      minCapacity: 0,
+      vpc: this.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
     });
 
@@ -90,8 +92,8 @@ export class ComputeStack extends cdk.Stack {
       autoScalingGroup: asg,
       enableManagedScaling: true,
       enableManagedTerminationProtection: false,
-      minimumScalingStepSize: 1,
       maximumScalingStepSize: 5,
+      minimumScalingStepSize: 1,
       targetCapacityPercent: 100,
     });
     this.cluster.addAsgCapacityProvider(capacityProvider);
@@ -156,18 +158,30 @@ export class ComputeStack extends cdk.Stack {
       host: { sourcePath: '/var/run/docker.sock' },
     });
 
+    // Bind-mount the runner-jobs scratch directory so that inner containers spawned via the
+    // host Docker socket can resolve the same path. When Dockerode passes a Binds path to the
+    // host daemon, the host looks up that path on its own filesystem — not inside the ECS
+    // container. Mapping the same host path into the container keeps the two in sync.
+    this.taskDefinition.addVolume({
+      name: 'runner-jobs',
+      host: { sourcePath: '/tmp/runner-jobs' },
+    });
+
     const container = this.taskDefinition.addContainer('WorkerContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(props.workerImageRepo, props.imageTag ?? 'latest'),
-      memoryReservationMiB: 1024,
-      logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),
       environment: {
-        DATA_BUCKET: props.workerEnv.DATA_BUCKET,
-        DATABASE_URL: props.workerEnv.DATABASE_URL,
         // SUBMISSION_ID is injected via container overrides by the dispatcher Lambda at launch time.
         AWS_REGION: cdk.Stack.of(this).region,
+        DATA_BUCKET: props.workerEnv.DATA_BUCKET,
+        DATABASE_URL: props.workerEnv.DATABASE_URL,
         ECR_REGISTRY: `${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com`,
         NODE_ENV: props.workerEnv.NODE_ENV,
       },
+      image: ecs.ContainerImage.fromEcrRepository(
+        props.workerImageRepo,
+        props.imageTag ?? 'latest',
+      ),
+      logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'worker' }),
+      memoryReservationMiB: 1024,
       privileged: true,
     });
 
@@ -177,5 +191,10 @@ export class ComputeStack extends cdk.Stack {
       sourceVolume: 'docker-sock',
     });
 
+    container.addMountPoints({
+      containerPath: '/tmp/runner-jobs',
+      readOnly: false,
+      sourceVolume: 'runner-jobs',
+    });
   }
 }
