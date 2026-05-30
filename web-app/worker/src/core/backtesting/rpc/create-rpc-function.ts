@@ -17,7 +17,7 @@ import { PassThrough } from 'stream';
 import z, { ZodType } from 'zod';
 import {
   EXTENSION_BY_LANGUAGE,
-  IMAGE_BY_LANGUAGE,
+  getImageForLanguage,
   RUNNER_CODE_FROM_LANGUAGE_AND_CODE_FILENAMES,
   START_COMMAND_BY_LANGUAGE,
   UTILS_CODE_FROM_LANGUAGE,
@@ -406,7 +406,7 @@ export async function createBatchRpcFunctionFromUserCode<
 
   return createRpcFunction<[In], Out>({
     files,
-    image: IMAGE_BY_LANGUAGE[language],
+    image: getImageForLanguage(language),
     startCommand: START_COMMAND_BY_LANGUAGE[language],
     userCodePostValidation: userCodePostValidiation,
     // @ts-expect-error - userResponseSchema is incorrectly typed as ZodType<[]>

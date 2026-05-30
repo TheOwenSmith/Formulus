@@ -1,7 +1,9 @@
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import { backtestAlgorithmsConcurrently } from '@worker/core/backtesting/backtest-algorithms-concurrently';
+import { getImageForLanguage, type SupportedLanguage } from '@worker/core/backtesting/rpc/languages';
 import { interactiveBrokersSlippageFunction } from '@worker/core/backtesting/slippage-functions';
+import { pullImageIfAbsent } from '@worker/lib/docker';
 import { internal, type AppError } from '@worker/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 import { config } from './lib/config';
@@ -49,6 +51,13 @@ async function processSubmission(submissionId: string): Promise<Result<undefined
   if (markRunningResult.isErr()) return err(markRunningResult.error);
 
   const algorithms = submission.algorithmVersions.map(convertAlgorithmVersionToUserAlgorithm);
+
+  const language = algorithms[0]?.language as SupportedLanguage | undefined;
+  if (language != null) {
+    const pullResult = await pullImageIfAbsent(getImageForLanguage(language));
+    if (pullResult.isErr()) return err(pullResult.error);
+  }
+
   const algorithmIds = submission.algorithmVersions
     .map((v) => v.algorithmId)
     .filter((id): id is string => id != null);
