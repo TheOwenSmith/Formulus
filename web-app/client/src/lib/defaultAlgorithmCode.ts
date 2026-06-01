@@ -4,8 +4,8 @@
  * Keep in sync with worker expectations (utils import, export signature).
  */
 
-import { AlgorithmType } from '@shared/api';
-import type { SupportedLanguage } from '@shared/worker';
+import type { SupportedLanguage } from '@shared/constants/trading';
+import { AlgorithmType } from '@shared/constants/trading';
 
 // ─── Simple (single ticker → Action) ───────────────────────────────────────
 

@@ -1,10 +1,3 @@
-/**
- * Central source for tickers, timeframes, languages, and algorithm types.
- * Add new stocks or options here so API, worker, and client stay in sync.
- */
-
-import z from 'zod';
-
 export const tickers = [
   'SPY',
   'SSO',
@@ -25,10 +18,8 @@ export const tickers = [
   'SNAP',
   'PFE',
 ] as const;
-
+export type Ticker = (typeof tickers)[number] | (string & {});
 export type TickerValue = (typeof tickers)[number];
-export const tickerSchema = z.enum(tickers);
-export type UserTicker = z.infer<typeof tickerSchema>;
 
 export const TICKER_COMPANY_NAMES: Record<TickerValue, string> = {
   AAPL: 'Apple',
@@ -51,25 +42,11 @@ export const TICKER_COMPANY_NAMES: Record<TickerValue, string> = {
   TSLA: 'Tesla',
 };
 
-// ─── Bar ─────────────────────────────────────────────────────────────────────
-
 export type Bar = [t: string, o: number, h: number, l: number, c: number, v: number];
-export const stringifiedBarSchema = z.tuple([
-  z.string(),
-  z.coerce.number(),
-  z.coerce.number(),
-  z.coerce.number(),
-  z.coerce.number(),
-  z.coerce.number(),
-]);
-
-// ─── Timestamps / timeframes ─────────────────────────────────────────────────
 
 export const aggregateTimestamps = ['1min', '5min', '15min', '30min', '60min'] as const;
 export type Timestamp = (typeof aggregateTimestamps)[number];
-export const timestampSchema = z.enum(aggregateTimestamps);
 
-/** For UI: value + label (e.g. "60 min") */
 export const TIMEFRAMES_WITH_LABELS: { value: Timestamp; label: string }[] = [
   { value: '1min', label: '1 min' },
   { value: '5min', label: '5 min' },
@@ -78,20 +55,15 @@ export const TIMEFRAMES_WITH_LABELS: { value: Timestamp; label: string }[] = [
   { value: '60min', label: '60 min' },
 ];
 
-// ─── Languages ───────────────────────────────────────────────────────────────
-
 export const SUPPORTED_LANGUAGE_VALUES = ['javascript', 'typescript', 'python', 'cpp'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGE_VALUES)[number];
 
-/** For UI and runner: value + display label + file extension */
 export const LANGUAGES: { value: SupportedLanguage; label: string; ext: string }[] = [
   { value: 'javascript', label: 'JavaScript', ext: '.js' },
   { value: 'typescript', label: 'TypeScript', ext: '.ts' },
   { value: 'python', label: 'Python', ext: '.py' },
   { value: 'cpp', label: 'C++', ext: '.cpp' },
 ];
-
-// ─── Algorithm type ─────────────────────────────────────────────────────────
 
 /** Numeric algorithm type (matches Prisma enum and worker AlgorithmType enum). */
 export const AlgorithmType = {
@@ -104,3 +76,45 @@ export type AlgorithmTypeValue = (typeof AlgorithmType)[keyof typeof AlgorithmTy
 export const MAX_ALGORITHMS_TO_COMPARE = 25;
 export const MAX_INDICATORS_COUNT = 40;
 export const MAX_INDICATOR_MULTIPLIER = 20;
+
+export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;
+export const ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT = 0.99;
+
+export type ProfitLossRatio =
+  | { type: 'VALUE'; value: number }
+  | { type: 'NO_LOSSES' }
+  | { type: 'UNKNOWN' };
+
+export type DescriptionMetrics = {
+  aggregate: Timestamp;
+  algorithmReturn: number;
+  averageHoldingDuration: number | null;
+  contextLength: number;
+  expectancyPerTrade: number | null;
+  growthRate: number;
+  maxDrawdown: number;
+  maxHoldingPorportion: number;
+  positionsClosed: number;
+  profitLossRatio: ProfitLossRatio;
+  sharpeRatio: number | null;
+  tickers: Ticker[];
+  timespan: [string, string];
+  tradesMade: number;
+  volatility: number | null;
+  winRate: number | null;
+};
+
+export type SimplePlot = {
+  name: string;
+  y: number[];
+};
+
+export type BacktestAlgorithmsResult = {
+  algorithmGraphs: {
+    aggregate: Timestamp;
+    descriptionMetrics: DescriptionMetrics;
+    algorithmPlot: SimplePlot;
+  }[];
+  tickerPlotByAggregateByTicker: Record<Timestamp, Record<Ticker, SimplePlot>>;
+  timestampsByAggregate: Record<Timestamp, string[]>;
+};

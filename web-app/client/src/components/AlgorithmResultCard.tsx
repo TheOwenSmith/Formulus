@@ -8,7 +8,7 @@ import { PerformanceMetrics } from '@client/components/PerformanceMetrics';
 import { ARROW_LEFT, STROKE_PROPERTIES, SVG_NAMESPACE } from '@client/icons/index';
 import { colorSchemes } from '@client/utils/colorSchemes';
 import { withCommasRounded } from '@client/utils/numberUtils';
-import type { DescriptionMetrics, SimplePlot, Ticker, Timestamp } from '@shared/worker';
+import type { DescriptionMetrics, SimplePlot, Ticker, Timestamp } from '@shared/constants/trading';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface AlgorithmResultCardProps {
@@ -167,12 +167,20 @@ function AlgorithmResultCardComponent({
             {onCopyVersion && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onCopyVersion(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopyVersion();
+                }}
                 title="Copy this algorithm version to your library"
                 className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-white/10 bg-white/[0.04] text-white/40 hover:text-white/80 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
                 </svg>
                 Copy
               </button>

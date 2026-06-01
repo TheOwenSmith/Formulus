@@ -3,15 +3,19 @@ import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { trpcCredentials } from '@client/lib/trpc';
 import Editor from '@monaco-editor/react';
-import { AlgorithmType, type UserTicker } from '@shared/api';
-import { ALGORITHM_EXAMPLES, type AlgorithmExample } from '@shared/examples';
+import { ALGORITHM_EXAMPLES, type AlgorithmExample } from '@shared/constants/examples';
 import {
   maxPeriodByIndicatorByContextLength,
   minPeriodByIndicator,
   type IndicatorMetadataKey,
-} from '@shared/indicator-params';
-import { MAX_INDICATOR_MULTIPLIER, MAX_INDICATORS_COUNT } from '@shared/trading-constants';
-import type { AnyUserAlgorithmType, SupportedLanguage } from '@shared/worker';
+} from '@shared/constants/indicator-params';
+import type { AnyUserAlgorithmType, SupportedLanguage } from '@shared/constants/trading';
+import {
+  AlgorithmType,
+  MAX_INDICATOR_MULTIPLIER,
+  MAX_INDICATORS_COUNT,
+} from '@shared/constants/trading';
+import { type UserTicker } from '@shared/schemas/trading';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useLoaderData, useNavigate } from 'react-router-dom';

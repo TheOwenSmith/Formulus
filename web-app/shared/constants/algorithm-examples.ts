@@ -1,11 +1,16 @@
-import type { SupportedLanguage } from './trading-constants';
+import type { SupportedLanguage } from './trading';
+
+enum AlgorithmExampleType {
+  NORMAL = 0,
+  SIMPLE = 1,
+  TOP_K = 2,
+}
 
 export type AlgorithmExample = {
   id: string;
   name: string;
   description: string;
-  /** 0 = Normal, 1 = Simple, 2 = Top-K */
-  algorithmType: 0 | 1 | 2;
+  algorithmType: AlgorithmExampleType;
   indicators: string[];
   contextLength: number;
   aggregate: string;
@@ -14,8 +19,6 @@ export type AlgorithmExample = {
   k?: number;
   code: Record<SupportedLanguage, string>;
 };
-
-// ─── Normal algorithm examples ────────────────────────────────────────────────
 
 export const ABOVE_BELOW_SMA_CODE: Record<SupportedLanguage, string> = {
   typescript: `
@@ -636,14 +639,12 @@ std::map<std::string, double> implementation(
 `,
 };
 
-// ─── Example registry ─────────────────────────────────────────────────────────
-
 export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
   {
     id: 'above-below-sma',
     name: 'Above-Below SMA',
     description: 'Buy when price is above the 20-period SMA, sell when below.',
-    algorithmType: 0,
+    algorithmType: AlgorithmExampleType.NORMAL,
     indicators: ['SMA(20)'],
     contextLength: 20,
     aggregate: '60min',
@@ -654,7 +655,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'overbought-oversold',
     name: 'Overbought-Oversold RSI',
     description: 'Buy when RSI drops below 30 (oversold), sell when RSI exceeds 70 (overbought).',
-    algorithmType: 0,
+    algorithmType: AlgorithmExampleType.NORMAL,
     indicators: ['RSI(14)'],
     contextLength: 15,
     aggregate: '60min',
@@ -665,7 +666,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'long-short',
     name: 'Long-Short (SPY-SH)',
     description: 'Uses RSI on SPY to switch between the market (SPY) and its inverse ETF (SH).',
-    algorithmType: 0,
+    algorithmType: AlgorithmExampleType.NORMAL,
     indicators: ['RSI(14)'],
     contextLength: 15,
     aggregate: '60min',
@@ -676,7 +677,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'regression-line',
     name: 'Regression Line',
     description: 'Buy when price is below the 50-bar linear regression line; sell when above.',
-    algorithmType: 0,
+    algorithmType: AlgorithmExampleType.NORMAL,
     indicators: ['LinearRegression(50)'],
     contextLength: 50,
     aggregate: '60min',
@@ -687,7 +688,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'super-trend-direction',
     name: 'SuperTrend Direction',
     description: 'Follow the SuperTrend direction: buy when trending up, sell when trending down.',
-    algorithmType: 0,
+    algorithmType: AlgorithmExampleType.NORMAL,
     indicators: ['SuperTrend(10,3)'],
     contextLength: 11,
     aggregate: '60min',
@@ -698,7 +699,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'if-green',
     name: 'If Green',
     description: 'Buy if the previous bar closed green (close >= open), sell otherwise.',
-    algorithmType: 1,
+    algorithmType: AlgorithmExampleType.SIMPLE,
     indicators: [],
     contextLength: 1,
     aggregate: '60min',
@@ -709,7 +710,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'no-mondays',
     name: 'No Mondays',
     description: 'Sell on Mondays, buy every other day. Uses the dayOfWeek helper.',
-    algorithmType: 1,
+    algorithmType: AlgorithmExampleType.SIMPLE,
     indicators: [],
     contextLength: 1,
     aggregate: '60min',
@@ -720,7 +721,7 @@ export const ALGORITHM_EXAMPLES: AlgorithmExample[] = [
     id: 'top-k-most_oversold',
     name: 'Top-K Most Oversold',
     description: 'Score tickers by inverted RSI. The most oversold K tickers are held.',
-    algorithmType: 2,
+    algorithmType: AlgorithmExampleType.TOP_K,
     indicators: ['RSI(14)'],
     contextLength: 15,
     aggregate: '60min',

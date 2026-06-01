@@ -1,4 +1,5 @@
-import { stringifiedBarSchema, type Bar } from '@shared/api';
+import { type Bar } from '@shared/constants/trading';
+import { stringifiedBarSchema } from '@shared/schemas/trading';
 import { cleanup } from '@worker/utils/cleanup';
 import {
   fromThrowable,

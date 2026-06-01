@@ -7,6 +7,8 @@
   "dependencies": {
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",
-    "prisma": "^7.8.0"
+    "neverthrow": "^8.2.0",
+    "prisma": "^7.8.0",
+    "zod": "^4.4.3"
   }
 }

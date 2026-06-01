@@ -1,5 +1,5 @@
-import { ALGORITHM_EXAMPLES, type AlgorithmExample } from '@shared/examples';
-import type { SupportedLanguage } from '@shared/worker';
+import { ALGORITHM_EXAMPLES, type AlgorithmExample } from '@shared/constants/examples';
+import type { SupportedLanguage } from '@shared/constants/trading';
 import { useState } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -38,7 +38,9 @@ export function ExamplesModal({ language, initialExampleId, onCreateFromExample,
     () =>
       (initialExampleId != null
         ? ALGORITHM_EXAMPLES.find((e) => e.id === initialExampleId)
-        : null) ?? ALGORITHM_EXAMPLES[0] ?? null,
+        : null) ??
+      ALGORITHM_EXAMPLES[0] ??
+      null,
   );
   const [previewLang, setPreviewLang] = useState<SupportedLanguage>(
     LANG_ORDER.includes(language) ? language : 'typescript',
@@ -68,7 +70,12 @@ export function ExamplesModal({ language, initialExampleId, onCreateFromExample,
             className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/50 hover:text-white transition-all cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -109,8 +116,12 @@ export function ExamplesModal({ language, initialExampleId, onCreateFromExample,
                       : 'bg-transparent border-transparent hover:bg-white/[0.05] hover:border-white/[0.06]'
                   }`}
                 >
-                  <div className="text-sm font-semibold text-white/90 leading-tight mb-1.5">{ex.name}</div>
-                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-gradient-to-r border ${TYPE_COLORS[ex.algorithmType]}`}>
+                  <div className="text-sm font-semibold text-white/90 leading-tight mb-1.5">
+                    {ex.name}
+                  </div>
+                  <span
+                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-gradient-to-r border ${TYPE_COLORS[ex.algorithmType]}`}
+                  >
                     {TYPE_LABELS[ex.algorithmType]}
                   </span>
                 </button>
@@ -132,15 +143,22 @@ export function ExamplesModal({ language, initialExampleId, onCreateFromExample,
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-base font-bold text-white">{selected.name}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md bg-gradient-to-r border ${TYPE_COLORS[selected.algorithmType]}`}>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md bg-gradient-to-r border ${TYPE_COLORS[selected.algorithmType]}`}
+                        >
                           {TYPE_LABELS[selected.algorithmType]}
                         </span>
                       </div>
-                      <p className="text-sm text-white/50 leading-relaxed">{selected.description}</p>
+                      <p className="text-sm text-white/50 leading-relaxed">
+                        {selected.description}
+                      </p>
                       {selected.indicators.length > 0 && (
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                           {selected.indicators.map((ind) => (
-                            <span key={ind} className="text-xs font-mono px-2 py-0.5 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300">
+                            <span
+                              key={ind}
+                              className="text-xs font-mono px-2 py-0.5 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300"
+                            >
                               {ind}
                             </span>
                           ))}
@@ -191,7 +209,9 @@ export function ExamplesModal({ language, initialExampleId, onCreateFromExample,
           <button
             type="button"
             disabled={selected == null}
-            onClick={() => { if (selected) onCreateFromExample(selected, previewLang); }}
+            onClick={() => {
+              if (selected) onCreateFromExample(selected, previewLang);
+            }}
             className="px-4 py-2 rounded-xl text-sm border border-emerald-500/40 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-white hover:from-emerald-500/30 hover:to-teal-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             Create Algorithm

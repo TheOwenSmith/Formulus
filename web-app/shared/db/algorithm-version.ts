@@ -1,13 +1,11 @@
-import { type UserTicker } from '@shared/api';
+import { type Indicator } from '@shared/constants/indicators/indicator';
+import { AlgorithmType } from '@shared/constants/trading';
 import { AlgorithmType as DbAlgorithmType } from '@shared/generated/prisma/enums';
 import { type AlgorithmVersionModel } from '@shared/generated/prisma/models';
-import {
-  AlgorithmType,
-  type AnyUserAlgorithmType,
-  type Indicator,
-  type UserSimpleAlgorithm,
-  type UserTopKAlgorithm,
-} from '@shared/worker';
+import { type AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
+import { type UserSimpleAlgorithm } from '@shared/schemas/algorithms/user-simple-algorithm';
+import { type UserTopKAlgorithm } from '@shared/schemas/algorithms/user-top-k-algorithm';
+import { type UserTicker } from '@shared/schemas/trading';
 import { convertSupportedLanguageToDbSupportedLanguage } from './language';
 import { convertDbTimestampToTimestamp } from './timestamp';
 

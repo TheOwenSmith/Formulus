@@ -232,7 +232,7 @@ export async function getResultAccessInfo(
   const { creatorId, isPublic, shares } = result.value;
   const isOwner = creatorId === userId;
   const shareEntry = shares[0];
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- okay to just use || here
+
   const hasAccess = isOwner || isPublic || shareEntry != null;
   const canCopy = isOwner ? true : (shareEntry?.allowCopy ?? false);
 

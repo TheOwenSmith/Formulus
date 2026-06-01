@@ -1,5 +1,4 @@
-import type { Bar, Ticker } from '@shared/api';
-import type { Timestamp } from '@shared/trading-constants';
+import type { Bar, Ticker, Timestamp } from '@shared/constants/trading';
 import {
   Action,
   type Algorithm,

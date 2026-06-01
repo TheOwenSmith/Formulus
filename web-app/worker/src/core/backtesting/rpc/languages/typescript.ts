@@ -1,9 +1,9 @@
-import { atrIndicatorResultStringified } from '@worker/core/algorithms/indicators/atr';
-import { emaIndicatorResultStringified } from '@worker/core/algorithms/indicators/ema';
-import { linearRegressionIndicatorResultStringified } from '@worker/core/algorithms/indicators/linear-regression';
-import { rsiIndicatorResultStringified } from '@worker/core/algorithms/indicators/rsi';
-import { smaIndicatorResultStringified } from '@worker/core/algorithms/indicators/sma';
-import { superTrendIndicatorResultStringified } from '@worker/core/algorithms/indicators/super-trend';
+import { atrIndicatorResultStringified } from '@shared/constants/indicators/atr';
+import { emaIndicatorResultStringified } from '@shared/constants/indicators/ema';
+import { linearRegressionIndicatorResultStringified } from '@shared/constants/indicators/linear-regression';
+import { rsiIndicatorResultStringified } from '@shared/constants/indicators/rsi';
+import { smaIndicatorResultStringified } from '@shared/constants/indicators/sma';
+import { superTrendIndicatorResultStringified } from '@shared/constants/indicators/super-trend';
 
 const indicatorResultTypeStrinigifed: string = `interface IndicatorResult {
 ${[

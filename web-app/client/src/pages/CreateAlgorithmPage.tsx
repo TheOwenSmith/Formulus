@@ -3,17 +3,18 @@ import { Tooltip } from '@client/components/Tooltip';
 import { CheckIcon, ExamplesIcon, NormalIcon, SimpleIcon, Spinner, TopKIcon } from '@client/icons';
 import { getDefaultImplementationCode } from '@client/lib/defaultAlgorithmCode';
 import { trpcCredentials } from '@client/lib/trpc';
+import type { AlgorithmExample } from '@shared/constants/examples';
+import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/constants/trading';
 import {
+  ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   AlgorithmType,
   LANGUAGES,
+  tickers as TICKERS,
   TICKER_COMPANY_NAMES,
   TIMEFRAMES_WITH_LABELS,
   type TickerValue,
-} from '@shared/api';
-import { ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT } from '@shared/constants';
-import type { AlgorithmExample } from '@shared/examples';
-import { tickers as TICKERS, type Timestamp } from '@shared/trading-constants';
-import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/worker';
+  type Timestamp,
+} from '@shared/constants/trading';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -112,9 +113,7 @@ const STEP_CONTENT_HEIGHT = 320;
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-white/50 text-sm mb-2 uppercase tracking-wider font-semibold">
-      {children}
-    </p>
+    <p className="text-white/50 text-sm mb-2 uppercase tracking-wider font-semibold">{children}</p>
   );
 }
 
@@ -199,7 +198,12 @@ export function CreateAlgorithmPage() {
     if (example.algorithmType === AlgorithmType.SIMPLE) {
       payload = { ...base, ticker: example.ticker! as TickerValue, type: AlgorithmType.SIMPLE };
     } else if (example.algorithmType === AlgorithmType.TOP_K) {
-      payload = { ...base, k: example.k!, tickers: example.tickers! as TickerValue[], type: AlgorithmType.TOP_K };
+      payload = {
+        ...base,
+        k: example.k!,
+        tickers: example.tickers! as TickerValue[],
+        type: AlgorithmType.TOP_K,
+      };
     } else {
       payload = { ...base, tickers: example.tickers! as TickerValue[], type: AlgorithmType.NORMAL };
     }
@@ -307,7 +311,19 @@ export function CreateAlgorithmPage() {
         <SectionLabel>Strategy type</SectionLabel>
         <div className="grid grid-cols-4 gap-4 w-full">
           {ALGO_TYPES.map(
-            ({ type, label, tagline, description, Icon, gradient, border, iconColor, glow, hoverBorder, hoverGradient }) => {
+            ({
+              type,
+              label,
+              tagline,
+              description,
+              Icon,
+              gradient,
+              border,
+              iconColor,
+              glow,
+              hoverBorder,
+              hoverGradient,
+            }) => {
               const isSelected = state.algorithmType === type;
               return (
                 <Tooltip key={label} content={description}>
@@ -631,139 +647,146 @@ export function CreateAlgorithmPage() {
 
   return (
     <>
-    <div
-      className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col font-sans text-white overflow-hidden"
-      style={{
-        bottom: 0,
-        left: 0,
-        position: 'fixed',
-        right: 0,
-        top: HEADER_OFFSET,
-      }}
-    >
-      <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-        <div className="absolute top-[-10%] left-[-5%] w-96 h-96 bg-blue-500/5 blur-3xl rounded-full animate-pulse" />
-        <div
-          className="absolute bottom-[-10%] right-[-5%] w-96 h-96 bg-purple-500/5 blur-3xl rounded-full animate-pulse"
-          style={{ animationDelay: '1s' }}
-        />
-      </div>
-
-      {/* Centered block: step tracker + content (fixed height) + buttons — distance between header and footer unchanged */}
-      <div className="flex-1 flex items-center justify-center px-6 py-6 min-h-0 overflow-hidden">
-        <div className="w-full max-w-3xl flex flex-col items-center gap-6 shrink-0">
-          <StepIndicator step={step} />
+      <div
+        className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col font-sans text-white overflow-hidden"
+        style={{
+          bottom: 0,
+          left: 0,
+          position: 'fixed',
+          right: 0,
+          top: HEADER_OFFSET,
+        }}
+      >
+        <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+          <div className="absolute top-[-10%] left-[-5%] w-96 h-96 bg-blue-500/5 blur-3xl rounded-full animate-pulse" />
           <div
-            className="w-full overflow-hidden flex flex-col"
-            style={{ height: STEP_CONTENT_HEIGHT }}
-          >
-            <div className="flex-1 flex flex-col justify-center min-h-0 overflow-auto">
-              {step === 1 && step1}
-              {step === 2 && step2}
-              {step === 3 && step3}
-            </div>
-          </div>
-          <div className="flex items-center gap-4 w-full">
-            <button
-              type="button"
-              onClick={() => {
-                if (step === 1) navigate('/algorithms');
-                else setStep((s) => (s - 1) as 1 | 2 | 3);
-              }}
-              className="flex-1 min-w-0 py-4 px-6 rounded-xl font-semibold text-base border border-white/10 bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center gap-2"
-            >
-              {step === 1 ? (
-                'Cancel'
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  Back
-                </>
-              )}
-            </button>
+            className="absolute bottom-[-10%] right-[-5%] w-96 h-96 bg-purple-500/5 blur-3xl rounded-full animate-pulse"
+            style={{ animationDelay: '1s' }}
+          />
+        </div>
 
-            {step === 1 && (
+        {/* Centered block: step tracker + content (fixed height) + buttons — distance between header and footer unchanged */}
+        <div className="flex-1 flex items-center justify-center px-6 py-6 min-h-0 overflow-hidden">
+          <div className="w-full max-w-3xl flex flex-col items-center gap-6 shrink-0">
+            <StepIndicator step={step} />
+            <div
+              className="w-full overflow-hidden flex flex-col"
+              style={{ height: STEP_CONTENT_HEIGHT }}
+            >
+              <div className="flex-1 flex flex-col justify-center min-h-0 overflow-auto">
+                {step === 1 && step1}
+                {step === 2 && step2}
+                {step === 3 && step3}
+              </div>
+            </div>
+            <div className="flex items-center gap-4 w-full">
               <button
                 type="button"
-                disabled={!step1Valid}
-                onClick={() => setStep(2)}
-                className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
+                onClick={() => {
+                  if (step === 1) navigate('/algorithms');
+                  else setStep((s) => (s - 1) as 1 | 2 | 3);
+                }}
+                className="flex-1 min-w-0 py-4 px-6 rounded-xl font-semibold text-base border border-white/10 bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                Continue
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            )}
-            {step === 2 && (
-              <button
-                type="button"
-                disabled={!step2Valid}
-                onClick={() => setStep(3)}
-                className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
-              >
-                Continue
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            )}
-            {step === 3 && (
-              <button
-                type="button"
-                disabled={!step3Valid || isPending}
-                onClick={handleCreate}
-                className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
-              >
-                {isPending ? (
-                  <>
-                    <Spinner />
-                    Creating…
-                  </>
+                {step === 1 ? (
+                  'Cancel'
                 ) : (
                   <>
-                    Create & Open Editor
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                        d="M15 19l-7-7 7-7"
                       />
                     </svg>
+                    Back
                   </>
                 )}
               </button>
-            )}
+
+              {step === 1 && (
+                <button
+                  type="button"
+                  disabled={!step1Valid}
+                  onClick={() => setStep(2)}
+                  className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
+                >
+                  Continue
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              )}
+              {step === 2 && (
+                <button
+                  type="button"
+                  disabled={!step2Valid}
+                  onClick={() => setStep(3)}
+                  className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
+                >
+                  Continue
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              )}
+              {step === 3 && (
+                <button
+                  type="button"
+                  disabled={!step3Valid || isPending}
+                  onClick={handleCreate}
+                  className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
+                >
+                  {isPending ? (
+                    <>
+                      <Spinner />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      Create & Open Editor
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                        />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {showExamplesModal && (
-      <ExamplesModal
-        language={state.language ?? 'typescript'}
-        onCreateFromExample={(example, lang) => { void handleCreateFromExample(example, lang); }}
-        onClose={() => setShowExamplesModal(false)}
-      />
-    )}
+      {showExamplesModal && (
+        <ExamplesModal
+          language={state.language ?? 'typescript'}
+          onCreateFromExample={(example, lang) => {
+            void handleCreateFromExample(example, lang);
+          }}
+          onClose={() => setShowExamplesModal(false)}
+        />
+      )}
     </>
   );
 }

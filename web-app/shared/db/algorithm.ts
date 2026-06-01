@@ -1,5 +1,5 @@
 import { AlgorithmType as DbAlgorithmType } from '@shared/generated/prisma/enums';
-import { AlgorithmType } from '@shared/worker';
+import { AlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 
 export function convertAlgorithmTypeToDbAlgorithmType(
   algorithmType: AlgorithmType,

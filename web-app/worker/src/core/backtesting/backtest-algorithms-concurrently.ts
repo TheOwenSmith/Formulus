@@ -1,18 +1,21 @@
-import { type Bar, type Ticker } from '@shared/api';
+import { getTickers } from '@shared/constants/algorithm';
+import type { Indicator, IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
+import type { IndicatorMetadata } from '@shared/constants/indicators/indicator-metadata';
+import type {
+  BacktestAlgorithmsResult,
+  DescriptionMetrics,
+  SimplePlot,
+  Ticker,
+  Timestamp,
+} from '@shared/constants/trading';
 import {
+  aggregateTimestamps,
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION,
-} from '@shared/constants';
-import type { Timestamp } from '@shared/trading-constants';
-import { aggregateTimestamps } from '@shared/trading-constants';
+  type Bar,
+} from '@shared/constants/trading';
+import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
-import {
-  indicatorsToIndicatorResultsFunction,
-  type Indicator,
-  type IndicatorResultByIndicator,
-} from '@worker/core/algorithms/indicators/indicator';
-import type { IndicatorMetadata } from '@worker/core/algorithms/indicators/indicator-metadata';
-import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
 import { config } from '@worker/lib/config';
 import { yearsBetween } from '@worker/utils/date-utils';
 import { badRequest, internal, safeReduce, type AppError } from '@worker/utils/error-handling';
@@ -21,6 +24,7 @@ import { roundToDecimal, withCommas } from '@worker/utils/number-utils';
 import { SharpeRatioCalculator } from '@worker/utils/sharpe-ratio-calculator';
 import { err, ok, type Result } from 'neverthrow';
 import { BYTES_PROGRESS_UPDATE_INTERVAL, type TickerData } from './constants';
+import { indicatorsToIndicatorResultsFunction } from './indicator-utils';
 import {
   countBytesToProcess,
   getIteratorBounds,
@@ -35,7 +39,7 @@ import {
   type ImplementationArgumentsByAlgorithmIndex,
 } from './rpc/get-batch-algorithm-implementations';
 import { type SupportedLanguage } from './rpc/languages';
-import { getAlgorithmGraph, updateGraph, type DescriptionMetrics } from './statistics';
+import { getAlgorithmGraph, updateGraph } from './statistics';
 import {
   createIndexByTicker,
   downloadTickDataFromS3,
@@ -44,7 +48,6 @@ import {
   getDistinctTickersByAggregate,
   getFilenameAndIndexByAggregateByTicker,
   getMarketSlippageByTicker,
-  getTickers,
 } from './ticker-utils';
 
 export type AlgorithmData = {
@@ -74,21 +77,6 @@ export type BacktestingAlgorithmsConcurrentlyOptions = {
   slippageByTicker?: Partial<Record<Ticker, number>>;
   tickerData?: TickerData[];
   verboseLogging?: boolean;
-};
-
-export type SimplePlot = {
-  name: string;
-  y: number[];
-};
-
-export type BacktestAlgorithmsResult = {
-  algorithmGraphs: {
-    aggregate: Timestamp;
-    descriptionMetrics: DescriptionMetrics;
-    algorithmPlot: SimplePlot;
-  }[];
-  tickerPlotByAggregateByTicker: Record<Timestamp, Record<Ticker, SimplePlot>>;
-  timestampsByAggregate: Record<Timestamp, string[]>;
 };
 
 export async function backtestAlgorithmsConcurrently(inp: {

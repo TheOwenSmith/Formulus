@@ -1,7 +1,7 @@
-import type { Bar, Ticker } from '@shared/api';
-import { type Timestamp } from '@shared/trading-constants';
+import type { Indicator, IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
+import type { Bar, Ticker } from '@shared/constants/trading';
+import { type Timestamp } from '@shared/constants/trading';
 import z from 'zod';
-import { type Indicator, type IndicatorResultByIndicator } from './indicators/indicator';
 
 export const enum Action {
   BUY = 0,

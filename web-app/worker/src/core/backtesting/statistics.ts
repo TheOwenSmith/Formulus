@@ -1,11 +1,15 @@
-import type { Ticker } from '@shared/api';
-import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } from '@shared/constants';
-import type { Timestamp } from '@shared/trading-constants';
+import { getTickers } from '@shared/constants/algorithm';
+import type {
+  DescriptionMetrics,
+  ProfitLossRatio,
+  SimplePlot,
+  Timestamp,
+} from '@shared/constants/trading';
+import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } from '@shared/constants/trading';
+import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
-import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
-import { type AlgorithmData, type SimplePlot } from './backtest-algorithms-concurrently';
+import { type AlgorithmData } from './backtest-algorithms-concurrently';
 import { MAX_POINTS_PER_PLOT } from './constants';
-import { getTickers } from './ticker-utils';
 
 export function updateGraph<T, P>({
   graphIndex,
@@ -31,30 +35,6 @@ export function updateGraph<T, P>({
   }
   return false;
 }
-
-export type ProfitLossRatio =
-  | { type: 'VALUE'; value: number }
-  | { type: 'NO_LOSSES' }
-  | { type: 'UNKNOWN' };
-
-export type DescriptionMetrics = {
-  aggregate: Timestamp;
-  algorithmReturn: number;
-  averageHoldingDuration: number | null;
-  contextLength: number;
-  expectancyPerTrade: number | null;
-  growthRate: number;
-  maxDrawdown: number;
-  maxHoldingPorportion: number;
-  positionsClosed: number;
-  profitLossRatio: ProfitLossRatio;
-  sharpeRatio: number | null;
-  tickers: Ticker[];
-  timespan: [string, string];
-  tradesMade: number;
-  volatility: number | null;
-  winRate: number | null;
-};
 
 export async function getAlgorithmGraph({
   aggregate,

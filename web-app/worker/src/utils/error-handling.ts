@@ -1,4 +1,3 @@
-import type { TRPC_ERROR_CODE_KEY } from '@shared/api';
 import { ok, Result, ResultAsync } from 'neverthrow';
 
 export const fromThrowable = <T>(
@@ -14,7 +13,7 @@ export const fromThrowableAsync = <T>(
 export type AppError = {
   message?: string;
   error?: unknown;
-  code: TRPC_ERROR_CODE_KEY;
+  code: 'INTERNAL_SERVER_ERROR' | 'BAD_REQUEST' | 'USER_CODE_ERROR';
   isUserCode?: boolean;
 };
 

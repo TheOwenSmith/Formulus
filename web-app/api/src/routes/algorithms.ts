@@ -1,5 +1,6 @@
 import { type TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import { indicatorsValidationForContextLength } from '@api/middleware/indicator';
 import {
   deleteAlgorithmByIdForCreator,
   getAlgorithmByIdForCreator,
@@ -11,15 +12,12 @@ import {
 import { getResultAccessInfo } from '@api/repository/db-sharing';
 import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
 import { badRequest } from '@api/utils/error-handling';
+import { indicatorSchema } from '@shared/constants/indicators/indicator';
+import { MAX_INDICATORS_COUNT } from '@shared/constants/trading';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
-import { MAX_INDICATORS_COUNT } from '@shared/trading-constants';
-import {
-  indicatorSchema,
-  indicatorsValidationForContextLength,
-  userAlgorithmSchema,
-  userSimpleAlgorithmSchema,
-  userTopKAlgorithmSchema,
-} from '@shared/worker';
+import { userAlgorithmSchema } from '@shared/schemas/algorithms/user-algorithm';
+import { userSimpleAlgorithmSchema } from '@shared/schemas/algorithms/user-simple-algorithm';
+import { userTopKAlgorithmSchema } from '@shared/schemas/algorithms/user-top-k-algorithm';
 import z from 'zod';
 
 const anyAlgorithmSchema = z.union([

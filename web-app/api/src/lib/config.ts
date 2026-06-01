@@ -11,7 +11,6 @@ const devEnvVars = [
 type DevEnvVar = (typeof devEnvVars)[number];
 
 const envVarsAll = [
-  'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
   'CORS_ORIGIN',
   'DATABASE_URL',

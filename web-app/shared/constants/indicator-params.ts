@@ -1,6 +1,6 @@
-import type { IndicatorMetadataKey } from '@worker/core/algorithms/indicators/indicator-metadata';
+import type { IndicatorMetadataKey } from '@shared/constants/indicators/indicator-metadata';
 
-export type { IndicatorMetadataKey } from '@worker/core/algorithms/indicators/indicator-metadata';
+export type { IndicatorMetadataKey } from '@shared/constants/indicators/indicator-metadata';
 
 export const minPeriodByIndicator: Record<IndicatorMetadataKey, number> = {
   atr: 1,

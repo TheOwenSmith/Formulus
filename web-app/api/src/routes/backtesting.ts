@@ -17,7 +17,7 @@ import {
 } from '@api/repository/db-submission';
 import { badRequest, fromThrowableAsync, internal } from '@api/utils/error-handling';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
-import { MAX_ALGORITHMS_TO_COMPARE } from '@shared/trading-constants';
+import { MAX_ALGORITHMS_TO_COMPARE } from '@shared/constants/trading';
 import z from 'zod';
 
 export function backtestingRouter(
@@ -29,7 +29,7 @@ export function backtestingRouter(
       .input(
         z.object({
           algorithms: z.object({ id: z.string() }).array().min(1).max(MAX_ALGORITHMS_TO_COMPARE),
-          name: z.string().max(64).optional(),
+          name: z.string().max(64),
           timespan: z.tuple([z.string().nullable(), z.string().nullable()]).optional(),
         }),
       )

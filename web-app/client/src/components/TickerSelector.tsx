@@ -1,5 +1,5 @@
 import { ARROW_DOWN_SMALL, STROKE_PROPERTIES_SMALL, SVG_NAMESPACE } from '@client/icons/index';
-import type { Ticker } from '@shared/worker';
+import type { Ticker } from '@shared/constants/trading';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface TickerSelectorProps {

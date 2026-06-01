@@ -29,7 +29,7 @@
 
     "rootDir": "..",
   },
-  "include": ["./src/**/*", "../shared/**/*"],
+  "include": ["./src/**/*", "../shared/**/*", "../worker/src/core/algorithms/pipeline.ts"],
   "exclude": [
     "node_modules",
     "*.config.ts",
