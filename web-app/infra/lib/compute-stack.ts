@@ -18,7 +18,7 @@ export class ComputeStack extends cdk.Stack {
     id: string,
     props: cdk.StackProps & {
       workerImageRepo: ecr.IRepository;
-      workerEnv: { DATA_BUCKET: string; DATABASE_URL: string; NODE_ENV: string };
+      workerEnv: { ALPHA_VANTAGE_API_KEY: string; DATA_BUCKET: string; DATABASE_URL: string; NODE_ENV: string };
       clusterName?: string;
       imageTag?: string;
       logGroupName?: string;
@@ -170,6 +170,7 @@ export class ComputeStack extends cdk.Stack {
     const container = this.taskDefinition.addContainer('WorkerContainer', {
       environment: {
         // SUBMISSION_ID is injected via container overrides by the dispatcher Lambda at launch time.
+        ALPHA_VANTAGE_API_KEY: props.workerEnv.ALPHA_VANTAGE_API_KEY,
         AWS_REGION: cdk.Stack.of(this).region,
         DATA_BUCKET: props.workerEnv.DATA_BUCKET,
         DATABASE_URL: props.workerEnv.DATABASE_URL,

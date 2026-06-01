@@ -36,6 +36,7 @@ jobs:
       CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
       DEPLOY_TARGET: worker
+      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       NODE_ENV: ${{ vars.NODE_ENV }}
       ECR_REPO: formulus-worker

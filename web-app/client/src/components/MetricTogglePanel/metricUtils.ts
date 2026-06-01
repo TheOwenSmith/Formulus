@@ -1,6 +1,11 @@
 import { withCommas, withCommasRounded } from '@client/utils/numberUtils';
 import { exhaustiveArray } from '@client/utils/types';
-import type { DescriptionMetrics, ProfitLossRatio, Ticker, Timestamp } from '@shared/worker';
+import type {
+  DescriptionMetrics,
+  ProfitLossRatio,
+  Ticker,
+  Timestamp,
+} from '@shared/constants/trading';
 
 export type MetricKey = keyof DescriptionMetrics;
 

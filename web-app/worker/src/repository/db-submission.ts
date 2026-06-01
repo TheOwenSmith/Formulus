@@ -6,7 +6,7 @@ import { err, ok, Result } from 'neverthrow';
 
 export type SubmissionWithVersions = {
   id: string;
-  name: string | null;
+  name: string;
   publicId: string;
   creatorId: string;
   status: BacktestingSubmissionStatus;

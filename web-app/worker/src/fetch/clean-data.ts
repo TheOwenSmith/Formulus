@@ -1,5 +1,5 @@
-import { fromThrowable, internal, type AppError } from '@api/utils/error-handling';
-import type { Timestamp } from '@shared/trading-constants';
+import type { Timestamp } from '@shared/constants/trading';
+import { fromThrowable, internal, type AppError } from '@worker/utils/error-handling';
 import { spawnSync } from 'child_process';
 import { err, ok, type Result } from 'neverthrow';
 import path from 'path';

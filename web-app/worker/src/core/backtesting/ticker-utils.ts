@@ -1,9 +1,10 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { tickerSchema, type Ticker } from '@shared/api';
-import type { Timestamp } from '@shared/trading-constants';
-import { aggregateTimestamps } from '@shared/trading-constants';
+import { getTickers } from '@shared/constants/algorithm';
+import type { Ticker, Timestamp } from '@shared/constants/trading';
+import { aggregateTimestamps } from '@shared/constants/trading';
+import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
+import { tickerSchema } from '@shared/schemas/trading';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
-import type { AnyUserAlgorithmType } from '@worker/core/algorithms/user-algorithm';
 import { s3 } from '@worker/lib/s3';
 import {
   badRequest,
@@ -56,10 +57,6 @@ export function getDistinctTickersByAggregate(
     },
     {} as Record<Timestamp, Ticker[]>,
   );
-}
-
-export function getTickers(algorithm: Algorithm | AnyUserAlgorithmType): Ticker[] {
-  return 'tickers' in algorithm ? algorithm.tickers : [algorithm.ticker];
 }
 
 export function getAllTickers(distinctTickersByAggregate: Record<Timestamp, Ticker[]>): Ticker[] {

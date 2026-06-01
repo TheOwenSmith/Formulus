@@ -57,9 +57,10 @@ if (!amplifyOnly) {
   new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
 
   const workerEnvConfig = {
+    ALPHA_VANTAGE_API_KEY: config.getKey<WorkerCdkEnvVar>('ALPHA_VANTAGE_API_KEY'),
     DATA_BUCKET: config.getKey<WorkerCdkEnvVar>('DATA_BUCKET'),
-    DATABASE_URL: config.getKey<ApiEnvVar>('DATABASE_URL'),
-    NODE_ENV: config.getKey<ApiEnvVar>('NODE_ENV'),
+    DATABASE_URL: config.getKey<WorkerCdkEnvVar>('DATABASE_URL'),
+    NODE_ENV: config.getKey<WorkerCdkEnvVar>('NODE_ENV'),
   };
 
   for (const { suffix, clusterName, imageTag, logGroupName, queueBaseName } of [

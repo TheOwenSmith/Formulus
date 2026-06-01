@@ -1,4 +1,4 @@
-import type { Ticker } from '@shared/api';
+import type { Ticker } from '@shared/constants/trading';
 import { Action } from '@worker/core/algorithms/algorithm';
 import { badRequest, internal, type AppError } from '@worker/utils/error-handling';
 import { err, ok, Result } from 'neverthrow';

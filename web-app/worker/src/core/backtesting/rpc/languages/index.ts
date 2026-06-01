@@ -2,7 +2,7 @@ import {
   LANGUAGES,
   SUPPORTED_LANGUAGE_VALUES,
   type SupportedLanguage,
-} from '@shared/trading-constants';
+} from '@shared/constants/trading';
 import { config } from '@worker/lib/config';
 import z from 'zod';
 import { RUNNER_CPP_BATCHED_FROM_FILENAMES, UTILS_CPP_CODE, UTILS_CPP_HEADER } from './cpp';

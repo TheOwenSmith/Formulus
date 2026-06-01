@@ -1,8 +1,8 @@
 import { ECRClient, GetAuthorizationTokenCommand } from '@aws-sdk/client-ecr';
+import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
 import Docker from 'dockerode';
 import { err, ok, type Result } from 'neverthrow';
 import { config } from './config';
-import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
 
 declare global {
   var docker: Docker | undefined;
@@ -18,7 +18,9 @@ async function getEcrAuthConfig(
   const registry = image.split('/')[0];
   const ecr = new ECRClient({ region: config.getKey('AWS_REGION') });
   const { authorizationData } = await ecr.send(new GetAuthorizationTokenCommand({}));
-  const decoded = Buffer.from(authorizationData![0].authorizationToken!, 'base64').toString('utf-8');
+  const decoded = Buffer.from(authorizationData![0].authorizationToken!, 'base64').toString(
+    'utf-8',
+  );
   const colonIdx = decoded.indexOf(':');
   return {
     password: decoded.slice(colonIdx + 1),
@@ -52,8 +54,9 @@ export async function pullImageIfAbsent(image: string): Promise<Result<undefined
         docker.pull(
           image,
           {},
-          (pullErr: Error | null, stream: NodeJS.ReadableStream) => {
+          (pullErr: Error | null, stream: NodeJS.ReadableStream | undefined) => {
             if (pullErr) return reject(pullErr);
+            if (stream == undefined) return reject(new Error('Pull returned no stream'));
             docker.modem.followProgress(stream, (progressErr: Error | null) => {
               if (progressErr) return reject(progressErr);
               resolve();

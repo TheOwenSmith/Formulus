@@ -1,4 +1,3 @@
-import type { UserTicker } from '@api/fetch/types';
 import { prisma } from '@api/lib/prisma';
 import {
   badRequest,
@@ -7,6 +6,8 @@ import {
   isPrismaUniqueConstraintError,
   type AppError,
 } from '@api/utils/error-handling';
+import { getTickers } from '@shared/constants/algorithm';
+import type { Indicator } from '@shared/constants/indicators/indicator';
 import {
   convertAlgorithmTypeToDbAlgorithmType,
   convertDbAlgorithmTypeToAlgorithmType,
@@ -18,15 +19,14 @@ import {
 import { convertDbTimestampToTimestamp, convertTimestampToDbTimestamp } from '@shared/db/timestamp';
 import { AlgorithmType as DbAlgorithmType } from '@shared/generated/prisma/enums';
 import type { AlgorithmModel } from '@shared/generated/prisma/models';
-import {
-  AlgorithmType,
-  getTickers,
-  type AnyUserAlgorithmType,
-  type Indicator,
-  type UserAlgorithm,
-  type UserSimpleAlgorithm,
-  type UserTopKAlgorithm,
-} from '@shared/worker';
+import type {
+  AnyUserAlgorithmType,
+  UserAlgorithm,
+} from '@shared/schemas/algorithms/user-algorithm';
+import { AlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
+import type { UserSimpleAlgorithm } from '@shared/schemas/algorithms/user-simple-algorithm';
+import type { UserTopKAlgorithm } from '@shared/schemas/algorithms/user-top-k-algorithm';
+import type { UserTicker } from '@shared/schemas/trading';
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
 

@@ -12,7 +12,6 @@ const envVarsCdk = [
 const envVarsClient = [...envVarsCdk, 'VITE_SERVER_URL'] as const;
 
 export const envVarsLambda = [
-  'ALPHA_VANTAGE_API_KEY',
   'NODE_ENV',
   'CORS_ORIGIN',
   'DATABASE_URL',
@@ -27,6 +26,7 @@ const envVarsApi = [...envVarsCdk, ...envVarsLambda] as const;
 
 export const envVarsWorkerCdk = [
   ...envVarsCdk,
+  'ALPHA_VANTAGE_API_KEY',
   'DATA_BUCKET',
   'DATABASE_URL',
   'NODE_ENV',

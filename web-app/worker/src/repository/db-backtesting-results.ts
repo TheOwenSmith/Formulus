@@ -1,6 +1,5 @@
+import type { BacktestAlgorithmsResult, Timestamp } from '@shared/constants/trading';
 import { convertTimestampToDbTimestamp } from '@shared/db/timestamp';
-import type { Timestamp } from '@shared/trading-constants';
-import type { BacktestAlgorithmsResult } from '@worker/core/backtesting/backtest-algorithms-concurrently';
 import { prisma } from '@worker/lib/prisma';
 import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
 import { ok, type Result } from 'neverthrow';
@@ -14,7 +13,7 @@ export async function createBacktestingResults({
 }: {
   algorithmIds: string[];
   creatorId: string;
-  name: string | null;
+  name: string;
   publicId: string;
   result: BacktestAlgorithmsResult;
 }): Promise<Result<string, AppError>> {

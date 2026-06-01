@@ -1,4 +1,4 @@
-import type { SupportedLanguage } from '../trading-constants';
+import type { SupportedLanguage } from '../trading';
 
 export type AlgorithmExample = {
   id: string;

@@ -1,7 +1,7 @@
 import { TickerSelector } from '@client/components/TickerSelector';
 import '@client/styles/BacktestChart.css';
 import { getTailwindColorHex } from '@client/utils/colorUtils';
-import type { SimplePlot, Ticker } from '@shared/worker';
+import type { SimplePlot, Ticker } from '@shared/constants/trading';
 import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

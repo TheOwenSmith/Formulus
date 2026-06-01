@@ -1,9 +1,13 @@
-import type { Ticker } from '@api/fetch/types';
 import { prisma } from '@api/lib/prisma';
 import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
+import type {
+  BacktestAlgorithmsResult,
+  ProfitLossRatio,
+  SimplePlot,
+  Ticker,
+  Timestamp,
+} from '@shared/constants/trading';
 import { convertDbTimestampToTimestamp } from '@shared/db/timestamp';
-import type { Timestamp } from '@shared/trading-constants';
-import type { BacktestAlgorithmsResult, ProfitLossRatio, SimplePlot } from '@shared/worker';
 import { err, ok, type Result } from 'neverthrow';
 
 export type BacktestingResultsWithName = BacktestAlgorithmsResult & { name: string | null };

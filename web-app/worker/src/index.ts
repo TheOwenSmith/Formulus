@@ -181,7 +181,7 @@ async function devLoop(): Promise<never> {
           new ReceiveMessageCommand({
             MaxNumberOfMessages: 1,
             QueueUrl: queueUrl,
-            WaitTimeSeconds: 20,
+            WaitTimeSeconds: 1,
           }),
         ),
       (e) => internal(e, 'Failed to receive SQS message'),

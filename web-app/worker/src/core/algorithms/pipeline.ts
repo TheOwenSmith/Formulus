@@ -1,12 +1,12 @@
-import type { Bar, Ticker } from '@shared/api';
-import type { ZodType } from 'zod';
-import { actionSchema, type Action } from './algorithm';
-import type { IndicatorResultByIndicator } from './indicators/indicator';
+import type { IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
+import type { Bar, Ticker } from '@shared/constants/trading';
 import {
   AlgorithmType,
-  rpcUserAlgorithmResponseSchemaFromTickers,
   type AnyUserAlgorithmType,
-} from './user-algorithm';
+} from '@shared/schemas/algorithms/user-algorithm';
+import { actionSchema, type Action } from '@worker/core/algorithms/algorithm';
+import type { ZodType } from 'zod';
+import { rpcUserAlgorithmResponseSchemaFromTickers } from './user-algorithm';
 import {
   userSimpleAlgorithmInputTransformer,
   userSimpleAlgorithmOutputTransformer,

@@ -80,7 +80,7 @@ export async function createSubmission({
 }: {
   algorithms: AlgorithmModel[];
   creatorId: string;
-  name?: string;
+  name: string;
   timespan?: [string | null, string | null];
 }): Promise<Result<BacktestingSubmissionModel, AppError>> {
   const publicId = nanoid(12);
@@ -106,7 +106,7 @@ export async function createSubmission({
           },
           creatorId,
           endTimespan: timespan?.[1] ?? null,
-          name: name ?? null,
+          name,
           publicId,
           startTimespan: timespan?.[0] ?? null,
           status: BacktestingSubmissionStatus.PENDING,

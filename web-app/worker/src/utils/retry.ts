@@ -1,5 +1,5 @@
+import { internal, type AppError } from '@worker/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
-import { internal, type AppError } from './error-handling';
 import { sleep } from './misc';
 import { withCommas } from './number-utils';
 

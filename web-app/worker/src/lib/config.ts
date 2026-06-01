@@ -14,6 +14,7 @@ const envVars = [
   'NODE_ENV',
   'DATABASE_URL',
   'AWS_REGION',
+  'ALPHA_VANTAGE_API_KEY',
 ] as const satisfies string[];
 type EnvVar = (typeof envVars)[number];
 

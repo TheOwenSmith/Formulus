@@ -37,7 +37,6 @@ jobs:
       DEPLOY_TARGET: api
 
       # API Lambda environment (see LAMBDA_ENV_KEYS in web-app/infra/bin/app.ts)
-      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       NODE_ENV: ${{ vars.NODE_ENV }}
       CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
