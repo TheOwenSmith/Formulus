@@ -59,7 +59,9 @@ The schema uses `engineType = "client"` (Prisma 7's pure-JS query engine). There
 
 ## Critical Import Rule
 
-**Never import from `@shared/worker` or `@api/repository/*` in worker code.** These chain to `@api/lib/config`, which validates API-only environment variables and crashes the worker at runtime. The worker has its own standalone Prisma client at `worker/src/lib/prisma.ts`.
+**Never import from `@api/*` in worker code.** This chains to `@api/lib/config`, which validates API-only environment variables and crashes the worker at runtime. The worker has its own standalone Prisma client at `worker/src/lib/prisma.ts`.
+
+**Never import `@shared/api` from worker code** — it re-exports `AppRouter` which chains to `@api/lib/trpc`.
 
 ## Environment Variables
 
@@ -189,7 +191,7 @@ useMutation(trpcPublic.path.to.query.mutationOptions(...))
 
 ## Shared Types
 
-Import shared backend types exclusively from `@shared/api` (re-exports from the API). Do **not** import from `@api/shared/...` directly in client code.
+Shared types live in `@shared/constants/*`, `@shared/schemas/*`, and `@shared/db/*` and are safe to import from API, worker, and client code. `@shared/api` is now only a single-export shim for `AppRouter` (the tRPC router type used to type the client) — do not use it for anything else. Do not import from `@api/*` or `@worker/*` directly in client code.
 
 ## Code Conventions
 
