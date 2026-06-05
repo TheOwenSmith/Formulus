@@ -19,7 +19,7 @@ ${[
 export const RUNNER_TS_BATCHED_FROM_FILENAMES = (filenames: string[]) => `
 process.stdout.write('compiled\\n');
 
-import type { AlgorithmImplementation } from '@worker/core/algorithms/algorithm';
+import type { AlgorithmImplementation } from '@shared/constants/algorithm';
 import readline from 'readline';
 
 async function main() {

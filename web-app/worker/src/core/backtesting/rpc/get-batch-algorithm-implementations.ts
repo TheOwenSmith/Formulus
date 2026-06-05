@@ -2,7 +2,7 @@ import type { IndicatorResultByIndicator } from '@shared/constants/indicators/in
 import type { Bar, Ticker } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import type { AppError } from '@shared/utils/error-handling';
-import type { Action, Algorithm } from '@worker/core/algorithms/algorithm';
+import type { Action, Algorithm } from '@shared/constants/algorithm';
 import {
   getAlgorithmPipelinesFromUserAlgorithms,
   type UserAlgorithmPipeline,

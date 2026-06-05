@@ -1,7 +1,7 @@
 import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
-import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handlinging';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import z from 'zod';
 
 export function usersRouter(

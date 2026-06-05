@@ -1,4 +1,4 @@
-import { getTickers } from '@shared/constants/algorithm';
+import { getTickers, type Algorithm } from '@shared/constants/algorithm';
 import type { Indicator, IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
 import type { IndicatorMetadata } from '@shared/constants/indicators/indicator-metadata';
 import type {
@@ -16,7 +16,6 @@ import {
 } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { badRequest, internal, safeReduce, type AppError } from '@shared/utils/error-handling';
-import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import { config } from '@worker/lib/config';
 import { yearsBetween } from '@worker/utils/date-utils';
 import { groupBy } from '@worker/utils/group-by';

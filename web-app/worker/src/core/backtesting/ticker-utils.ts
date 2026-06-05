@@ -1,5 +1,5 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { getTickers } from '@shared/constants/algorithm';
+import { getTickers, type Algorithm } from '@shared/constants/algorithm';
 import type { Ticker, Timestamp } from '@shared/constants/trading';
 import { aggregateTimestamps } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
@@ -12,7 +12,6 @@ import {
   safeReduce,
   type AppError,
 } from '@shared/utils/error-handling';
-import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import { s3 } from '@worker/lib/s3';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';

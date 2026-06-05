@@ -1,4 +1,4 @@
-import { getTickers } from '@shared/constants/algorithm';
+import { getTickers, type Algorithm } from '@shared/constants/algorithm';
 import type {
   DescriptionMetrics,
   ProfitLossRatio,
@@ -7,7 +7,6 @@ import type {
 } from '@shared/constants/trading';
 import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
-import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import { type AlgorithmData } from './backtest-algorithms-concurrently';
 import { MAX_POINTS_PER_PLOT } from './constants';
 

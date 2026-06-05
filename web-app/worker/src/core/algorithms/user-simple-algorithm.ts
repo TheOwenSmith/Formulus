@@ -1,8 +1,8 @@
+import type { Action } from '@shared/constants/algorithm';
 import type { IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
 import type { Bar, Ticker } from '@shared/constants/trading';
 import { type AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import type { UserSimpleAlgorithm } from '@shared/schemas/algorithms/user-simple-algorithm';
-import type { Action } from '@shared/constants/algorithm';
 import type { InputTransformer, OutputTransformer } from './pipeline';
 
 export const userSimpleAlgorithmInputTransformer: InputTransformer = (

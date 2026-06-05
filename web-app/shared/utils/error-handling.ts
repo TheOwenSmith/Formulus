@@ -14,7 +14,28 @@ export const fromThrowableAsync = <T>(
 export type AppError = {
   message?: string;
   error?: unknown;
-  code: 'INTERNAL_SERVER_ERROR' | 'BAD_REQUEST' | 'USER_CODE_ERROR';
+  code:
+    | 'INTERNAL_SERVER_ERROR'
+    | 'PARSE_ERROR'
+    | 'BAD_REQUEST'
+    | 'NOT_IMPLEMENTED'
+    | 'BAD_GATEWAY'
+    | 'SERVICE_UNAVAILABLE'
+    | 'GATEWAY_TIMEOUT'
+    | 'UNAUTHORIZED'
+    | 'PAYMENT_REQUIRED'
+    | 'FORBIDDEN'
+    | 'NOT_FOUND'
+    | 'METHOD_NOT_SUPPORTED'
+    | 'TIMEOUT'
+    | 'CONFLICT'
+    | 'PRECONDITION_FAILED'
+    | 'PAYLOAD_TOO_LARGE'
+    | 'UNSUPPORTED_MEDIA_TYPE'
+    | 'UNPROCESSABLE_CONTENT'
+    | 'PRECONDITION_REQUIRED'
+    | 'TOO_MANY_REQUESTS'
+    | 'CLIENT_CLOSED_REQUEST';
   isUserCode?: boolean;
 };
 
@@ -63,5 +84,11 @@ export function safeReduce<T, U, E>(
   return arr.reduce<Result<U, E>>(
     (accResult, value) => accResult.andThen((acc: U) => reducer(acc, value)),
     ok(startAcc) as Result<U, E>,
+  );
+}
+
+export function isPrismaUniqueConstraintError(e: unknown): boolean {
+  return (
+    typeof e === 'object' && e != null && 'code' in e && (e as { code: unknown }).code === 'P2002'
   );
 }

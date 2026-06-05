@@ -3,7 +3,7 @@ import { prisma } from '@api/lib/prisma';
 import { stripe } from '@api/lib/stripe';
 import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
-import { badRequest, fromThrowableAsync, internal } from '@shared/utils/error-handlinginging';
+import { badRequest, fromThrowableAsync, internal } from '@shared/utils/error-handling';
 import z from 'zod';
 
 export function paymentsRouter(

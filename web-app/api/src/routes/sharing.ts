@@ -11,7 +11,7 @@ import {
   setResultPublic,
   upsertShare,
 } from '@api/repository/db-sharing';
-import { badRequest } from '@shared/utils/error-handlinginging';
+import { badRequest } from '@shared/utils/error-handling';
 import z from 'zod';
 
 export function sharingRouter(
