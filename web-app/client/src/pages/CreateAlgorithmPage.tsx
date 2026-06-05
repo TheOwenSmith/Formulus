@@ -4,7 +4,9 @@ import { CheckIcon, ExamplesIcon, NormalIcon, SimpleIcon, Spinner, TopKIcon } fr
 import { getDefaultImplementationCode } from '@client/lib/defaultAlgorithmCode';
 import { trpcCredentials } from '@client/lib/trpc';
 import type { AlgorithmExample } from '@shared/constants/examples';
-import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/constants/trading';
+import type { SupportedLanguage } from '@shared/constants/trading';
+import type { Indicator } from '@shared/constants/indicators/indicator';
+import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   AlgorithmType,

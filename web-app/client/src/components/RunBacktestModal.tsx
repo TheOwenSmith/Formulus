@@ -71,7 +71,7 @@ export function RunBacktestModal({
   onClose,
 }: {
   algorithms: { id: string; name: string }[];
-  onConfirm: (algorithmIds: string[], timespan?: Timespan, name?: string) => void;
+  onConfirm: (algorithmIds: string[], timespan: Timespan | undefined, name: string) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(() =>
@@ -135,7 +135,7 @@ export function RunBacktestModal({
     onConfirm(
       algorithms.map((a) => a.id),
       timespan,
-      name.trim() || undefined,
+      name.trim() || `Backtest ${new Date().toISOString().split('T')[0]}`,
     );
   }
 

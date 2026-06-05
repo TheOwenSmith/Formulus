@@ -9,7 +9,8 @@ import {
   minPeriodByIndicator,
   type IndicatorMetadataKey,
 } from '@shared/constants/indicator-params';
-import type { AnyUserAlgorithmType, SupportedLanguage } from '@shared/constants/trading';
+import type { SupportedLanguage } from '@shared/constants/trading';
+import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import {
   AlgorithmType,
   MAX_INDICATOR_MULTIPLIER,
@@ -1521,7 +1522,7 @@ export function AlgorithmEditorPage() {
         <RunBacktestModal
           algorithms={[{ id: algorithm.id, name: algorithm.name }]}
           onConfirm={(algorithmIds, timespan, name) => {
-            void runBacktest(algorithmIds, timespan, name);
+            void runBacktest(algorithmIds, name, timespan);
             setShowRunModal(false);
           }}
           onClose={() => setShowRunModal(false)}

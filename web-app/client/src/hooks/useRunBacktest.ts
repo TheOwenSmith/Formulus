@@ -60,17 +60,17 @@ export function useRunBacktest() {
 
   async function runBacktest(
     algorithmIds: string | string[],
+    name: string,
     timespan?: [string | null, string | null],
-    name?: string,
   ) {
     const ids = Array.isArray(algorithmIds) ? algorithmIds : [algorithmIds];
     try {
       const { publicId } = await backtestAlgorithms({
         algorithms: ids.map((id) => ({ id })),
-        timespan,
         name,
+        timespan,
       });
-      setPending(ids, publicId);
+      if (publicId != null) setPending(ids, publicId);
       startCooldown();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to start backtest');

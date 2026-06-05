@@ -4,12 +4,14 @@ import { Tooltip } from '@client/components/Tooltip';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { trpcCredentials } from '@client/lib/trpc';
 import type { AlgorithmExample } from '@shared/constants/examples';
-import type { AnyUserAlgorithmType, Indicator, SupportedLanguage } from '@shared/constants/trading';
+import type { SupportedLanguage, Timestamp } from '@shared/constants/trading';
 import {
   AlgorithmType,
   MAX_ALGORITHMS_TO_COMPARE,
   type TickerValue,
 } from '@shared/constants/trading';
+import type { Indicator } from '@shared/constants/indicators/indicator';
+import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useLoaderData, useNavigate, useRevalidator } from 'react-router-dom';
@@ -692,7 +694,7 @@ export function AlgorithmsPage() {
         <RunBacktestModal
           algorithms={runModalAlgorithms}
           onConfirm={(algorithmIds, timespan, name) => {
-            void runBacktest(algorithmIds, timespan, name);
+            void runBacktest(algorithmIds, name, timespan);
             setRunModalAlgorithms(null);
             exitCompareMode();
           }}
