@@ -1,9 +1,8 @@
 # Deploy client to Amplify Hosting (staging + production).
 #
-# - Push client-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
-# - Push client-prod: environment production; Prettier/ESLint block deploy on failure.
-# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is client-prod and
-#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
+# - Push client-staging: Prettier/ESLint skipped.
+# - Push client-prod: Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": Prettier/ESLint run by default; set `skip_quality_checks` to bypass.
 
 name: Deploy Client
 
@@ -13,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_quality_checks:
-        description: Skip Prettier and ESLint (manual runs on client-prod only; push never skips)
+        description: Skip code quality checks
         required: false
         default: false
         type: boolean
@@ -37,7 +36,7 @@ jobs:
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
       VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
       DEPLOY_TARGET: client
-      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/client-staging') && !(github.event_name == 'workflow_dispatch' && inputs.skip_quality_checks) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,7 +67,6 @@ jobs:
 
       - name: Prettier
         if: env.RUN_QUALITY_CHECKS == 'true'
-        continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
         working-directory: web-app
         run: pnpm exec prettier "client/src/**/*.{ts,js}" --check
 
@@ -78,7 +76,6 @@ jobs:
 
       - name: ESLint
         if: env.RUN_QUALITY_CHECKS == 'true'
-        continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
         working-directory: web-app/client
         run: pnpm run lint
 

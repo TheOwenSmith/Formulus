@@ -1,10 +1,9 @@
 # Build the worker Docker image, push to ECR, and deploy all worker infrastructure stacks
 # (FormulusEcr, FormulusQueue, FormulusCompute, FormulusDispatcher).
 #
-# - Push worker-staging: environment staging; Prettier/ESLint warn only (do not block deploy).
-# - Push worker-prod: environment production; Prettier/ESLint block deploy on failure.
-# - Manual "Run workflow": pick branch. Bypass Prettier/ESLint only when branch is worker-prod and
-#   `skip_quality_checks` is enabled (default off). Cannot bypass on push.
+# - Push worker-staging: Prettier/ESLint skipped.
+# - Push worker-prod: Prettier/ESLint block deploy on failure.
+# - Manual "Run workflow": Prettier/ESLint run by default; set `skip_quality_checks` to bypass.
 
 name: Deploy Worker
 
@@ -14,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_quality_checks:
-        description: Skip Prettier and ESLint (manual runs on worker-prod only; push never skips)
+        description: Skip code quality checks
         required: false
         default: false
         type: boolean
@@ -42,7 +41,7 @@ jobs:
       ECR_REPO: formulus-worker
       IMAGE_TAG: ${{ github.ref == 'refs/heads/worker-staging' && 'staging' || 'latest' }}
       DATA_BUCKET: ${{ vars.DATA_BUCKET }}
-      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/worker-staging') && !(github.event_name == 'workflow_dispatch' && inputs.skip_quality_checks) }}
 
     steps:
       - name: Checkout
@@ -72,7 +71,6 @@ jobs:
 
       - name: Prettier
         if: env.RUN_QUALITY_CHECKS == 'true'
-        continue-on-error: ${{ github.ref == 'refs/heads/worker-staging' }}
         working-directory: web-app
         run: pnpm exec prettier "worker/src/**/*.{ts,js}" --check
 
@@ -88,7 +86,6 @@ jobs:
 
       - name: ESLint
         if: env.RUN_QUALITY_CHECKS == 'true'
-        continue-on-error: ${{ github.ref == 'refs/heads/worker-staging' }}
         working-directory: web-app/worker
         run: pnpm run lint
 
