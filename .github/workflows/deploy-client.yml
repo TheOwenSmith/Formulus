@@ -37,6 +37,7 @@ jobs:
       CDK_DEFAULT_REGION: ${{ secrets.CDK_DEFAULT_REGION }}
       VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
       DEPLOY_TARGET: client
+      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,19 +56,18 @@ jobs:
             web-app/pnpm-lock.yaml
             web-app/client/pnpm-lock.yaml
             web-app/api/pnpm-lock.yaml
-            web-app/worker/pnpm-lock.yaml
             web-app/shared/pnpm-lock.yaml
             web-app/infra/pnpm-lock.yaml
 
       # --- Quality checks ---
 
       - name: Install web-app dependencies (Prettier)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app
         run: pnpm install --frozen-lockfile
 
       - name: Prettier
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
         working-directory: web-app
         run: pnpm exec prettier "client/src/**/*.{ts,js}" --check
@@ -77,7 +77,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: ESLint
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         continue-on-error: ${{ github.ref == 'refs/heads/client-staging' }}
         working-directory: web-app/client
         run: pnpm run lint
@@ -96,16 +96,12 @@ jobs:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
         run: pnpm run prisma:generate
 
-      - name: Install worker dependencies
-        working-directory: web-app/worker
-        run: pnpm install --frozen-lockfile
-
       - name: Build
         working-directory: web-app/client
         run: pnpm run build
 
       - name: Quality checks skipped
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/client-prod' && inputs.skip_quality_checks }}
+        if: env.RUN_QUALITY_CHECKS != 'true'
         run: echo "::warning::Prettier and ESLint were skipped (manual workflow on client-prod only)."
 
       # --- Deploy ---

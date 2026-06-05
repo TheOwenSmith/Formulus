@@ -48,6 +48,7 @@ jobs:
       STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
       STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
 
     steps:
       - name: Checkout
@@ -68,39 +69,38 @@ jobs:
             web-app/api/pnpm-lock.yaml
             web-app/infra/pnpm-lock.yaml
 
-      # Skip install / prisma / lint only for manual prod deploy with bypass (never on push).
       - name: Install API dependencies
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client (for ESLint)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
         run: pnpm run prisma:generate
 
       # Prettier CLI + .prettierrc.json live under web-app/
       - name: Install web-app dependencies (Prettier)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app
         env:
           CI: "true"
         run: pnpm install --frozen-lockfile
 
       - name: Prettier
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
         working-directory: web-app/api
         run: pnpm -C .. exec prettier "api/src/**/*.{ts,js}" --check
 
       - name: ESLint
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         continue-on-error: ${{ github.ref == 'refs/heads/api-staging' }}
         working-directory: web-app/api
         run: pnpm run lint
 
       - name: Quality checks skipped
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/api-prod' && inputs.skip_quality_checks }}
+        if: env.RUN_QUALITY_CHECKS != 'true'
         run: echo "::warning::Prettier and ESLint were skipped (manual workflow on api-prod only)."
 
       - name: Configure AWS credentials

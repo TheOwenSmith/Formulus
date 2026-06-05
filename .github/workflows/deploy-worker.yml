@@ -42,6 +42,7 @@ jobs:
       ECR_REPO: formulus-worker
       IMAGE_TAG: ${{ github.ref == 'refs/heads/worker-staging' && 'staging' || 'latest' }}
       DATA_BUCKET: ${{ vars.DATA_BUCKET }}
+      RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
 
     steps:
       - name: Checkout
@@ -65,34 +66,34 @@ jobs:
       # --- Quality checks ---
 
       - name: Install web-app dependencies (Prettier)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app
         run: pnpm install --frozen-lockfile
 
       - name: Prettier
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         continue-on-error: ${{ github.ref == 'refs/heads/worker-staging' }}
         working-directory: web-app
         run: pnpm exec prettier "worker/src/**/*.{ts,js}" --check
 
       - name: Install worker dependencies
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/worker
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client (for ESLint)
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/worker
         run: pnpm run prisma:generate
 
       - name: ESLint
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks) }}
+        if: env.RUN_QUALITY_CHECKS == 'true'
         continue-on-error: ${{ github.ref == 'refs/heads/worker-staging' }}
         working-directory: web-app/worker
         run: pnpm run lint
 
       - name: Quality checks skipped
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/worker-prod' && inputs.skip_quality_checks }}
+        if: env.RUN_QUALITY_CHECKS != 'true'
         run: echo "::warning::Prettier and ESLint were skipped (manual workflow on worker-prod only)."
 
       - name: Configure AWS credentials
