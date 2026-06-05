@@ -1,7 +1,7 @@
 import type { Ticker } from '@shared/constants/trading';
+import { actionSchema } from '@shared/schemas/algorithms/user-algorithm';
 import { tickerSchema } from '@shared/schemas/trading';
 import z from 'zod';
-import { actionSchema } from './algorithm';
 
 export const rpcUserAlgorithmResponseSchemaFromTickers = (tickers: Ticker[]) =>
   z.partialRecord(tickerSchema, actionSchema).superRefine((result, ctx) => {

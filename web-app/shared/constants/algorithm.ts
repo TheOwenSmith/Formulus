@@ -1,5 +1,5 @@
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
-import { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
+import type { Indicator, IndicatorResultByIndicator } from './indicators/indicator';
 import type { Bar, Ticker, Timestamp } from './trading';
 
 export const enum Action {
