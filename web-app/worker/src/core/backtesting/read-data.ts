@@ -1,12 +1,12 @@
 import { type Bar } from '@shared/constants/trading';
 import { stringifiedBarSchema } from '@shared/schemas/trading';
-import { cleanup } from '@worker/utils/cleanup';
 import {
   fromThrowable,
   fromThrowableAsync,
   internal,
   type AppError,
-} from '@worker/utils/error-handling';
+} from '@shared/utils/error-handling';
+import { cleanup } from '@worker/utils/cleanup';
 import { withCommas } from '@worker/utils/number-utils';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';

@@ -4,8 +4,6 @@ import type { Ticker, Timestamp } from '@shared/constants/trading';
 import { aggregateTimestamps } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { tickerSchema } from '@shared/schemas/trading';
-import { type Algorithm } from '@worker/core/algorithms/algorithm';
-import { s3 } from '@worker/lib/s3';
 import {
   badRequest,
   fromThrowable,
@@ -13,7 +11,9 @@ import {
   internal,
   safeReduce,
   type AppError,
-} from '@worker/utils/error-handling';
+} from '@shared/utils/error-handling';
+import { type Algorithm } from '@worker/core/algorithms/algorithm';
+import { s3 } from '@worker/lib/s3';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';
 import path from 'node:path';

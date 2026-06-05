@@ -1,5 +1,5 @@
 import { ECRClient, GetAuthorizationTokenCommand } from '@aws-sdk/client-ecr';
-import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import Docker from 'dockerode';
 import { err, ok, type Result } from 'neverthrow';
 import { config } from './config';

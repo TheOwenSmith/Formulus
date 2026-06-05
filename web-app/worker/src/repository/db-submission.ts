@@ -1,7 +1,7 @@
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import type { AlgorithmVersionModel } from '@shared/generated/prisma/models';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import { prisma } from '@worker/lib/prisma';
-import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
 import { err, ok, Result } from 'neverthrow';
 
 export type SubmissionWithVersions = {

@@ -1,11 +1,11 @@
 import { prisma } from '@api/lib/prisma';
-import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import type {
   AlgorithmModel,
   AlgorithmVersionModel,
   BacktestingSubmissionModel,
 } from '@shared/generated/prisma/models';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import { nanoid } from 'nanoid';
 import { err, ok, type Result } from 'neverthrow';
 

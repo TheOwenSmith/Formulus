@@ -1,6 +1,6 @@
 import { DATE_LENGTH, NUMBER_LENGTH } from '@shared/constants/search-index';
 import type { Timestamp } from '@shared/constants/trading';
-import { fromThrowable, internal, type AppError } from '@worker/utils/error-handling';
+import { fromThrowable, internal, type AppError } from '@shared/utils/error-handling';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';
 import { finished } from 'node:stream/promises';

@@ -1,4 +1,3 @@
-import { badRequest } from '@api/utils/error-handling';
 import {
   maxPeriodByIndicatorByContextLength,
   minPeriodByIndicator,
@@ -10,6 +9,7 @@ import {
   type Indicator,
 } from '@shared/constants/indicators/indicator';
 import { MAX_INDICATOR_MULTIPLIER } from '@shared/constants/trading';
+import { badRequest } from '@shared/utils/error-handling';
 import { err, ok } from 'neverthrow';
 
 export const indicatorKeyToShorthand: Record<IndicatorMetadataKey, string> = {

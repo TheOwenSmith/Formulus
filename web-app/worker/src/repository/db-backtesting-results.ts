@@ -1,7 +1,7 @@
 import type { BacktestAlgorithmsResult, Timestamp } from '@shared/constants/trading';
 import { convertTimestampToDbTimestamp } from '@shared/db/timestamp';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import { prisma } from '@worker/lib/prisma';
-import { fromThrowableAsync, internal, type AppError } from '@worker/utils/error-handling';
 import { ok, type Result } from 'neverthrow';
 
 export async function createBacktestingResults({

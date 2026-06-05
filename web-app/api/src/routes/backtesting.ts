@@ -15,9 +15,9 @@ import {
   getSubmissionsByCreatorId,
   getSubmissionStatus,
 } from '@api/repository/db-submission';
-import { badRequest, fromThrowableAsync, internal } from '@api/utils/error-handling';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { MAX_ALGORITHMS_TO_COMPARE } from '@shared/constants/trading';
+import { badRequest, fromThrowableAsync, internal } from '@shared/utils/error-handling';
 import z from 'zod';
 
 export function backtestingRouter(

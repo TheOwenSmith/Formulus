@@ -1,7 +1,7 @@
 import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
-import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
 import { parseCookies } from '@api/utils/parse-cookies';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 
 export function createUserAuthenticationProcedure(t: TRPCContext) {
   return t.procedure.use(async ({ ctx, next }) => {

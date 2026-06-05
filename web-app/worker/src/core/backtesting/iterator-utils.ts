@@ -1,12 +1,12 @@
 import { DATE_LENGTH, LINE_LENGTH } from '@shared/constants/search-index';
 import { aggregateTimestamps, type Ticker } from '@shared/constants/trading';
-import { toValidTimespan } from '@worker/utils/date-utils';
 import {
   fromThrowableAsync,
   internal,
   safeReduce,
   type AppError,
-} from '@worker/utils/error-handling';
+} from '@shared/utils/error-handling';
+import { toValidTimespan } from '@worker/utils/date-utils';
 import fsp from 'fs/promises';
 import { err, ok, Result } from 'neverthrow';
 import { getAggregateDataIterator, type AggregateDataIterator } from './read-data';

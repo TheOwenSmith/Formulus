@@ -15,10 +15,10 @@ import {
   type Bar,
 } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
+import { badRequest, internal, safeReduce, type AppError } from '@shared/utils/error-handling';
 import { type Algorithm } from '@worker/core/algorithms/algorithm';
 import { config } from '@worker/lib/config';
 import { yearsBetween } from '@worker/utils/date-utils';
-import { badRequest, internal, safeReduce, type AppError } from '@worker/utils/error-handling';
 import { groupBy } from '@worker/utils/group-by';
 import { roundToDecimal, withCommas } from '@worker/utils/number-utils';
 import { SharpeRatioCalculator } from '@worker/utils/sharpe-ratio-calculator';

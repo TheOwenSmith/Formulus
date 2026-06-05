@@ -1,4 +1,5 @@
 import type { Bar, Ticker, Timestamp } from '@shared/constants/trading';
+import type { AppError } from '@shared/utils/error-handling';
 import {
   Action,
   type Algorithm,
@@ -8,8 +9,7 @@ import {} from '@worker/core/algorithms/simple-algorithm';
 import type { TopKAlgorithm } from '@worker/core/algorithms/top-k-algorithm';
 import { getAggregateDataIterator } from '@worker/core/backtesting/read-data';
 import { toValidTimespan } from '@worker/utils/date-utils';
-import type { AppError } from '@worker/utils/error-handling';
-import { badRequest, fromThrowable } from '@worker/utils/error-handling';
+import { badRequest, fromThrowable } from '@shared/utils/error-handling';
 import { isRecord } from '@worker/utils/types';
 import { err, ok, Result } from 'neverthrow';
 import z, { ZodType } from 'zod';

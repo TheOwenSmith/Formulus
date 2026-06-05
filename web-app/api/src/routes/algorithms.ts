@@ -11,13 +11,13 @@ import {
 } from '@api/repository/db-algorithm';
 import { getResultAccessInfo } from '@api/repository/db-sharing';
 import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
-import { badRequest } from '@api/utils/error-handling';
 import { indicatorSchema } from '@shared/constants/indicators/indicator';
 import { MAX_INDICATORS_COUNT } from '@shared/constants/trading';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import { userAlgorithmSchema } from '@shared/schemas/algorithms/user-algorithm';
 import { userSimpleAlgorithmSchema } from '@shared/schemas/algorithms/user-simple-algorithm';
 import { userTopKAlgorithmSchema } from '@shared/schemas/algorithms/user-top-k-algorithm';
+import { badRequest } from '@shared/utils/error-handling';
 import z from 'zod';
 
 const anyAlgorithmSchema = z.union([

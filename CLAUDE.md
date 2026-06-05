@@ -102,8 +102,8 @@ import {
   fromThrowableAsync,
   internal,
   badRequest,
-} from "@api/utils/error-handling";
-// or '@worker/utils/error-handling' in worker code
+} from "@shared/utils/error-handling";
+// or '@shared/utils/error-handling' in worker code
 
 // Async operation that may throw:
 const result = await fromThrowableAsync(
@@ -121,7 +121,7 @@ const parsed = fromThrowable(
 if (parsed.isErr()) return err(parsed.error);
 ```
 
-**Error constructors** (from `@api/utils/error-handling`):
+**Error constructors** (from `@shared/utils/error-handling`):
 
 - `internal(error, message?)` → `INTERNAL_SERVER_ERROR` — for unexpected failures
 - `badRequest(message, error?)` → `BAD_REQUEST` — for invalid input or not-found

@@ -1,6 +1,12 @@
 import { DeleteMessageCommand, ReceiveMessageCommand } from '@aws-sdk/client-sqs';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
+import {
+  fromThrowable,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@shared/utils/error-handling';
 import { backtestAlgorithmsConcurrently } from '@worker/core/backtesting/backtest-algorithms-concurrently';
 import {
   getImageForLanguage,
@@ -8,12 +14,6 @@ import {
 } from '@worker/core/backtesting/rpc/languages';
 import { interactiveBrokersSlippageFunction } from '@worker/core/backtesting/slippage-functions';
 import { pullImageIfAbsent } from '@worker/lib/docker';
-import {
-  fromThrowable,
-  fromThrowableAsync,
-  internal,
-  type AppError,
-} from '@worker/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 import { config } from './lib/config';
 import { sqs } from './lib/sqs';

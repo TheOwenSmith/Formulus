@@ -1,4 +1,4 @@
-import { badRequest, type AppError } from '@worker/utils/error-handling';
+import { badRequest, type AppError } from '@shared/utils/error-handling';
 import { err, ok, Result } from 'neverthrow';
 
 const dayRegex = /^(\d{4})-(\d{2})-(\d{2})$/;

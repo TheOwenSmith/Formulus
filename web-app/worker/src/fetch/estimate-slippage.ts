@@ -1,5 +1,5 @@
+import type { AppError } from '@shared/utils/error-handling';
 import { getAggregateDataIterator } from '@worker/core/backtesting/read-data';
-import type { AppError } from '@worker/utils/error-handling';
 import { err, ok, Result } from 'neverthrow';
 import type { Ticker } from './types';
 

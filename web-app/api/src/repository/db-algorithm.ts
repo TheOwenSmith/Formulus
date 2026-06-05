@@ -1,11 +1,4 @@
 import { prisma } from '@api/lib/prisma';
-import {
-  badRequest,
-  fromThrowableAsync,
-  internal,
-  isPrismaUniqueConstraintError,
-  type AppError,
-} from '@api/utils/error-handling';
 import { getTickers } from '@shared/constants/algorithm';
 import type { Indicator } from '@shared/constants/indicators/indicator';
 import {
@@ -27,6 +20,13 @@ import { AlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import type { UserSimpleAlgorithm } from '@shared/schemas/algorithms/user-simple-algorithm';
 import type { UserTopKAlgorithm } from '@shared/schemas/algorithms/user-top-k-algorithm';
 import type { UserTicker } from '@shared/schemas/trading';
+import {
+  badRequest,
+  fromThrowableAsync,
+  internal,
+  isPrismaUniqueConstraintError,
+  type AppError,
+} from '@shared/utils/error-handling';
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
 

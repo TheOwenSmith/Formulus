@@ -8,7 +8,7 @@ import { computeRSI } from '@shared/constants/indicators/rsi';
 import { computeSMA } from '@shared/constants/indicators/sma';
 import { computeSuperTrend } from '@shared/constants/indicators/super-trend';
 import type { Bar } from '@shared/constants/trading';
-import { badRequest, type AppError } from '@worker/utils/error-handling';
+import { badRequest, type AppError } from '@shared/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 
 export function indicatorsToIndicatorResultsFunction(

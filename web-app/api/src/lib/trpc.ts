@@ -4,7 +4,7 @@ import { backtestingRouter } from '@api/routes/backtesting';
 import { paymentsRouter } from '@api/routes/payments';
 import { sharingRouter } from '@api/routes/sharing';
 import { usersRouter } from '@api/routes/users';
-import { isAppError } from '@api/utils/error-handling';
+import { isAppError } from '@shared/utils/error-handling';
 import { initTRPC } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import { config } from './config';

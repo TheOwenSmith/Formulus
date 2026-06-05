@@ -1,6 +1,6 @@
 import { prisma } from '@api/lib/prisma';
-import { fromThrowableAsync, internal, type AppError } from '@api/utils/error-handling';
 import type { UserModel } from '@shared/generated/prisma/models';
+import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import { err, ok, type Result } from 'neverthrow';
 
 export type ShareEntry = {

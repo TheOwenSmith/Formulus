@@ -1,12 +1,12 @@
 import type { IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
 import type { Bar, Ticker } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
+import type { AppError } from '@shared/utils/error-handling';
 import type { Action, Algorithm } from '@worker/core/algorithms/algorithm';
 import {
   getAlgorithmPipelinesFromUserAlgorithms,
   type UserAlgorithmPipeline,
 } from '@worker/core/algorithms/pipeline';
-import type { AppError } from '@worker/utils/error-handling';
 import { err, ok, Result } from 'neverthrow';
 import { createBatchRpcFunctionFromUserCode } from './create-rpc-function';
 import { EXTENSION_BY_LANGUAGE, type SupportedLanguage } from './languages';

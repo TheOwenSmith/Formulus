@@ -1,4 +1,5 @@
 import { ok, Result, ResultAsync } from 'neverthrow';
+import z from 'zod';
 
 export const fromThrowable = <T>(
   fn: () => T,
@@ -16,6 +17,18 @@ export type AppError = {
   code: 'INTERNAL_SERVER_ERROR' | 'BAD_REQUEST' | 'USER_CODE_ERROR';
   isUserCode?: boolean;
 };
+
+export const appErrorSchema = z
+  .object({
+    message: z.string().optional(),
+    error: z.unknown().optional(),
+    code: z.string(),
+  })
+  .strict();
+
+export function isAppError(x: unknown): x is AppError {
+  return appErrorSchema.safeParse(x).success;
+}
 
 export function internal(error: unknown, message?: string): AppError {
   return {

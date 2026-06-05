@@ -1,4 +1,4 @@
-import { betterAuth, type User } from 'better-auth';
+import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { customSession } from 'better-auth/plugins';
 import { config } from './config';
@@ -13,8 +13,7 @@ export const auth = betterAuth({
   },
   plugins: [
     customSession(async ({ user, session }) => {
-      const userWithoutImage: Omit<User, 'image'> = { ...user };
-      delete userWithoutImage['image'];
+      const { image: _image, ...userWithoutImage } = user;
       return { user: userWithoutImage, session };
     }),
   ],

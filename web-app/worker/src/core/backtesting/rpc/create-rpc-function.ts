@@ -1,12 +1,12 @@
-import { docker } from '@worker/lib/docker';
-import { cleanup } from '@worker/utils/cleanup';
 import {
   fromThrowable,
   fromThrowableAsync,
   internal,
   userCodeError,
   type AppError,
-} from '@worker/utils/error-handling';
+} from '@shared/utils/error-handling';
+import { docker } from '@worker/lib/docker';
+import { cleanup } from '@worker/utils/cleanup';
 import { randomUUID } from 'crypto';
 import type { Container } from 'dockerode';
 import fs from 'fs';

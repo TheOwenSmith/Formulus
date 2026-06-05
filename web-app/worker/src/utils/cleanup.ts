@@ -1,4 +1,4 @@
-import { fromThrowableAsync, internal } from '@worker/utils/error-handling';
+import { fromThrowableAsync, internal } from '@shared/utils/error-handling';
 import { Result } from 'neverthrow';
 
 export async function cleanup(
