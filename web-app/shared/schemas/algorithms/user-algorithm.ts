@@ -1,11 +1,14 @@
-import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from '@shared/constants/algorithm';
+import {
+  Action,
+  USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES,
+} from '@shared/constants/algorithm';
 import { indicatorSchema } from '@shared/constants/indicators/indicator';
 import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   MAX_INDICATORS_COUNT,
+  SUPPORTED_LANGUAGE_VALUES,
 } from '@shared/constants/trading';
 import { tickerSchema, timestampSchema } from '@shared/schemas/trading';
-import { supportedLanguageSchema } from '@worker/core/backtesting/rpc/languages';
 import z from 'zod';
 import type { UserSimpleAlgorithm } from './user-simple-algorithm';
 import type { UserTopKAlgorithm } from './user-top-k-algorithm';
@@ -17,6 +20,14 @@ export enum AlgorithmType {
   SIMPLE,
   TOP_K,
 }
+
+export const actionSchema = z.union([
+  z.literal(Action.BUY),
+  z.literal(Action.SELL),
+  z.literal(Action.HOLD),
+]);
+
+export const supportedLanguageSchema = z.enum(SUPPORTED_LANGUAGE_VALUES);
 
 export const userAlgorithmNameSchema = z
   .string()

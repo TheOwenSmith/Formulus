@@ -1,5 +1,5 @@
 import type { IndicatorMetadataKey } from '@shared/constants/indicators/indicator-metadata';
-import { completeUnionArray } from '@worker/utils/types';
+import { completeUnionArray } from '@shared/utils/types';
 import z from 'zod';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
