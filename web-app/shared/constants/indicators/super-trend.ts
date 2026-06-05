@@ -1,5 +1,5 @@
 import type { Bar } from '@shared/constants/trading';
-import { badRequest, type AppError } from '@worker/utils/error-handling';
+import { badRequest, type AppError } from '@shared/utils/error-handling';
 import { err, ok, Result } from 'neverthrow';
 import { computeATR } from './atr';
 import type { IndicatorMetadata } from './indicator-metadata';
