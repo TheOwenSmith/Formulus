@@ -39,7 +39,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       NODE_ENV: ${{ vars.NODE_ENV }}
       ECR_REPO: formulus-worker
-      IMAGE_TAG: ${{ github.ref == 'refs/heads/worker-staging' && 'staging' || 'latest' }}
+      IMAGE_TAG: ${{ github.ref == 'refs/heads/worker-prod' && 'latest' || 'staging' }}
       DATA_BUCKET: ${{ vars.DATA_BUCKET }}
       RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/worker-staging') && !(github.event_name == 'workflow_dispatch' && inputs.skip_quality_checks) }}
 
@@ -162,12 +162,12 @@ jobs:
       - name: CDK deploy worker stacks
         working-directory: web-app/infra
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/worker-staging" ]; then
-            COMPUTE_STACK=FormulusComputeStaging
-            DISPATCHER_STACK=FormulusDispatcherStaging
-          else
+          if [ "${{ github.ref }}" = "refs/heads/worker-prod" ]; then
             COMPUTE_STACK=FormulusCompute
             DISPATCHER_STACK=FormulusDispatcher
+          else
+            COMPUTE_STACK=FormulusComputeStaging
+            DISPATCHER_STACK=FormulusDispatcherStaging
           fi
           npx cdk deploy "$COMPUTE_STACK" "$DISPATCHER_STACK" \
             --require-approval never \

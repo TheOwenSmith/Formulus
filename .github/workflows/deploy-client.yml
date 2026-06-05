@@ -122,24 +122,24 @@ jobs:
         working-directory: web-app/infra
         run: |
           set -euo pipefail
-          if [ "${{ github.ref }}" = "refs/heads/client-staging" ]; then
-            STACK=FormulusAmplifyStaging
-            BRANCH=client-staging
-          else
+          if [ "${{ github.ref }}" = "refs/heads/client-prod" ]; then
             STACK=FormulusAmplify
             BRANCH=client-prod
+          else
+            STACK=FormulusAmplifyStaging
+            BRANCH=client-staging
           fi
           npx cdk deploy "$STACK" --require-approval never -c amplifyOnly=true
 
       - name: Deploy to Amplify
         run: |
           set -euo pipefail
-          if [ "${{ github.ref }}" = "refs/heads/client-staging" ]; then
-            STACK=FormulusAmplifyStaging
-            BRANCH=client-staging
-          else
+          if [ "${{ github.ref }}" = "refs/heads/client-prod" ]; then
             STACK=FormulusAmplify
             BRANCH=client-prod
+          else
+            STACK=FormulusAmplifyStaging
+            BRANCH=client-staging
           fi
 
           APP_ID=$(aws cloudformation describe-stacks \

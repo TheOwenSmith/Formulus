@@ -125,19 +125,19 @@ jobs:
           API_SUB_DOMAIN: ${{ vars.API_SUB_DOMAIN }}
         run: |
           set -euo pipefail
-          if [ "${{ github.ref }}" = "refs/heads/api-staging" ]; then
-            QUEUE_STACK=FormulusQueueStaging
-            STACK=FormulusApiStaging
-            EXTRA=()
-            if [ -n "${API_DOMAIN_NAME:-}" ] && [ -n "${API_SUB_DOMAIN:-}" ]; then
-              EXTRA+=( -c "apiStagingDomainName=${API_DOMAIN_NAME}" -c "apiStagingSubDomain=${API_SUB_DOMAIN}" )
-            fi
-          else
+          if [ "${{ github.ref }}" = "refs/heads/api-prod" ]; then
             QUEUE_STACK=FormulusQueue
             STACK=FormulusApi
             EXTRA=()
             if [ -n "${API_DOMAIN_NAME:-}" ] && [ -n "${API_SUB_DOMAIN:-}" ]; then
               EXTRA+=( -c "apiDomainName=${API_DOMAIN_NAME}" -c "apiSubDomain=${API_SUB_DOMAIN}" )
+            fi
+          else
+            QUEUE_STACK=FormulusQueueStaging
+            STACK=FormulusApiStaging
+            EXTRA=()
+            if [ -n "${API_DOMAIN_NAME:-}" ] && [ -n "${API_SUB_DOMAIN:-}" ]; then
+              EXTRA+=( -c "apiStagingDomainName=${API_DOMAIN_NAME}" -c "apiStagingSubDomain=${API_SUB_DOMAIN}" )
             fi
           fi
           npx cdk deploy "$STACK" "$QUEUE_STACK" --require-approval never "${EXTRA[@]}"
