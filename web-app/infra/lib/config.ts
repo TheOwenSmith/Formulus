@@ -20,6 +20,9 @@ export const envVarsLambda = [
   'GOOGLE_CLIENT_SECRET',
   'COHERE_API_KEY',
   'COHERE_MODEL',
+  'STRIPE_API_KEY',
+  'STRIPE_PRICE_ID',
+  'STRIPE_WEBHOOK_SECRET',
 ] as const satisfies string[];
 
 const envVarsApi = [...envVarsCdk, ...envVarsLambda] as const;
