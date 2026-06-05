@@ -3,7 +3,7 @@ import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algor
 import type { UserTopKAlgorithm } from '@shared/schemas/algorithms/user-top-k-algorithm';
 import { tickerSchema } from '@shared/schemas/trading';
 import z from 'zod';
-import type { Action } from './algorithm';
+import type { Action } from '@shared/constants/algorithm';
 import type { OutputTransformer } from './pipeline';
 import { scoresToActionsTopKAlgorithm } from './top-k-algorithm';
 

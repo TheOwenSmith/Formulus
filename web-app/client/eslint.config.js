@@ -53,19 +53,25 @@ export default defineConfig([
         'error',
         {
           patterns: [
-            // Block TS path alias to api
-            {
-              group: ['@api/*'],
-              message: 'Client code cannot import from @api. Use @shared.',
-            },
-            {
-              group: ['@worker/*'],
-              message: 'Client code cannot import from @worker. Use @shared.',
-            },
             // Block ../* imports
             {
               group: ['../*'],
               message: 'Use @client/path/to/file instead of ../path/to/file',
+            },
+            // Block @api/* imports
+            {
+              group: ['@api/*'],
+              message: 'Client code cannot import from @api. Use @shared.',
+            },
+            // Block @worker/* imports
+            {
+              group: ['@worker/*'],
+              message: 'Client code cannot import from @worker. Use @shared.',
+            },
+            // Block @shared/* imports
+            {
+              group: ['@shared/schemas/*'],
+              message: 'Client code cannot import from @shared/schemas.',
             },
           ],
         },

@@ -2,7 +2,7 @@ import type { Indicator, IndicatorResultByIndicator } from '@shared/constants/in
 import type { Ticker, Timestamp } from '@shared/constants/trading';
 import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Bar } from '@shared/constants/trading';
 import { Heap } from '@worker/utils/heap';
-import { Action, type Algorithm } from './algorithm';
+import { Action, type Algorithm } from '@shared/constants/algorithm';
 
 export type TopKAlgorithmImplementation = (
   context: Record<Ticker, Bar[]>,

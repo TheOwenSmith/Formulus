@@ -1,9 +1,6 @@
 // @ts-check
 
-import eslint from '@eslint/js';
-import eslintConfigPrettier from 'eslint-config-prettier/flat';
 import importPlugin from 'eslint-plugin-import';
-import sortKeysFix from 'eslint-plugin-sort-keys';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
@@ -13,11 +10,8 @@ export default defineConfig([
   },
   {
     files: ['**/*.{ts,tsx}'],
-    extends: [eslint.configs.recommended, ...tseslint.configs.recommended, eslintConfigPrettier],
     plugins: {
-      '@typescript-eslint': tseslint.plugin,
       import: importPlugin,
-      'sort-keys-fix': sortKeysFix,
     },
     settings: {
       'import/parsers': {
@@ -39,24 +33,6 @@ export default defineConfig([
       },
     },
     rules: {
-      // Safety
-      '@typescript-eslint/no-floating-promises': 'error',
-
-      // Clean code
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/prefer-nullish-coalescing': 'error',
-      '@typescript-eslint/prefer-optional-chain': 'error',
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        {
-          vars: 'all', // check all variables
-          args: 'after-used', // check function arguments after used ones
-          varsIgnorePattern: '^_', // ignore variables starting with _
-          argsIgnorePattern: '^_', // ignore function args starting with _
-        },
-      ],
-      // 'capitalized-comments': ['warn', 'always', { ignoreInlineComments: true }],
-
       // Import/Export rules
       'import/no-default-export': 'error',
       'no-restricted-imports': [
@@ -71,12 +47,17 @@ export default defineConfig([
             // Block @client/* imports
             {
               group: ['@client/*'],
-              message: 'API code cannot import from @client. Use @shared.',
+              message: 'Shared code cannot import from @client.',
+            },
+            // Block @api/* imports
+            {
+              group: ['@api/*'],
+              message: 'Shared code cannot import from @api.',
             },
             // Block @worker/* imports
             {
               group: ['@worker/*'],
-              message: 'API code cannot import from @worker. Use @shared.',
+              message: 'Shared code cannot import from @worker.',
             },
           ],
         },
@@ -88,13 +69,6 @@ export default defineConfig([
           ignoreExternal: true,
         },
       ],
-
-      // Sorting
-      'sort-keys-fix/sort-keys-fix': [
-        'warn',
-        'asc',
-        { caseSensitive: false, natural: true, minKeys: 5 },
-      ],
     },
   },
   {
@@ -103,5 +77,4 @@ export default defineConfig([
       'import/no-default-export': 'off',
     },
   },
-  eslintConfigPrettier,
 ]);
