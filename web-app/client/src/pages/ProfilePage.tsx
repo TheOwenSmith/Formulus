@@ -113,7 +113,9 @@ export function ProfilePage() {
   const { mutateAsync: createCheckoutSession, isPending: checkoutIsPending } = useMutation(
     trpcCredentials.payments.createCheckoutSession.mutationOptions({
       onError: (error) => {
-        toast.error(error instanceof Error ? error.message : 'Failed to start checkout. Please try again.');
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to start checkout. Please try again.',
+        );
       },
     }),
   );
@@ -121,7 +123,11 @@ export function ProfilePage() {
   const { mutateAsync: createPortalSession, isPending: portalIsPending } = useMutation(
     trpcCredentials.payments.createPortalSession.mutationOptions({
       onError: (error) => {
-        toast.error(error instanceof Error ? error.message : 'Failed to open billing portal. Please try again.');
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to open billing portal. Please try again.',
+        );
       },
     }),
   );
@@ -378,7 +384,7 @@ export function ProfilePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col md:flex-row items-center md:items-start gap-3 h-full">
+                    <div className="flex flex-col md:flex-row items-center gap-3 h-full">
                       <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent leading-[1.875rem]">
                         {user?.name ?? 'User'}
                       </h2>
@@ -486,114 +492,168 @@ export function ProfilePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
-                      <svg
-                        className="w-5 h-5 text-blue-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={CHART_BAR}
-                        />
-                      </svg>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
+                        <svg
+                          className="w-5 h-5 text-blue-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d={CHART_BAR}
+                          />
+                        </svg>
+                      </div>
+                      <h3 className="text-white/60 text-sm font-medium">Algorithms</h3>
                     </div>
-                    <h3 className="text-white/60 text-sm font-medium">Algorithms</h3>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                      {profileStats?.numberOfAlgorithms ?? 0}
+                    </p>
                   </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                    {profileStats?.numberOfAlgorithms ?? 0}
-                  </p>
+
+                  <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
+                        <svg
+                          className="w-5 h-5 text-purple-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d={CHART_BAR}
+                          />
+                        </svg>
+                      </div>
+                      <h3 className="text-white/60 text-sm font-medium">Backtests</h3>
+                    </div>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                      {profileStats?.numberOfBacktestingResults ?? 0}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center">
+                        <svg
+                          className="w-5 h-5 text-emerald-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d={SHARE}
+                          />
+                        </svg>
+                      </div>
+                      <h3 className="text-white/60 text-sm font-medium">Shared with Me</h3>
+                    </div>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                      {profileStats?.numberOfBacktestingShares ?? 0}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
-                      <svg
-                        className="w-5 h-5 text-purple-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={CHART_BAR}
-                        />
-                      </svg>
+                <div className="flex justify-center">
+                  <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300 w-full md:w-1/3">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/30 flex items-center justify-center">
+                        <svg
+                          className="w-5 h-5 text-orange-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d={SHARE}
+                          />
+                        </svg>
+                      </div>
+                      <h3 className="text-white/60 text-sm font-medium">Shared by Me</h3>
                     </div>
-                    <h3 className="text-white/60 text-sm font-medium">Backtests</h3>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+                      {profileStats?.numberOfBacktestingSharesSent ?? 0}
+                    </p>
                   </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    {profileStats?.numberOfBacktestingResults ?? 0}
-                  </p>
                 </div>
-
-                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 flex items-center justify-center">
-                      <svg
-                        className="w-5 h-5 text-emerald-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={SHARE}
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-white/60 text-sm font-medium">Shared with Me</h3>
-                  </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                    {profileStats?.numberOfBacktestingShares ?? 0}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <div className="bg-slate-800/40 rounded-xl p-6 border border-white/5 hover:border-white/10 transition-all duration-300 w-full md:w-1/3">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/30 flex items-center justify-center">
-                      <svg
-                        className="w-5 h-5 text-orange-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={SHARE}
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-white/60 text-sm font-medium">Shared by Me</h3>
-                  </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
-                    {profileStats?.numberOfBacktestingSharesSent ?? 0}
-                  </p>
-                </div>
-              </div>
               </div>
             )}
           </div>
 
           {/* Pro Plan Card */}
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
-            <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+            <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
               Pro Plan
             </h2>
+            <p className="text-white/40 text-sm mb-6">$8.95 / month</p>
+
+            {/* Plan comparison */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {/* Basic column */}
+              <div className="rounded-xl bg-white/[0.03] border border-white/[0.07] p-4">
+                <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Basic</p>
+                <div className="flex flex-col gap-2.5">
+                  {[
+                    '3 backtests / month',
+                    '3 concurrent backtests',
+                    'No Pro badge',
+                    'Non-refundable',
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2">
+                      <svg className="w-3.5 h-3.5 text-white/20 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span className="text-white/40 text-sm">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pro column */}
+              <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-yellow-500/5 border border-amber-500/30 p-4">
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">Pro</p>
+                <div className="flex flex-col gap-2.5">
+                  {(
+                    [
+                      '100 backtests / month',
+                      '10 concurrent backtests',
+                      'Pro badge on profile',
+                    ] as const
+                  ).map((item) => (
+                    <div key={item} className="flex items-start gap-2">
+                      <svg className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-white/80 text-sm">{item}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-start gap-2">
+                    <svg className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-white/80 text-sm">
+                      <a href="mailto:owensmith@uchicago.edu" className="underline underline-offset-2 hover:text-amber-400 transition-colors">Refundable</a> within billing period
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {user?.stripePlanActive ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/30">
@@ -604,7 +664,7 @@ export function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-white font-semibold">You are a Pro member</p>
-                    <p className="text-white/50 text-sm">$8.95/month — thank you for your support!</p>
+                    <p className="text-white/50 text-sm">Thank you for your support!</p>
                   </div>
                 </div>
                 <button
@@ -613,7 +673,12 @@ export function ProfilePage() {
                   className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border-amber-500/30 hover:border-amber-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {portalIsPending ? (
-                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg
+                      className="animate-spin h-5 w-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
@@ -627,38 +692,28 @@ export function ProfilePage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-                  {[
-                    'Pro badge on your profile and shared backtests',
-                    'Support ongoing platform development',
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-white/70 text-sm">
-                      <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {feature}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => void handleUpgradeToPro()}
-                  disabled={checkoutIsPending}
-                  className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border-amber-500/30 hover:border-amber-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {checkoutIsPending ? (
-                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  )}
-                  <span>Upgrade to Pro — $8.95/month</span>
-                </button>
-              </div>
+              <button
+                onClick={() => void handleUpgradeToPro()}
+                disabled={checkoutIsPending}
+                className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border-amber-500/30 hover:border-amber-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {checkoutIsPending ? (
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                )}
+                <span>Upgrade to Pro — $8.95/month</span>
+              </button>
             )}
           </div>
 
@@ -685,7 +740,10 @@ export function ProfilePage() {
 
               {!showDeleteConfirm ? (
                 <button
-                  onClick={() => { setShowDeleteConfirm(true); setDeleteBacktests(false); }}
+                  onClick={() => {
+                    setShowDeleteConfirm(true);
+                    setDeleteBacktests(false);
+                  }}
                   className="w-full px-6 py-4 rounded-xl font-medium text-base cursor-pointer transition-all duration-300 flex items-center justify-center gap-3 shadow-lg border hover:-translate-y-0.5 bg-gradient-to-r from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 border-red-500/30 hover:border-red-500/50 text-white"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -705,7 +763,9 @@ export function ProfilePage() {
                   </p>
 
                   <div className="space-y-2">
-                    <p className="text-white/60 text-sm font-medium">What should happen to your backtesting results?</p>
+                    <p className="text-white/60 text-sm font-medium">
+                      What should happen to your backtesting results?
+                    </p>
                     <label className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition-all duration-200">
                       <input
                         type="radio"
@@ -718,8 +778,8 @@ export function ProfilePage() {
                       <div>
                         <p className="text-white/90 text-sm font-medium">Keep my backtests</p>
                         <p className="text-white/50 text-xs mt-0.5">
-                          Results remain accessible via their links, but will no longer have an owner.
-                          You will have no control over them once your account is deleted.
+                          Results remain accessible via their links, but will no longer have an
+                          owner. You will have no control over them once your account is deleted.
                         </p>
                       </div>
                     </label>

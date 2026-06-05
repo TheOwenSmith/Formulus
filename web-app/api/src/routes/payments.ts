@@ -17,33 +17,55 @@ export function paymentsRouter(
         const { user } = ctx;
 
         const userResult = await fromThrowableAsync(
-          () => prisma.user.findUnique({ where: { id: user.id }, select: { stripeCustomerId: true, stripePlanActive: true } }),
+          () =>
+            prisma.user.findUnique({
+              where: { id: user.id },
+              select: { stripeCustomerId: true, stripePlanActive: true },
+            }),
           (e) => internal(e, 'Failed to load user'),
         );
         if (userResult.isErr()) throw userResult.error;
-        if (userResult.value?.stripePlanActive) throw badRequest('You already have an active Pro subscription');
-
+        if (userResult.value?.stripePlanActive ?? false) {
+          throw badRequest('You already have an active Pro subscription');
+        }
         let customerId = userResult.value?.stripeCustomerId ?? null;
 
-        if (!customerId) {
+        if (customerId == null) {
+          // Create new customer
           const customerResult = await fromThrowableAsync(
-            () => stripe.customers.create({ email: user.email, name: user.name, metadata: { userId: user.id } }),
+            () =>
+              stripe.customers.create({
+                email: user.email,
+                name: user.name,
+                metadata: { userId: user.id },
+              }),
             (e) => internal(e, 'Failed to create Stripe customer'),
           );
           if (customerResult.isErr()) throw customerResult.error;
           customerId = customerResult.value.id;
 
           const saveResult = await fromThrowableAsync(
-            () => prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } }),
+            () =>
+              prisma.user.update({
+                where: { id: user.id },
+                data: { stripeCustomerId: customerId },
+              }),
             (e) => internal(e, 'Failed to save Stripe customer'),
           );
           if (saveResult.isErr()) throw saveResult.error;
         }
 
+        // Create checkout session
         const sessionResult = await fromThrowableAsync(
           () =>
             stripe.checkout.sessions.create({
               cancel_url: input.cancelUrl,
+              custom_text: {
+                submit: {
+                  message:
+                    '100 backtests/month · 10 concurrent backtests · Pro badge · Refundable within your billing period',
+                },
+              },
               customer: customerId,
               line_items: [{ price: config.getKey('STRIPE_PRICE_ID'), quantity: 1 }],
               mode: 'subscription',
@@ -62,11 +84,14 @@ export function paymentsRouter(
         const { user } = ctx;
 
         const userResult = await fromThrowableAsync(
-          () => prisma.user.findUnique({ where: { id: user.id }, select: { stripeCustomerId: true } }),
+          () =>
+            prisma.user.findUnique({ where: { id: user.id }, select: { stripeCustomerId: true } }),
           (e) => internal(e, 'Failed to load user'),
         );
         if (userResult.isErr()) throw userResult.error;
-        if (!userResult.value?.stripeCustomerId) throw badRequest('No active subscription found');
+        if (userResult.value?.stripeCustomerId == undefined) {
+          throw badRequest('No active subscription found');
+        }
 
         const sessionResult = await fromThrowableAsync(
           () =>

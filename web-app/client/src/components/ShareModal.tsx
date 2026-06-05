@@ -3,6 +3,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+function ProBadge() {
+  return (
+    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-400 shrink-0">
+      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </svg>
+      PRO
+    </span>
+  );
+}
+
 function Avatar({ name, image, size = 'sm' }: { name: string; image: string | null; size?: 'sm' | 'md' }) {
   const cls = size === 'md' ? 'w-9 h-9 text-sm' : 'w-7 h-7 text-xs';
   if (image) {
@@ -294,7 +305,10 @@ export function ShareModal({
                     <div className="flex items-center gap-3">
                       <Avatar name={foundUser.name} image={foundUser.image} size="md" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-white/90 truncate">{foundUser.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-white/90 truncate">{foundUser.name}</p>
+                          {foundUser.stripePlanActive && <ProBadge />}
+                        </div>
                         <p className="text-xs text-white/40 truncate">{foundUser.email}</p>
                       </div>
                     </div>
@@ -341,7 +355,10 @@ export function ShareModal({
                   >
                     <Avatar name={share.userName} image={share.userImage} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-white/80 font-medium truncate">{share.userName}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm text-white/80 font-medium truncate">{share.userName}</p>
+                        {share.userIsPro && <ProBadge />}
+                      </div>
                       <p className="text-xs text-white/35 truncate">{share.userEmail}</p>
                     </div>
                     {share.dismissedByRecipient && (

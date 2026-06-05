@@ -8,6 +8,7 @@ export type ShareEntry = {
   userName: string;
   userEmail: string;
   userImage: string | null;
+  userIsPro: boolean;
   allowCopy: boolean;
   dismissedByRecipient: boolean;
   sharedAt: Date;
@@ -113,7 +114,9 @@ export async function getSharesForResult(
           allowCopy: true,
           createdAt: true,
           dismissedByRecipient: true,
-          user: { select: { email: true, id: true, image: true, name: true } },
+          user: {
+            select: { email: true, id: true, image: true, name: true, stripePlanActive: true },
+          },
         },
       }),
     (e) => internal(e, 'Failed to load shares'),
@@ -127,6 +130,7 @@ export async function getSharesForResult(
       userEmail: s.user.email,
       userId: s.user.id,
       userImage: s.user.image,
+      userIsPro: s.user.stripePlanActive,
       userName: s.user.name,
     })),
   );
@@ -241,5 +245,5 @@ export async function getResultAccessInfo(
     ? { name: creator.name, image: creator.image, isPro: creator.stripePlanActive }
     : null;
 
-  return ok({ hasAccess, isOwner, canCopy, isPublic, creator: creatorInfo });
+  return ok({ canCopy, creator: creatorInfo, hasAccess, isOwner, isPublic });
 }
