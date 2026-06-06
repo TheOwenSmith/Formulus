@@ -66,19 +66,12 @@ jobs:
           cache-dependency-path: |
             web-app/pnpm-lock.yaml
             web-app/api/pnpm-lock.yaml
+            web-app/shared/pnpm-lock.yaml
             web-app/infra/pnpm-lock.yaml
 
-      - name: Install API dependencies
-        working-directory: web-app/api
-        run: pnpm install --frozen-lockfile
+      # --- Quality checks ---
 
-      - name: Generate Prisma client (for ESLint)
-        if: env.RUN_QUALITY_CHECKS == 'true'
-        working-directory: web-app/api
-        run: pnpm run prisma:generate
-
-      # Prettier CLI + .prettierrc.json live under web-app/
-      - name: Install web-app dependencies (Prettier)
+      - name: Install /web-app dependencies (Prettier)
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app
         env:
@@ -88,16 +81,37 @@ jobs:
       - name: Prettier
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
-        run: pnpm -C .. exec prettier "api/src/**/*.{ts,js}" --check
+        run: pnpm run prettier:check
+
+      - name: Install /api dependencies
+        working-directory: web-app/api
+        run: pnpm install --frozen-lockfile
 
       - name: ESLint
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
         run: pnpm run lint
 
+      - name: Install /shared dependencies
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/shared
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint (shared)
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/shared
+        run: pnpm run lint
+
       - name: Quality checks skipped
         if: env.RUN_QUALITY_CHECKS != 'true'
-        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on api-prod only)."
+        run: echo "::warning::Prettier and ESLint were skipped."
+
+      # --- Deploy ---
+
+      - name: Generate Prisma client
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/api
+        run: pnpm run prisma:generate
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

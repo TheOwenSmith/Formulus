@@ -60,6 +60,7 @@ jobs:
           cache-dependency-path: |
             web-app/pnpm-lock.yaml
             web-app/worker/pnpm-lock.yaml
+            web-app/shared/pnpm-lock.yaml
             web-app/infra/pnpm-lock.yaml
 
       # --- Quality checks ---
@@ -74,24 +75,36 @@ jobs:
         working-directory: web-app
         run: pnpm exec prettier "worker/src/**/*.{ts,js}" --check
 
-      - name: Install worker dependencies
+      - name: Install /worker dependencies
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/worker
         run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client (for ESLint)
-        if: env.RUN_QUALITY_CHECKS == 'true'
-        working-directory: web-app/worker
-        run: pnpm run prisma:generate
 
       - name: ESLint
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/worker
         run: pnpm run lint
 
+      - name: Install /shared dependencies
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/shared
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint (shared)
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/shared
+        run: pnpm run lint
+
       - name: Quality checks skipped
         if: env.RUN_QUALITY_CHECKS != 'true'
-        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on worker-prod only)."
+        run: echo "::warning::Prettier and ESLint were skipped."
+
+      # --- Deploy ECR ---
+
+      - name: Generate Prisma client
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/worker
+        run: pnpm run prisma:generate
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -99,8 +112,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      # --- Deploy ECR ---
 
       - name: Install infra dependencies
         working-directory: web-app/infra

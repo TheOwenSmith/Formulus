@@ -68,9 +68,9 @@ jobs:
       - name: Prettier
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app
-        run: pnpm exec prettier "client/src/**/*.{ts,js}" --check
+        run: pnpm run prettier:check
 
-      - name: Install client dependencies
+      - name: Install /client dependencies
         working-directory: web-app/client
         run: pnpm install --frozen-lockfile
 
@@ -79,13 +79,25 @@ jobs:
         working-directory: web-app/client
         run: pnpm run lint
 
-      - name: Install shared dependencies
+      - name: Install /shared dependencies
+        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/shared
         run: pnpm install --frozen-lockfile
 
-      - name: Install API dependencies
+      - name: ESLint (shared)
+        if: env.RUN_QUALITY_CHECKS == 'true'
+        working-directory: web-app/shared
+        run: pnpm run lint
+
+      - name: Install /api dependencies
         working-directory: web-app/api
         run: pnpm install --frozen-lockfile
+
+      # --- Deploy ---
+
+      - name: Quality checks skipped
+        if: env.RUN_QUALITY_CHECKS != 'true'
+        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on client-prod only)."
 
       - name: Generate Prisma client
         working-directory: web-app/api
@@ -96,12 +108,6 @@ jobs:
       - name: Build
         working-directory: web-app/client
         run: pnpm run build
-
-      - name: Quality checks skipped
-        if: env.RUN_QUALITY_CHECKS != 'true'
-        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on client-prod only)."
-
-      # --- Deploy ---
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
