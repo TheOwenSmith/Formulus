@@ -16,10 +16,10 @@ import {
 } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { badRequest, internal, safeReduce, type AppError } from '@shared/utils/error-handling';
+import { roundToDecimal, withCommas } from '@shared/utils/number-utils';
 import { config } from '@worker/lib/config';
 import { yearsBetween } from '@worker/utils/date-utils';
 import { groupBy } from '@worker/utils/group-by';
-import { roundToDecimal, withCommas } from '@worker/utils/number-utils';
 import { SharpeRatioCalculator } from '@worker/utils/sharpe-ratio-calculator';
 import { err, ok, type Result } from 'neverthrow';
 import { BYTES_PROGRESS_UPDATE_INTERVAL, type TickerData } from './constants';

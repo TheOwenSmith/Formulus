@@ -6,8 +6,8 @@ import {
   internal,
   type AppError,
 } from '@shared/utils/error-handling';
+import { withCommas } from '@shared/utils/number-utils';
 import { cleanup } from '@worker/utils/cleanup';
-import { withCommas } from '@worker/utils/number-utils';
 import fs from 'fs';
 import { err, ok, type Result } from 'neverthrow';
 import readline from 'readline';

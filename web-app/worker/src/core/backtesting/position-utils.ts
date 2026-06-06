@@ -1,6 +1,6 @@
+import { Action } from '@shared/constants/algorithm';
 import type { Ticker } from '@shared/constants/trading';
 import { badRequest, internal, type AppError } from '@shared/utils/error-handling';
-import { Action } from '@shared/constants/algorithm';
 import { err, ok, Result } from 'neverthrow';
 import type { AlgorithmData } from './backtest-algorithms-concurrently';
 

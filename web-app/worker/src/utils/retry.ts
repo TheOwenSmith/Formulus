@@ -1,7 +1,7 @@
 import { internal, type AppError } from '@shared/utils/error-handling';
+import { withCommas } from '@shared/utils/number-utils';
 import { err, ok, type Result } from 'neverthrow';
 import { sleep } from './misc';
-import { withCommas } from './number-utils';
 
 export async function retryWithBackoff<T>({
   fn,

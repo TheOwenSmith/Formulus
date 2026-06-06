@@ -1,6 +1,7 @@
 import { prisma } from '@api/lib/prisma';
 import { getTickers } from '@shared/constants/algorithm';
 import type { Indicator } from '@shared/constants/indicators/indicator';
+import { AlgorithmType } from '@shared/constants/trading';
 import {
   convertAlgorithmTypeToDbAlgorithmType,
   convertDbAlgorithmTypeToAlgorithmType,
@@ -16,7 +17,6 @@ import type {
   AnyUserAlgorithmType,
   UserAlgorithm,
 } from '@shared/schemas/algorithms/user-algorithm';
-import { AlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import type { UserSimpleAlgorithm } from '@shared/schemas/algorithms/user-simple-algorithm';
 import type { UserTopKAlgorithm } from '@shared/schemas/algorithms/user-top-k-algorithm';
 import type { UserTicker } from '@shared/schemas/trading';

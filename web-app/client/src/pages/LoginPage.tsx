@@ -3,7 +3,7 @@ import { signIn, signUp } from '@client/lib/auth-client';
 import { useUserStore } from '@client/stores/user-store';
 import '@client/styles/LoginPage.css';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 // Floating particles component for background
@@ -114,13 +114,18 @@ export function LoginPage() {
   const [hasError, setHasError] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = (() => {
+    const param = searchParams.get('redirect') ?? '';
+    return param.startsWith('/') ? param : '/algorithms';
+  })();
 
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleLoading(true);
       await signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/profile`,
+        callbackURL: `${window.location.origin}${redirectTo}`,
       });
       // Mark that user has an account and is authenticated after successful Google sign-in
       setHasAccount(true);
@@ -203,8 +208,7 @@ export function LoginPage() {
       // Mark that user has an account and is authenticated after successful auth
       setHasAccount(true);
 
-      // Redirect on success
-      navigate('/backtest');
+      navigate(redirectTo);
     } catch (err) {
       console.error(`Error ${isSignUp ? 'signing up' : 'signing in'}:`, err);
       toast.error('An unexpected error occurred. Please try again.');

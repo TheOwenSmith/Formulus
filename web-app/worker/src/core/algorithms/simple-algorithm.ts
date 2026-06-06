@@ -1,7 +1,7 @@
+import { Action, type Algorithm } from '@shared/constants/algorithm';
 import type { Indicator, IndicatorResultByIndicator } from '@shared/constants/indicators/indicator';
 import type { Ticker, Timestamp } from '@shared/constants/trading';
 import { DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION, type Bar } from '@shared/constants/trading';
-import { Action, type Algorithm } from '@shared/constants/algorithm';
 
 export type SimpleAlgorithmImplementation = (
   context: Bar[],

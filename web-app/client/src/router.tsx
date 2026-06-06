@@ -101,14 +101,17 @@ export const router = createBrowserRouter([
   },
 ]);
 
-async function requireAuthLoader() {
+async function requireAuthLoader({ request }: { request: Request }) {
   const { data: session } = await getSession();
-  if (!session) throw redirect('/login');
+  if (session == null) {
+    const { pathname, search } = new URL(request.url);
+    throw redirect(`/login?redirect=${encodeURIComponent(pathname + search)}`);
+  }
   return <Outlet />;
 }
 
 async function requireGuestLoader() {
   const { data: session } = await getSession();
-  if (session) throw redirect('/algorithms');
+  if (session != null) throw redirect('/algorithms');
   return <Outlet />;
 }

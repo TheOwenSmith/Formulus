@@ -68,11 +68,6 @@ export default defineConfig([
               group: ['@worker/*'],
               message: 'Client code cannot import from @worker. Use @shared.',
             },
-            // Block @shared/* imports
-            {
-              group: ['@shared/schemas/*'],
-              message: 'Client code cannot import from @shared/schemas.',
-            },
           ],
         },
       ],

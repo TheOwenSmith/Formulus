@@ -65,13 +65,11 @@ export const LANGUAGES: { value: SupportedLanguage; label: string; ext: string }
   { value: 'cpp', label: 'C++', ext: '.cpp' },
 ];
 
-/** Numeric algorithm type (matches Prisma enum and worker AlgorithmType enum). */
-export const AlgorithmType = {
-  NORMAL: 0,
-  SIMPLE: 1,
-  TOP_K: 2,
-} as const;
-export type AlgorithmTypeValue = (typeof AlgorithmType)[keyof typeof AlgorithmType];
+export enum AlgorithmType {
+  NORMAL,
+  SIMPLE,
+  TOP_K,
+}
 
 export const MAX_ALGORITHMS_TO_COMPARE = 25;
 export const MAX_INDICATORS_COUNT = 40;

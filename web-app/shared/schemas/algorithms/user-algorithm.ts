@@ -5,6 +5,7 @@ import {
 import { indicatorSchema } from '@shared/constants/indicators/indicator';
 import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
+  AlgorithmType,
   MAX_INDICATORS_COUNT,
   SUPPORTED_LANGUAGE_VALUES,
 } from '@shared/constants/trading';
@@ -14,12 +15,6 @@ import type { UserSimpleAlgorithm } from './user-simple-algorithm';
 import type { UserTopKAlgorithm } from './user-top-k-algorithm';
 
 export type AnyUserAlgorithmType = UserAlgorithm | UserSimpleAlgorithm | UserTopKAlgorithm;
-
-export enum AlgorithmType {
-  NORMAL,
-  SIMPLE,
-  TOP_K,
-}
 
 export const actionSchema = z.union([
   z.literal(Action.BUY),

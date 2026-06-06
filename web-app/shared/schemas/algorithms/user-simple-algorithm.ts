@@ -1,7 +1,8 @@
 import { USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES } from '@shared/constants/algorithm';
+import { AlgorithmType } from '@shared/constants/trading';
 import { tickerSchema } from '@shared/schemas/trading';
 import z from 'zod';
-import { AlgorithmType, userAlgorithmSchemaBase } from './user-algorithm';
+import { userAlgorithmSchemaBase } from './user-algorithm';
 
 export const userSimpleAlgorithmSchema = userAlgorithmSchemaBase
   .extend({
