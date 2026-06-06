@@ -30,5 +30,6 @@
 
     "rootDir": "..",
     "outDir": "./dist",
-  }
+  },
+  "exclude": ["node_modules", "dist", "generated", "prisma/migrations"]
 }

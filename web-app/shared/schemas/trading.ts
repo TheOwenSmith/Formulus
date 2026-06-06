@@ -1,5 +1,5 @@
 import z from 'zod';
-import { aggregateTimestamps, tickers } from '../constants/trading';
+import { aggregateTimestamps, tickers } from '@shared/constants/trading';
 
 export const tickerSchema = z.enum(tickers);
 export type UserTicker = z.infer<typeof tickerSchema>;

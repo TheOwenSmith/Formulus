@@ -1,16 +1,20 @@
 // @ts-check
 
+import eslint from '@eslint/js';
+import eslintConfigPrettier from 'eslint-config-prettier/flat';
 import importPlugin from 'eslint-plugin-import';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
   {
-    ignores: ['dist', 'node_modules', 'generated', 'src/generated', '*.config.{ts,mjs,js}'],
+    ignores: ['dist', 'node_modules', 'generated', '*.config.{ts,mjs,js}'],
   },
   {
     files: ['**/*.{ts,tsx}'],
+    extends: [eslint.configs.recommended, ...tseslint.configs.recommended, eslintConfigPrettier],
     plugins: {
+      '@typescript-eslint': tseslint.plugin,
       import: importPlugin,
     },
     settings: {
@@ -42,7 +46,7 @@ export default defineConfig([
             // Block ../* imports
             {
               group: ['../*'],
-              message: 'Use @api/path/to/file instead of ../path/to/file',
+              message: 'Use @shared/path/to/file instead of ../path/to/file',
             },
             // Block @client/* imports
             {
@@ -72,9 +76,16 @@ export default defineConfig([
     },
   },
   {
+    files: ['api.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+  {
     files: ['*.config.ts', '*.config.ts'],
     rules: {
       'import/no-default-export': 'off',
     },
   },
+  eslintConfigPrettier,
 ]);

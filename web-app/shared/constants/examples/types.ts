@@ -1,4 +1,4 @@
-import type { SupportedLanguage } from '../trading';
+import type { SupportedLanguage } from '@shared/constants/trading';
 
 export type AlgorithmExample = {
   id: string;
