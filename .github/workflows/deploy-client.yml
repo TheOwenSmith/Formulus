@@ -93,11 +93,15 @@ jobs:
         working-directory: web-app/api
         run: pnpm install --frozen-lockfile
 
-      # --- Deploy ---
-
       - name: Quality checks skipped
         if: env.RUN_QUALITY_CHECKS != 'true'
-        run: echo "::warning::Prettier and ESLint were skipped (manual workflow on client-prod only)."
+        run: echo "::warning::Prettier and ESLint were skipped."
+
+      # --- Deploy ---
+
+      - name: Install /shared dependencies
+        working-directory: web-app/shared
+        run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
         working-directory: web-app/api
