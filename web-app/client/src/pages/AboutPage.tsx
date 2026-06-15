@@ -59,23 +59,35 @@ export function AboutPage() {
             <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
               System Architecture
             </h2>
-            <p className="text-white/90 leading-relaxed">
+            <p className="text-white/90 leading-relaxed mb-4">
               <ExternalLink href="https://formulus.ai">formulus.ai</ExternalLink> is a SaaS
-              application that consists of a frontend, a backend, and a backtesting worker. At a
-              high level, when a user has a strategy they wish to backtest, the user submits a
-              request to the API, which adds the submission to a queue in AWS. The queue submission
-              triggers a lambda dispatcher, which then starts a worker task. The worker fetches the
-              appropriate submission from the database and then downloads the relevant tick data
-              files and indices from S3. Since the user&apos;s code is possibly malicious, the
-              worker initiates a Docker container and uploads the user&apos;s code to said container
-              via a bind mount. Note that since the worker is an ECS task, this process creates an
-              interesting docker-in-docker design. After the backtest is completed or when the user
-              code errors, the container containing the user&apos;s code is killed, and the
-              backtesting results or errors, resp., are uploaded in the database, and the ECS task
-              is terminated. Finally, on the frontend, users can view their results using the
-              performance analysis dashboard.{' '}
+              application that consists of a frontend, a backend, and a backtesting worker. In
+              total, the application has over 20,000 lines of code. At a high level, when a user has
+              a strategy they wish to backtest, the user submits a request to the API, which adds
+              the submission to a queue in AWS. The queue submission triggers a lambda dispatcher,
+              which then starts a worker task. The worker fetches the appropriate submission from
+              the database and then downloads the relevant tick data files and indices from S3.
+              Since the user&apos;s code is possibly malicious, the worker initiates a Docker
+              container and uploads the user&apos;s code to said container via a bind mount. Note
+              that since the worker is an ECS task, this process creates an interesting
+              docker-in-docker design.
+            </p>
+            <p className="text-white/90 leading-relaxed">
+              The worker and container communicate via a stdin/stdout RPC, which is different
+              depending on the programming language of the submitted code. After the backtest is
+              completed or when the user code errors, the container containing the user&apos;s code
+              is killed, and the backtesting results or errors, resp., are uploaded in the database,
+              and the ECS task is terminated. Finally, on the frontend, users can view their results
+              using the performance analysis dashboard.{' '}
               <ExternalLink href="#">Learn more</ExternalLink>
             </p>
+            <div className="mt-6 overflow-hidden">
+              <img
+                src="/formulus-architecture-light.svg"
+                alt="Formulus system architecture diagram"
+                className="w-full block"
+              />
+            </div>
           </div>
 
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">

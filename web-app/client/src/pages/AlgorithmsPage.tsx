@@ -519,7 +519,7 @@ export function AlgorithmsPage() {
         style={{ bottom: 0, left: 0, position: 'fixed', right: 0, top: HEADER_OFFSET }}
       >
         <div
-          className="max-w-[1400px] w-full mx-auto px-8 pt-6 pb-12 flex-1 min-h-0 overflow-auto animate-[fadeInUp_0.8s_ease-out]"
+          className="max-w-[1400px] w-full mx-auto px-8 pt-6 pb-4 flex-1 min-h-0 overflow-auto animate-[fadeInUp_0.8s_ease-out]"
           onClick={isCompareMode ? exitCompareMode : undefined}
         >
           <div
