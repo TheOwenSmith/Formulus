@@ -48,15 +48,15 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex w-9 h-5 rounded-full border transition-all duration-200 cursor-pointer shrink-0 ${
+      className={`inline-flex items-center w-9 h-5 rounded-full border transition-all duration-200 cursor-pointer shrink-0 px-0.5 ${
         checked
           ? 'bg-emerald-500/30 border-emerald-500/60'
           : 'bg-white/5 border-white/15'
       }`}
     >
       <span
-        className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-200 shadow-sm ${
-          checked ? 'left-4 bg-emerald-400' : 'left-0.5 bg-white/40'
+        className={`w-4 h-4 rounded-full transition-all duration-200 shadow-sm shrink-0 ${
+          checked ? 'ml-3.5 bg-emerald-400' : 'ml-0 bg-white/40'
         }`}
       />
     </button>
