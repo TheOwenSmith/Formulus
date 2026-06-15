@@ -1,6 +1,7 @@
 import { ExamplesModal } from '@client/components/ExamplesModal';
 import { RunBacktestModal } from '@client/components/RunBacktestModal';
 import { Tooltip } from '@client/components/Tooltip';
+import { usePlanLimits } from '@client/hooks/usePlanLimits';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { trpcCredentials } from '@client/lib/trpc';
 import type { AlgorithmExample } from '@shared/constants/examples';
@@ -79,6 +80,7 @@ function AlgorithmCard({
   onToggleSelect,
   isRunning,
   cooldownSecondsLeft,
+  backtestLimitTooltip,
   isDeleting,
   isSelected,
   isIncompatible,
@@ -91,6 +93,7 @@ function AlgorithmCard({
   onToggleSelect: (id: string) => void;
   isRunning: boolean;
   cooldownSecondsLeft: number;
+  backtestLimitTooltip: string | undefined;
   isDeleting: boolean;
   isSelected: boolean;
   isIncompatible: boolean;
@@ -99,6 +102,7 @@ function AlgorithmCard({
   const tickers = getTickers(algorithm);
   const typeColorClass = TYPE_COLOR[algorithm.type] ?? TYPE_COLOR[AlgorithmType.NORMAL];
   const lastEdited = formatLastEdited(algorithm.updatedAt);
+  const [isOverRunButton, setIsOverRunButton] = useState(false);
   const tooltipContent = (
     <div className="flex flex-col gap-0.5 text-xs">
       {tickers.length > 0 && (
@@ -134,7 +138,7 @@ function AlgorithmCard({
   };
 
   return (
-    <Tooltip content={tooltipContent} className="w-full">
+    <Tooltip content={isOverRunButton && backtestLimitTooltip != null ? backtestLimitTooltip : tooltipContent} className="w-full">
       <div
         role="button"
         tabIndex={0}
@@ -269,64 +273,75 @@ function AlgorithmCard({
           </button>
 
           {/* Run backtest */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRunBacktest();
-            }}
-            disabled={isCompareMode || isRunning || cooldownSecondsLeft > 0}
-            title={
-              isCompareMode
-                ? 'Exit compare mode to run individual algorithms'
-                : cooldownSecondsLeft > 0 && !isRunning
-                  ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest`
-                  : undefined
-            }
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
-              isCompareMode
-                ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed opacity-50'
-                : isRunning || cooldownSecondsLeft > 0
-                  ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border-emerald-500/25 hover:border-emerald-500/40 text-emerald-300 cursor-pointer'
-            }`}
+          <div
+            className="flex-1"
+            onMouseEnter={() => setIsOverRunButton(true)}
+            onMouseLeave={() => setIsOverRunButton(false)}
           >
-            {isRunning ? (
-              <>
-                <Spinner />
-                Running…
-              </>
-            ) : cooldownSecondsLeft > 0 ? (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Wait {cooldownSecondsLeft}s
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Run
-              </>
-            )}
-          </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRunBacktest();
+              }}
+              disabled={isCompareMode || isRunning || cooldownSecondsLeft > 0 || backtestLimitTooltip != null}
+              className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                isCompareMode
+                  ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed opacity-50'
+                  : isRunning || cooldownSecondsLeft > 0 || backtestLimitTooltip != null
+                    ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border-emerald-500/25 hover:border-emerald-500/40 text-emerald-300 cursor-pointer'
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Spinner />
+                  Running…
+                </>
+              ) : cooldownSecondsLeft > 0 ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Wait {cooldownSecondsLeft}s
+                </>
+              ) : backtestLimitTooltip != null ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Limit Reached
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Run
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </Tooltip>
@@ -340,7 +355,23 @@ export function AlgorithmsPage() {
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const queryClient = useQueryClient();
-  const { isPendingIds, cooldownSecondsLeft, runBacktest } = useRunBacktest();
+  const { isPendingIds, cooldownSecondsLeft, runBacktest, isAtConcurrentLimit, isAtMonthlyLimit } =
+    useRunBacktest();
+  const {
+    isAtAlgorithmLimit,
+    algorithmLimit,
+    isPro,
+    concurrentCount,
+    concurrentLimit,
+    monthlyCount,
+    monthlyLimit,
+  } = usePlanLimits();
+
+  const backtestLimitTooltip = isAtConcurrentLimit
+    ? `${concurrentCount}/${concurrentLimit} backtests running. Wait for one to finish.`
+    : isAtMonthlyLimit
+      ? `Monthly limit reached (${monthlyCount}/${monthlyLimit} this month).${isPro ? '' : ' Upgrade to Pro for 100/month.'}`
+      : undefined;
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
@@ -414,6 +445,12 @@ export function AlgorithmsPage() {
   );
 
   async function handleCreateFromExample(example: AlgorithmExample, lang: SupportedLanguage) {
+    if (isAtAlgorithmLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${algorithmLimit} algorithms.${isPro ? '' : ' Upgrade to Pro for up to 500 algorithms.'}`,
+      );
+      return;
+    }
     setShowExamplesModal(false);
     const base = {
       aggregate: example.aggregate as Timestamp,
@@ -505,7 +542,7 @@ export function AlgorithmsPage() {
                       const selected = algorithms.filter((a) => selectedIds.has(a.id));
                       openRunModal(selected.map((a) => ({ id: a.id, name: a.name })));
                     }}
-                    disabled={selectedIds.size === 0}
+                    disabled={selectedIds.size === 0 || isAtConcurrentLimit || isAtMonthlyLimit}
                     title={selectedIds.size === 0 ? 'Select at least one algorithm' : undefined}
                     className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border hover:-translate-y-0.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border-emerald-500/30 hover:border-emerald-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   >
@@ -563,46 +600,59 @@ export function AlgorithmsPage() {
               ) : (
                 <>
                   {algorithms.length > 1 && (
-                    <button
-                      onClick={() => setIsCompareMode(true)}
-                      disabled={cooldownSecondsLeft > 0}
-                      title={
-                        cooldownSecondsLeft > 0
+                    <Tooltip
+                      content={
+                        backtestLimitTooltip ??
+                        (cooldownSecondsLeft > 0
                           ? `Please wait ${cooldownSecondsLeft}s before submitting another backtest`
-                          : undefined
+                          : undefined)
                       }
-                      className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                      <button
+                        onClick={() => setIsCompareMode(true)}
+                        disabled={cooldownSecondsLeft > 0 || backtestLimitTooltip != null}
+                        className="px-4 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                       >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"
+                          />
+                        </svg>
+                        Compare
+                      </button>
+                    </Tooltip>
+                  )}
+                  <Tooltip
+                    content={
+                      isAtAlgorithmLimit
+                        ? `Algorithm limit reached (${algorithmLimit}/${algorithmLimit})${isPro ? '' : '. Upgrade to Pro for 500.'}`
+                        : undefined
+                    }
+                  >
+                    <button
+                      onClick={() => !isAtAlgorithmLimit && navigate('/algorithms/new')}
+                      disabled={isAtAlgorithmLimit}
+                      className="px-5 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border hover:-translate-y-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border-blue-500/30 hover:border-blue-500/50 text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"
+                          d="M12 4v16m8-8H4"
                         />
                       </svg>
-                      Compare
+                      New Algorithm
                     </button>
-                  )}
-                  <button
-                    onClick={() => navigate('/algorithms/new')}
-                    className="px-5 py-2.5 rounded-xl font-medium text-sm cursor-pointer transition-all duration-300 flex items-center gap-2 border hover:-translate-y-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border-blue-500/30 hover:border-blue-500/50 text-white"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    New Algorithm
-                  </button>
+                  </Tooltip>
                 </>
               )}
             </div>
@@ -660,6 +710,7 @@ export function AlgorithmsPage() {
                   onToggleSelect={toggleSelect}
                   isRunning={isPendingIds.has(algorithm.id) && cooldownSecondsLeft > 0}
                   cooldownSecondsLeft={cooldownSecondsLeft}
+                  backtestLimitTooltip={backtestLimitTooltip}
                   isDeleting={deletingId === algorithm.id}
                   isSelected={selectedIds.has(algorithm.id)}
                   isIncompatible={

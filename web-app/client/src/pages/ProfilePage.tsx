@@ -3,6 +3,14 @@ import { CAMERA_PATHS, CHART_BAR, SHARE } from '@client/icons/index';
 import { signOut } from '@client/lib/auth-client';
 import { trpcCredentials } from '@client/lib/trpc';
 import { useUserStore } from '@client/stores/user-store';
+import {
+  BASIC_PLAN_MAX_ALGORITHMS_COUNT,
+  BASIC_PLAN_MAX_BACKTESTS_PER_MONTH,
+  BASIC_PLAN_MAX_CONCURRENT_BACKTESTS,
+  PRO_PLAN_MAX_ALGORITHMS_COUNT,
+  PRO_PLAN_MAX_BACKTESTS_PER_MONTH,
+  PRO_PLAN_MAX_CONCURRENT_BACKTESTS,
+} from '@shared/constants/limits';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -609,8 +617,9 @@ export function ProfilePage() {
                 <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Basic</p>
                 <div className="flex flex-col gap-2.5">
                   {[
-                    '3 backtests / month',
-                    '3 concurrent backtests',
+                    `${BASIC_PLAN_MAX_BACKTESTS_PER_MONTH} backtests / month`,
+                    `${BASIC_PLAN_MAX_CONCURRENT_BACKTESTS} concurrent backtests`,
+                    `${BASIC_PLAN_MAX_ALGORITHMS_COUNT} algorithms`,
                     'No Pro badge',
                     'Non-refundable',
                   ].map((item) => (
@@ -628,13 +637,12 @@ export function ProfilePage() {
               <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-yellow-500/5 border border-amber-500/30 p-4">
                 <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">Pro</p>
                 <div className="flex flex-col gap-2.5">
-                  {(
-                    [
-                      '100 backtests / month',
-                      '10 concurrent backtests',
-                      'Pro badge on profile',
-                    ] as const
-                  ).map((item) => (
+                  {[
+                    `${PRO_PLAN_MAX_BACKTESTS_PER_MONTH} backtests / month`,
+                    `${PRO_PLAN_MAX_CONCURRENT_BACKTESTS} concurrent backtests`,
+                    `${PRO_PLAN_MAX_ALGORITHMS_COUNT} algorithms`,
+                    'Pro badge on profile',
+                  ].map((item) => (
                     <div key={item} className="flex items-start gap-2">
                       <svg className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

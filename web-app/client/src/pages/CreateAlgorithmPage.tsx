@@ -1,5 +1,6 @@
 import { ExamplesModal } from '@client/components/ExamplesModal';
 import { Tooltip } from '@client/components/Tooltip';
+import { usePlanLimits } from '@client/hooks/usePlanLimits';
 import { CheckIcon, ExamplesIcon, NormalIcon, SimpleIcon, Spinner, TopKIcon } from '@client/icons';
 import { getDefaultImplementationCode } from '@client/lib/defaultAlgorithmCode';
 import { trpcCredentials } from '@client/lib/trpc';
@@ -122,6 +123,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 export function CreateAlgorithmPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAtAlgorithmLimit, algorithmCount, algorithmLimit, isPro } = usePlanLimits();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
   const [tickerSearch, setTickerSearch] = useState('');
@@ -187,6 +189,12 @@ export function CreateAlgorithmPage() {
   );
 
   async function handleCreateFromExample(example: AlgorithmExample, lang: SupportedLanguage) {
+    if (isAtAlgorithmLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${algorithmLimit} algorithms (${algorithmCount}/${algorithmLimit}).${isPro ? '' : ' Upgrade to Pro for up to 500 algorithms.'}`,
+      );
+      return;
+    }
     setShowExamplesModal(false);
     const base = {
       aggregate: example.aggregate as Timestamp,
@@ -247,6 +255,12 @@ export function CreateAlgorithmPage() {
   }
 
   async function handleCreate() {
+    if (isAtAlgorithmLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${algorithmLimit} algorithms (${algorithmCount}/${algorithmLimit}).${isPro ? '' : ' Upgrade to Pro for up to 500 algorithms.'}`,
+      );
+      return;
+    }
     const result = await createAlgorithm(buildPayload());
     toast.success('Algorithm created');
     navigate(`/algorithms/${result.id}`);
@@ -746,7 +760,7 @@ export function CreateAlgorithmPage() {
               {step === 3 && (
                 <button
                   type="button"
-                  disabled={!step3Valid || isPending}
+                  disabled={!step3Valid || isPending || isAtAlgorithmLimit}
                   onClick={handleCreate}
                   className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
                 >

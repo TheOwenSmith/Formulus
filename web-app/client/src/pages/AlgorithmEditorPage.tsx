@@ -1,5 +1,6 @@
 import { ExamplesModal } from '@client/components/ExamplesModal';
 import { RunBacktestModal } from '@client/components/RunBacktestModal';
+import { usePlanLimits } from '@client/hooks/usePlanLimits';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { trpcCredentials } from '@client/lib/trpc';
 import Editor from '@monaco-editor/react';
@@ -1109,6 +1110,7 @@ export function AlgorithmEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isPendingIds, cooldownSecondsLeft, runBacktest } = useRunBacktest();
+  const { isAtAlgorithmLimit, algorithmLimit, isPro } = usePlanLimits();
 
   const [code, setCode] = useState(algorithm.userAlgorithmImplementationCode);
   const [savedCode, setSavedCode] = useState(algorithm.userAlgorithmImplementationCode);
@@ -1209,6 +1211,12 @@ export function AlgorithmEditorPage() {
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
 
   async function handleCreateFromExample(example: AlgorithmExample, lang: SupportedLanguage) {
+    if (isAtAlgorithmLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${algorithmLimit} algorithms.${isPro ? '' : ' Upgrade to Pro for up to 500 algorithms.'}`,
+      );
+      return;
+    }
     const existing = allAlgorithms.find((a) => a.name === example.name);
     if (existing) {
       setPendingCreate({ example, lang, conflictId: existing.id });

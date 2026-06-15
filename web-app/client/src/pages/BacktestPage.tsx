@@ -1,5 +1,6 @@
 import { AlgorithmResultCard } from '@client/components/AlgorithmResultCard';
 import { ShareModal } from '@client/components/ShareModal';
+import { usePlanLimits } from '@client/hooks/usePlanLimits';
 import { PLUS, SIDE_BY_SIDE_RECTS, SINGLE_COLUMN, SVG_NAMESPACE } from '@client/icons/index';
 import { trpcCredentials } from '@client/lib/trpc';
 import '@client/styles/BacktestPage.css';
@@ -141,6 +142,7 @@ function CopyAlgorithmModal({
 }) {
   const queryClient = useQueryClient();
   const [copyName, setCopyName] = useState(() => `Copy of ${version.name}`.slice(0, 64));
+  const { isAtAlgorithmLimit, algorithmLimit, isPro } = usePlanLimits();
 
   const { mutateAsync: copyAlgorithmVersion, isPending } = useMutation(
     trpcCredentials.algorithms.copyAlgorithmVersion.mutationOptions({
@@ -153,6 +155,12 @@ function CopyAlgorithmModal({
   async function handleCopy() {
     const trimmed = copyName.trim();
     if (!trimmed) return;
+    if (isAtAlgorithmLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${algorithmLimit} algorithms.${isPro ? '' : ' Upgrade to Pro for up to 500 algorithms.'}`,
+      );
+      return;
+    }
     await copyAlgorithmVersion({
       name: trimmed,
       resultPublicId,
@@ -205,10 +213,10 @@ function CopyAlgorithmModal({
           <button
             type="button"
             onClick={() => void handleCopy()}
-            disabled={isPending || !copyName.trim()}
+            disabled={isPending || !copyName.trim() || isAtAlgorithmLimit}
             className="px-4 py-2.5 rounded-xl text-sm font-medium border border-blue-500/40 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isPending ? 'Copying…' : 'Copy to My Algorithms'}
+            {isAtAlgorithmLimit ? `Limit reached (${algorithmLimit})` : isPending ? 'Copying…' : 'Copy to My Algorithms'}
           </button>
         </div>
       </div>

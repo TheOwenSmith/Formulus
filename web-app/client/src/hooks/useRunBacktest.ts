@@ -1,6 +1,7 @@
+import { usePlanLimits } from '@client/hooks/usePlanLimits';
 import { trpcCredentials } from '@client/lib/trpc';
 import { useBacktestStore } from '@client/store/backtestStore';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -16,7 +17,10 @@ function getCooldownSecondsLeft(): number {
 
 export function useRunBacktest() {
   const { pendingAlgorithmIds, setPending } = useBacktestStore();
+  const queryClient = useQueryClient();
   const [cooldownSecondsLeft, setCooldownSecondsLeft] = useState(getCooldownSecondsLeft);
+  const { isAtConcurrentLimit, isAtMonthlyLimit, concurrentLimit, monthlyLimit, isPro } =
+    usePlanLimits();
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -63,6 +67,19 @@ export function useRunBacktest() {
     name: string,
     timespan?: [string | null, string | null],
   ) {
+    if (isAtConcurrentLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${concurrentLimit} concurrent backtests. Wait for one to finish before starting another.`,
+      );
+      return;
+    }
+    if (isAtMonthlyLimit) {
+      toast.error(
+        `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${monthlyLimit} backtests this month.${isPro ? '' : ' Upgrade to Pro for 100 backtests/month.'}`,
+      );
+      return;
+    }
+
     const ids = Array.isArray(algorithmIds) ? algorithmIds : [algorithmIds];
     try {
       const { publicId } = await backtestAlgorithms({
@@ -71,6 +88,9 @@ export function useRunBacktest() {
         timespan,
       });
       if (publicId != null) setPending(ids, publicId);
+      void queryClient.invalidateQueries({
+        queryKey: trpcCredentials.backtesting.getSubmissions.queryKey(),
+      });
       startCooldown();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to start backtest');
@@ -78,5 +98,11 @@ export function useRunBacktest() {
   }
 
   const pendingAlgorithmIdsSet = new Set(pendingAlgorithmIds);
-  return { isPendingIds: pendingAlgorithmIdsSet, cooldownSecondsLeft, runBacktest };
+  return {
+    cooldownSecondsLeft,
+    isAtConcurrentLimit,
+    isAtMonthlyLimit,
+    isPendingIds: pendingAlgorithmIdsSet,
+    runBacktest,
+  };
 }

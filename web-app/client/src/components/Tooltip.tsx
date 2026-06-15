@@ -19,7 +19,7 @@ export function Tooltip({
   className = '',
   anchor = 'cursor',
 }: {
-  content: React.ReactNode;
+  content?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   anchor?: TooltipAnchor;
@@ -54,7 +54,7 @@ export function Tooltip({
       <div
         ref={triggerRef}
         className={`relative ${className}`}
-        onMouseEnter={(e) => {
+        onMouseEnter={content == null ? undefined : (e) => {
           pendingPositionRef.current = { x: e.clientX, y: e.clientY };
           delayRef.current = setTimeout(() => {
             delayRef.current = null;
@@ -67,18 +67,19 @@ export function Tooltip({
             }
           }, TOOLTIP_DELAY_MS);
         }}
-        onMouseMove={(e) => {
+        onMouseMove={content == null ? undefined : (e) => {
           if (visible) {
             hide();
           } else {
             pendingPositionRef.current = { x: e.clientX, y: e.clientY };
           }
         }}
-        onMouseLeave={hide}
+        onMouseLeave={content == null ? undefined : hide}
       >
         {children}
       </div>
-      {anchor === 'above' &&
+      {content != null &&
+        anchor === 'above' &&
         aboveVisible &&
         aboveRect &&
         createPortal(
@@ -96,12 +97,16 @@ export function Tooltip({
           </div>,
           document.body,
         )}
-      {anchor === 'cursor' &&
+      {content != null &&
+        anchor === 'cursor' &&
         cursorPos &&
         createPortal(
           <div
             className={`fixed ${TOOLTIP_STYLE}`}
-            style={{ left: cursorPos.x + TOOLTIP_OFFSET, top: cursorPos.y + TOOLTIP_OFFSET }}
+            style={{
+            left: Math.min(cursorPos.x + TOOLTIP_OFFSET, window.innerWidth - 292),
+            top: cursorPos.y + TOOLTIP_OFFSET,
+          }}
             role="tooltip"
           >
             {content}

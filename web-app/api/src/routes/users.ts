@@ -1,6 +1,7 @@
 import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
 import z from 'zod';
 
@@ -53,6 +54,9 @@ export function usersRouter(
       return { user };
     }),
     getProfileStats: authProcedure.query(async ({ ctx }) => {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
       const getProfileStatsResponse = await fromThrowableAsync(
         () =>
           prisma.$transaction([
@@ -68,6 +72,23 @@ export function usersRouter(
             prisma.backtestingShare.count({
               where: { backtestingResults: { creatorId: ctx.user.id } },
             }),
+            prisma.backtestingSubmission.count({
+              where: {
+                creatorId: ctx.user.id,
+                status: {
+                  in: [
+                    BacktestingSubmissionStatus.PENDING,
+                    BacktestingSubmissionStatus.RUNNING,
+                  ],
+                },
+              },
+            }),
+            prisma.backtestingSubmission.count({
+              where: {
+                creatorId: ctx.user.id,
+                createdAt: { gte: startOfMonth },
+              },
+            }),
           ]),
         (e) => internal(e, 'An unexpected error occurred while retrieving profile statistics'),
       );
@@ -79,9 +100,13 @@ export function usersRouter(
         numberOfBacktestingResults,
         numberOfBacktestingShares,
         numberOfBacktestingSharesSent,
+        concurrentBacktests,
+        backtestsThisMonth,
       ] = getProfileStatsResponse.value;
 
       return {
+        backtestsThisMonth,
+        concurrentBacktests,
         numberOfAlgorithms,
         numberOfBacktestingResults,
         numberOfBacktestingShares,
