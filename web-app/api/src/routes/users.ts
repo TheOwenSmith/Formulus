@@ -1,3 +1,4 @@
+import { deleteCachedSession } from '@api/lib/cache-session';
 import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
@@ -13,9 +14,9 @@ export function usersRouter(
     deleteAccount: authProcedure
       .input(z.object({ deleteBacktests: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
+        await deleteCachedSession(ctx.sessionToken);
+
         if (input.deleteBacktests) {
-          // Explicitly delete backtesting results before removing the user.
-          // Without this, SetNull on creatorId would orphan them instead.
           const deleteResultsResponse = await fromThrowableAsync(
             () => prisma.backtestingResults.deleteMany({ where: { creatorId: ctx.user.id } }),
             (e) => internal(e, 'An unexpected error occurred while deleting backtesting results'),
@@ -23,8 +24,6 @@ export function usersRouter(
           if (deleteResultsResponse.isErr()) throw deleteResultsResponse.error;
         }
 
-        // Delete user — cascade handles sessions, accounts, algorithms, and submissions.
-        // BacktestingResults rows whose creatorId was NOT deleted above become orphaned (SetNull).
         const deleteUserResponse = await fromThrowableAsync(
           () => prisma.user.delete({ where: { id: ctx.user.id } }),
           (e) => internal(e, 'An unexpected error occurred while deleting the user'),
@@ -117,7 +116,7 @@ export function usersRouter(
       .input(
         z.object({
           name: z.string().min(1).max(100).optional(),
-          image: z.string().optional().nullable(), // Accept base64 data URLs
+          image: z.string().optional().nullable(),
         }),
       )
       .mutation(async ({ input, ctx }) => {
@@ -143,6 +142,7 @@ export function usersRouter(
           throw updateUserResponse.error;
         }
         const updatedUser = updateUserResponse.value;
+        await deleteCachedSession(ctx.sessionToken);
         return { updatedUser };
       }),
   });

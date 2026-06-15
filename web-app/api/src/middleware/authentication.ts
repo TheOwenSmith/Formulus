@@ -1,3 +1,4 @@
+import { deleteCachedSession, getCachedSession, setCachedSession } from '@api/lib/cache-session';
 import { prisma } from '@api/lib/prisma';
 import type { TRPCContext } from '@api/lib/trpc';
 import { parseCookies } from '@api/utils/parse-cookies';
@@ -5,7 +6,6 @@ import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error
 
 export function createUserAuthenticationProcedure(t: TRPCContext) {
   return t.procedure.use(async ({ ctx, next }) => {
-    // Get session token
     const cookies = parseCookies(ctx);
     const sessionToken = cookies['better-auth.session_token']?.split('.', 1)[0];
     if (sessionToken == undefined) {
@@ -15,7 +15,18 @@ export function createUserAuthenticationProcedure(t: TRPCContext) {
       } satisfies AppError;
     }
 
-    // Get session from database
+    // Try Redis cache first
+    const cached = await getCachedSession(sessionToken);
+    if (cached != null) {
+      if (cached.expiresAt < new Date()) {
+        // Cached session has expired — evict and fall through to DB
+        await deleteCachedSession(sessionToken);
+      } else {
+        return next({ ctx: { ...ctx, sessionToken, user: cached.user } });
+      }
+    }
+
+    // Cache miss — hit Postgres
     const getSessionResponse = await fromThrowableAsync(
       () =>
         prisma.session.findUnique({
@@ -37,9 +48,12 @@ export function createUserAuthenticationProcedure(t: TRPCContext) {
       } satisfies AppError;
     }
 
+    await setCachedSession(sessionToken, { expiresAt: session.expiresAt, user: session.user });
+
     return next({
       ctx: {
         ...ctx,
+        sessionToken,
         user: session.user,
       },
     });

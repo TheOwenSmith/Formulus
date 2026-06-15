@@ -24,6 +24,7 @@ const envVarsAll = [
   'STRIPE_API_KEY',
   'STRIPE_PRICE_ID',
   'STRIPE_WEBHOOK_SECRET',
+  'REDIS_URL',
 ] as const satisfies string[];
 
 type EnvVar = (typeof envVarsAll)[number];

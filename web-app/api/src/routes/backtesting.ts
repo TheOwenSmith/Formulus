@@ -1,6 +1,7 @@
 import { config } from '@api/lib/config';
 import { generateText } from '@api/lib/llm';
 import { prisma } from '@api/lib/prisma';
+import { redis } from '@api/lib/redis';
 import { sqs } from '@api/lib/sqs';
 import { type TRPCContext } from '@api/lib/trpc';
 import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
@@ -56,27 +57,12 @@ export function backtestingRouter(
           throw badRequest('One or more algorithms not found');
         }
 
-        // Throttle: one submission per 20 seconds (global, across all algorithms)
-        const throttleWindowMs = 10_000;
-        const recentSubmissionResult = await fromThrowableAsync(
-          () =>
-            prisma.backtestingSubmission.findFirst({
-              where: {
-                creatorId: user.id,
-                createdAt: { gte: new Date(Date.now() - throttleWindowMs) },
-              },
-              select: { createdAt: true },
-              orderBy: { createdAt: 'desc' },
-            }),
-          (e) => internal(e, 'Failed to check submission throttle'),
-        );
-        if (recentSubmissionResult.isErr()) throw recentSubmissionResult.error;
-        if (recentSubmissionResult.value != null) {
-          const secondsLeft = Math.ceil(
-            (recentSubmissionResult.value.createdAt.getTime() + throttleWindowMs - Date.now()) /
-              1000,
-          );
-          throw badRequest(`Please wait ${secondsLeft}s before submitting another backtest`);
+        // Throttle: one submission per 10 seconds via Redis
+        const rateLimitKey = `rate_limit:backtest:${user.id}`;
+        const acquired = await redis.set(rateLimitKey, '1', 'EX', 10, 'NX');
+        if (acquired === null) {
+          const ttl = await redis.ttl(rateLimitKey);
+          throw badRequest(`Please wait ${ttl > 0 ? ttl : 1}s before submitting another backtest`);
         }
 
         // Create submission with snapshotted algorithm versions
