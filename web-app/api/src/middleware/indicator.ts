@@ -8,7 +8,7 @@ import {
   regexByIndicator,
   type Indicator,
 } from '@shared/constants/indicators/indicator';
-import { MAX_INDICATOR_MULTIPLIER } from '@shared/constants/trading';
+import { MAX_INDICATOR_MULTIPLIER } from '@shared/constants/limits';
 import { badRequest } from '@shared/utils/error-handling';
 import { err, ok } from 'neverthrow';
 

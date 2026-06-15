@@ -71,10 +71,6 @@ export enum AlgorithmType {
   TOP_K,
 }
 
-export const MAX_ALGORITHMS_TO_COMPARE = 25;
-export const MAX_INDICATORS_COUNT = 40;
-export const MAX_INDICATOR_MULTIPLIER = 20;
-
 export const DEFAULT_ALGORITHM_MAX_HOLDING_PROPORTION = 0.95;
 export const ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT = 0.99;
 

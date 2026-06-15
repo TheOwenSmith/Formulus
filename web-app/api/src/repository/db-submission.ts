@@ -1,11 +1,23 @@
 import { prisma } from '@api/lib/prisma';
+import {
+  BASIC_PLAN_MAX_BACKTESTS_PER_MONTH,
+  BASIC_PLAN_MAX_CONCURRENT_BACKTESTS,
+  LimitReachedError,
+  PRO_PLAN_MAX_BACKTESTS_PER_MONTH,
+  PRO_PLAN_MAX_CONCURRENT_BACKTESTS,
+} from '@shared/constants/limits';
 import { BacktestingSubmissionStatus } from '@shared/generated/prisma/enums';
 import type {
   AlgorithmModel,
   AlgorithmVersionModel,
   BacktestingSubmissionModel,
 } from '@shared/generated/prisma/models';
-import { fromThrowableAsync, internal, type AppError } from '@shared/utils/error-handling';
+import {
+  badRequest,
+  fromThrowableAsync,
+  internal,
+  type AppError,
+} from '@shared/utils/error-handling';
 import { nanoid } from 'nanoid';
 import { err, ok, type Result } from 'neverthrow';
 
@@ -77,42 +89,87 @@ export async function createSubmission({
   creatorId,
   name,
   timespan,
+  userIsPro,
 }: {
   algorithms: AlgorithmModel[];
   creatorId: string;
   name: string;
   timespan?: [string | null, string | null];
+  userIsPro: boolean;
 }): Promise<Result<BacktestingSubmissionModel, AppError>> {
   const publicId = nanoid(12);
 
+  const MAX_CONCURRENT_BACKTESTS = userIsPro
+    ? PRO_PLAN_MAX_CONCURRENT_BACKTESTS
+    : BASIC_PLAN_MAX_CONCURRENT_BACKTESTS;
+
+  const MAX_BACKTESTS_PER_MONTH = userIsPro
+    ? PRO_PLAN_MAX_BACKTESTS_PER_MONTH
+    : BASIC_PLAN_MAX_BACKTESTS_PER_MONTH;
+
   const createResult = await fromThrowableAsync(
     () =>
-      prisma.backtestingSubmission.create({
-        data: {
-          algorithmVersions: {
-            create: algorithms.map((algorithm) => ({
-              aggregate: algorithm.aggregate,
-              algorithm: { connect: { id: algorithm.id } },
-              algorithmMaxHoldingProportion: algorithm.algorithmMaxHoldingProportion,
-              contextLength: algorithm.contextLength,
-              indicators: algorithm.indicators,
-              k: algorithm.k,
-              language: algorithm.language,
-              name: algorithm.name,
-              tickers: algorithm.tickers,
-              type: algorithm.type,
-              userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
-            })),
+      prisma.$transaction(async (tx) => {
+        // Prevent the user from creating more algorithms during transaction
+        await tx.$queryRaw`SELECT id FROM "user" WHERE id = ${creatorId} FOR UPDATE`;
+
+        const inProgressSubmissions = await tx.backtestingSubmission.count({
+          where: {
+            creatorId,
+            status: {
+              in: [BacktestingSubmissionStatus.PENDING, BacktestingSubmissionStatus.RUNNING],
+            },
           },
-          creatorId,
-          endTimespan: timespan?.[1] ?? null,
-          name,
-          publicId,
-          startTimespan: timespan?.[0] ?? null,
-          status: BacktestingSubmissionStatus.PENDING,
-        },
+        });
+        if (inProgressSubmissions >= MAX_CONCURRENT_BACKTESTS) {
+          throw new LimitReachedError(
+            `${userIsPro ? 'Pro' : 'Basic'} plan concurrent backtest limit of ${MAX_CONCURRENT_BACKTESTS} reached`,
+          );
+        }
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const backtestsThisMonth = await tx.backtestingSubmission.count({
+          where: {
+            creatorId,
+            createdAt: {
+              gte: startOfMonth,
+            },
+          },
+        });
+        if (backtestsThisMonth >= MAX_BACKTESTS_PER_MONTH) {
+          throw new LimitReachedError(
+            `${userIsPro ? 'Pro' : 'Basic'} plan backtests per month limit of ${MAX_BACKTESTS_PER_MONTH} reached`,
+          );
+        }
+
+        return await tx.backtestingSubmission.create({
+          data: {
+            algorithmVersions: {
+              create: algorithms.map((algorithm) => ({
+                aggregate: algorithm.aggregate,
+                algorithm: { connect: { id: algorithm.id } },
+                algorithmMaxHoldingProportion: algorithm.algorithmMaxHoldingProportion,
+                contextLength: algorithm.contextLength,
+                indicators: algorithm.indicators,
+                k: algorithm.k,
+                language: algorithm.language,
+                name: algorithm.name,
+                tickers: algorithm.tickers,
+                type: algorithm.type,
+                userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
+              })),
+            },
+            creatorId,
+            endTimespan: timespan?.[1] ?? null,
+            name,
+            publicId,
+            startTimespan: timespan?.[0] ?? null,
+            status: BacktestingSubmissionStatus.PENDING,
+          },
+        });
       }),
-    (e) => internal(e),
+    (e) => (e instanceof LimitReachedError ? badRequest(e.message) : internal(e)),
   );
 
   if (createResult.isErr()) {

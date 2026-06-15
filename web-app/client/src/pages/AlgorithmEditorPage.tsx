@@ -9,12 +9,9 @@ import {
   minPeriodByIndicator,
   type IndicatorMetadataKey,
 } from '@shared/constants/indicator-params';
+import { MAX_INDICATOR_MULTIPLIER, MAX_INDICATORS_COUNT } from '@shared/constants/limits';
 import type { SupportedLanguage } from '@shared/constants/trading';
-import {
-  AlgorithmType,
-  MAX_INDICATOR_MULTIPLIER,
-  MAX_INDICATORS_COUNT,
-} from '@shared/constants/trading';
+import { AlgorithmType } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { type UserTicker } from '@shared/schemas/trading';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

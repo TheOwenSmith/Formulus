@@ -16,7 +16,7 @@ import {
   getSubmissionStatus,
 } from '@api/repository/db-submission';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
-import { MAX_ALGORITHMS_TO_COMPARE } from '@shared/constants/trading';
+import { MAX_ALGORITHMS_TO_COMPARE } from '@shared/constants/limits';
 import { badRequest, fromThrowableAsync, internal } from '@shared/utils/error-handling';
 import z from 'zod';
 
@@ -85,6 +85,7 @@ export function backtestingRouter(
           creatorId: user.id,
           name,
           timespan,
+          userIsPro: user.stripePlanActive,
         });
         if (submissionResult.isErr()) {
           throw submissionResult.error;

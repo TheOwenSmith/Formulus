@@ -1,6 +1,11 @@
 import { prisma } from '@api/lib/prisma';
 import { getTickers } from '@shared/constants/algorithm';
 import type { Indicator } from '@shared/constants/indicators/indicator';
+import {
+  BASIC_PLAN_MAX_ALGORITHMS_COUNT,
+  LimitReachedError,
+  PRO_PLAN_MAX_ALGORITHMS_COUNT,
+} from '@shared/constants/limits';
 import { AlgorithmType } from '@shared/constants/trading';
 import {
   convertAlgorithmTypeToDbAlgorithmType,
@@ -88,41 +93,58 @@ function dbAlgorithmToUserAlgorithm(
 export async function uploadAlgorithm({
   algorithm,
   creatorId,
+  userIsPro,
 }: {
   algorithm: AnyUserAlgorithmType;
   creatorId: string;
+  userIsPro: boolean;
 }): Promise<Result<AlgorithmModel, AppError>> {
   if (algorithm.type === AlgorithmType.TOP_K && !('k' in algorithm)) {
-    return err(
-      badRequest('Failed to upload algorithm: k is required for TOP_K algorithms', 'BAD_REQUEST'),
-    );
+    return err(badRequest('Failed to upload algorithm: k is required for TOP_K algorithms'));
   }
+
+  const MAX_ALGORITHMS_COUNT = userIsPro
+    ? PRO_PLAN_MAX_ALGORITHMS_COUNT
+    : BASIC_PLAN_MAX_ALGORITHMS_COUNT;
 
   const createAlgorithmResult = await fromThrowableAsync(
     () =>
-      prisma.algorithm.create({
-        data: {
-          aggregate: convertTimestampToDbTimestamp(algorithm.aggregate),
-          algorithmMaxHoldingProportion: algorithm.algorithmMaxHoldingProportion,
-          contextLength: algorithm.contextLength,
-          creator: {
-            connect: {
-              id: creatorId,
+      prisma.$transaction(async (tx) => {
+        // Prevent the user from creating more algorithms during transaction
+        await tx.$queryRaw`SELECT id FROM "user" WHERE id = ${creatorId} FOR UPDATE`;
+
+        const count = await tx.algorithm.count({ where: { creatorId } });
+        if (count >= MAX_ALGORITHMS_COUNT) {
+          throw new LimitReachedError(
+            `${userIsPro ? 'Pro' : 'Basic'} plan algorithm creation limit of ${MAX_ALGORITHMS_COUNT} reached`,
+          );
+        }
+        return await tx.algorithm.create({
+          data: {
+            aggregate: convertTimestampToDbTimestamp(algorithm.aggregate),
+            algorithmMaxHoldingProportion: algorithm.algorithmMaxHoldingProportion,
+            contextLength: algorithm.contextLength,
+            creator: {
+              connect: {
+                id: creatorId,
+              },
             },
+            indicators: algorithm.indicators ?? [],
+            k: 'k' in algorithm ? algorithm.k : undefined,
+            language: convertSupportedLanguageToDbSupportedLanguage(algorithm.language),
+            name: algorithm.name,
+            tickers: getTickers(algorithm),
+            type: convertAlgorithmTypeToDbAlgorithmType(algorithm.type),
+            userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
           },
-          indicators: algorithm.indicators ?? [],
-          k: 'k' in algorithm ? algorithm.k : undefined,
-          language: convertSupportedLanguageToDbSupportedLanguage(algorithm.language),
-          name: algorithm.name,
-          tickers: getTickers(algorithm),
-          type: convertAlgorithmTypeToDbAlgorithmType(algorithm.type),
-          userAlgorithmImplementationCode: algorithm.userAlgorithmImplementationCode,
-        },
+        });
       }),
     (e) =>
-      isPrismaUniqueConstraintError(e)
-        ? badRequest('An algorithm with that name already exists')
-        : internal(e),
+      e instanceof LimitReachedError
+        ? badRequest(e.message)
+        : isPrismaUniqueConstraintError(e)
+          ? badRequest('An algorithm with that name already exists')
+          : internal(e),
   );
   return createAlgorithmResult;
 }

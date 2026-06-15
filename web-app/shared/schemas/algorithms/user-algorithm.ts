@@ -3,10 +3,10 @@ import {
   USER_ALGORITHM_IMPLEMENTATION_CODE_MAX_LENGTH_BYTES,
 } from '@shared/constants/algorithm';
 import { indicatorSchema } from '@shared/constants/indicators/indicator';
+import { MAX_INDICATORS_COUNT } from '@shared/constants/limits';
 import {
   ALGORITHM_MAX_HOLDING_PROPORTION_LIMIT,
   AlgorithmType,
-  MAX_INDICATORS_COUNT,
   SUPPORTED_LANGUAGE_VALUES,
 } from '@shared/constants/trading';
 import { tickerSchema, timestampSchema } from '@shared/schemas/trading';

@@ -4,13 +4,10 @@ import { Tooltip } from '@client/components/Tooltip';
 import { useRunBacktest } from '@client/hooks/useRunBacktest';
 import { trpcCredentials } from '@client/lib/trpc';
 import type { AlgorithmExample } from '@shared/constants/examples';
-import type { SupportedLanguage, Timestamp } from '@shared/constants/trading';
-import {
-  AlgorithmType,
-  MAX_ALGORITHMS_TO_COMPARE,
-  type TickerValue,
-} from '@shared/constants/trading';
 import type { Indicator } from '@shared/constants/indicators/indicator';
+import { MAX_ALGORITHMS_TO_COMPARE } from '@shared/constants/limits';
+import type { SupportedLanguage, Timestamp } from '@shared/constants/trading';
+import { AlgorithmType, type TickerValue } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';

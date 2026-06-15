@@ -12,7 +12,7 @@ import {
 import { getResultAccessInfo } from '@api/repository/db-sharing';
 import { getAlgorithmVersionsByResultPublicId } from '@api/repository/db-submission';
 import { indicatorSchema } from '@shared/constants/indicators/indicator';
-import { MAX_INDICATORS_COUNT } from '@shared/constants/trading';
+import { MAX_INDICATORS_COUNT } from '@shared/constants/limits';
 import { convertAlgorithmVersionToUserAlgorithm } from '@shared/db/algorithm-version';
 import { userAlgorithmSchema } from '@shared/schemas/algorithms/user-algorithm';
 import { userSimpleAlgorithmSchema } from '@shared/schemas/algorithms/user-simple-algorithm';
@@ -66,6 +66,7 @@ export function algorithmsRouter(
         const uploadResult = await uploadAlgorithm({
           algorithm: userAlgorithm,
           creatorId: user.id,
+          userIsPro: user.stripePlanActive,
         });
         if (uploadResult.isErr()) throw uploadResult.error;
         return { id: uploadResult.value.id };
@@ -73,7 +74,11 @@ export function algorithmsRouter(
 
     createAlgorithm: authProcedure.input(anyAlgorithmSchema).mutation(async ({ ctx, input }) => {
       const { user } = ctx;
-      const result = await uploadAlgorithm({ algorithm: input, creatorId: user.id });
+      const result = await uploadAlgorithm({
+        algorithm: input,
+        creatorId: user.id,
+        userIsPro: user.stripePlanActive,
+      });
       if (result.isErr()) throw result.error;
       return { id: result.value.id };
     }),
