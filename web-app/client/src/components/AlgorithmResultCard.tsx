@@ -42,6 +42,10 @@ function AlgorithmResultCardComponent({
 }: AlgorithmResultCardProps) {
   // Memoize color scheme to avoid recalculation
   const colorScheme = useMemo(() => colorSchemes[index % colorSchemes.length], [index]);
+  const availableTickers = useMemo(
+    () => Object.keys(tickerPlotByTicker) as Ticker[],
+    [tickerPlotByTicker],
+  );
   const [selectedTicker, setSelectedTicker] = useState<Ticker>(defaultTicker);
   // In side-by-side mode, show graph by default (false). In normal mode, show metrics panel by default (true).
   const [isMetricsPanelVisible, setIsMetricsPanelVisible] = useState(!isSideBySideMode);
@@ -333,7 +337,7 @@ function AlgorithmResultCardComponent({
                   <BacktestChart
                     algorithmColor={colorScheme.primaryColor}
                     algorithmPlot={algorithmGraph.algorithmPlot}
-                    availableTickers={Object.keys(tickerPlotByTicker)}
+                    availableTickers={availableTickers}
                     gradientFrom={colorScheme.gradientFrom}
                     gradientTo={colorScheme.gradientTo}
                     isSideBySideMode={isSideBySideMode}
@@ -407,7 +411,7 @@ function AlgorithmResultCardComponent({
               <BacktestChart
                 algorithmColor={colorScheme.primaryColor}
                 algorithmPlot={algorithmGraph.algorithmPlot}
-                availableTickers={Object.keys(tickerPlotByTicker)}
+                availableTickers={availableTickers}
                 gradientFrom={colorScheme.gradientFrom}
                 gradientTo={colorScheme.gradientTo}
                 isSideBySideMode={isSideBySideMode}
