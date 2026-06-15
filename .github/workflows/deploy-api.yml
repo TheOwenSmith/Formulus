@@ -154,4 +154,4 @@ jobs:
               EXTRA+=( -c "apiStagingDomainName=${API_DOMAIN_NAME}" -c "apiStagingSubDomain=${API_SUB_DOMAIN}" )
             fi
           fi
-          npx cdk deploy "$STACK" "$QUEUE_STACK" --require-approval never "${EXTRA[@]}"
+          pnpm exec cdk deploy "$STACK" "$QUEUE_STACK" --require-approval never "${EXTRA[@]}"

@@ -124,7 +124,7 @@ jobs:
       - name: CDK deploy ECR stack
         working-directory: web-app/infra
         run: |
-          npx cdk deploy FormulusEcr \
+          pnpm exec cdk deploy FormulusEcr \
             --require-approval never \
             -c workerOnly=true
 
@@ -180,6 +180,6 @@ jobs:
             COMPUTE_STACK=FormulusComputeStaging
             DISPATCHER_STACK=FormulusDispatcherStaging
           fi
-          npx cdk deploy "$COMPUTE_STACK" "$DISPATCHER_STACK" \
+          pnpm exec cdk deploy "$COMPUTE_STACK" "$DISPATCHER_STACK" \
             --require-approval never \
             -c workerOnly=true

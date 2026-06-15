@@ -139,7 +139,7 @@ jobs:
             STACK=FormulusAmplifyStaging
             BRANCH=client-staging
           fi
-          npx cdk deploy "$STACK" --require-approval never -c amplifyOnly=true
+          pnpm exec cdk deploy "$STACK" --require-approval never -c amplifyOnly=true
 
       - name: Deploy to Amplify
         run: |
