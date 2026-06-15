@@ -802,7 +802,7 @@ export function SubmissionsPage() {
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
               <h1
-                className="text-3xl font-bold bg-clip-text text-transparent min-w-0 m-0 leading-tight"
+                className="text-3xl font-bold bg-clip-text text-transparent min-w-0 m-0 leading-normal pb-1"
                 style={{
                   backgroundImage: 'linear-gradient(to right, #34d399, #3b82f6, #a855f7)',
                 }}

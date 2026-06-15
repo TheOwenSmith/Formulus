@@ -130,7 +130,7 @@ jobs:
 
       - name: Run database migrations
         working-directory: web-app/api
-        run: pnpm exec prisma migrate deploy
+        run: pnpm run prisma:deploy
 
       - name: CDK deploy API stack
         working-directory: web-app/infra

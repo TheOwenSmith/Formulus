@@ -643,11 +643,7 @@ export function BacktestPage() {
 
   // Interactive gradient based on global cursor position
   const headerRef = useRef<HTMLDivElement>(null);
-  const [gradientColors, setGradientColors] = useState({
-    from: 'rgb(34, 211, 238)', // cyan-400
-    via: 'rgb(59, 130, 246)', // blue-500
-    to: 'rgb(168, 85, 247)', // purple-500
-  });
+  const gradientHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     const handleMouseMove = throttle((e: MouseEvent) => {
@@ -668,11 +664,9 @@ export function BacktestPage() {
       const saturation = 75; // Moderate saturation
       const lightness = 60; // Consistent lightness
 
-      setGradientColors({
-        from: `hsl(${hue1}, ${saturation}%, ${lightness}%)`,
-        via: `hsl(${hue2}, ${saturation}%, ${lightness}%)`,
-        to: `hsl(${hue3}, ${saturation}%, ${lightness}%)`,
-      });
+      if (gradientHeadingRef.current) {
+        gradientHeadingRef.current.style.backgroundImage = `linear-gradient(to right, hsl(${hue1}, ${saturation}%, ${lightness}%), hsl(${hue2}, ${saturation}%, ${lightness}%), hsl(${hue3}, ${saturation}%, ${lightness}%))`;
+      }
     }, 16); // ~60fps throttling
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
@@ -745,9 +739,10 @@ export function BacktestPage() {
           className="text-center mb-2 animate-[fadeInDown_0.8s_ease-out] cursor-default"
         >
           <h1
+            ref={gradientHeadingRef}
             className="text-4xl font-bold m-0 bg-clip-text text-transparent tracking-tight leading-normal pb-1 transition-all duration-300"
             style={{
-              backgroundImage: `linear-gradient(to right, ${gradientColors.from}, ${gradientColors.via}, ${gradientColors.to})`,
+              backgroundImage: 'linear-gradient(to right, rgb(34, 211, 238), rgb(59, 130, 246), rgb(168, 85, 247))',
             }}
           >
             Backtesting Performance Analysis
