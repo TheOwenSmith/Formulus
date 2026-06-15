@@ -18,11 +18,13 @@ export function Tooltip({
   children,
   className = '',
   anchor = 'cursor',
+  suppressRef,
 }: {
   content?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   anchor?: TooltipAnchor;
+  suppressRef?: { current: boolean };
 }) {
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [aboveVisible, setAboveVisible] = useState(false);
@@ -58,6 +60,7 @@ export function Tooltip({
           pendingPositionRef.current = { x: e.clientX, y: e.clientY };
           delayRef.current = setTimeout(() => {
             delayRef.current = null;
+            if (suppressRef?.current) return;
             if (anchor === 'above') {
               const rect = triggerRef.current?.getBoundingClientRect();
               setAboveRect(rect ?? null);

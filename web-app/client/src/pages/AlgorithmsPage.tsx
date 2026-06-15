@@ -11,7 +11,7 @@ import type { SupportedLanguage, Timestamp } from '@shared/constants/trading';
 import { AlgorithmType, type TickerValue } from '@shared/constants/trading';
 import type { AnyUserAlgorithmType } from '@shared/schemas/algorithms/user-algorithm';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLoaderData, useNavigate, useRevalidator } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -102,7 +102,7 @@ function AlgorithmCard({
   const tickers = getTickers(algorithm);
   const typeColorClass = TYPE_COLOR[algorithm.type] ?? TYPE_COLOR[AlgorithmType.NORMAL];
   const lastEdited = formatLastEdited(algorithm.updatedAt);
-  const [isOverRunButton, setIsOverRunButton] = useState(false);
+  const isOverRunButtonRef = useRef(false);
   const tooltipContent = (
     <div className="flex flex-col gap-0.5 text-xs">
       {tickers.length > 0 && (
@@ -138,7 +138,11 @@ function AlgorithmCard({
   };
 
   return (
-    <Tooltip content={isOverRunButton && backtestLimitTooltip != null ? backtestLimitTooltip : tooltipContent} className="w-full">
+    <Tooltip
+      content={tooltipContent}
+      suppressRef={backtestLimitTooltip != null ? isOverRunButtonRef : undefined}
+      className="w-full"
+    >
       <div
         role="button"
         tabIndex={0}
@@ -275,9 +279,10 @@ function AlgorithmCard({
           {/* Run backtest */}
           <div
             className="flex-1"
-            onMouseEnter={() => setIsOverRunButton(true)}
-            onMouseLeave={() => setIsOverRunButton(false)}
+            onMouseEnter={() => { isOverRunButtonRef.current = true; }}
+            onMouseLeave={() => { isOverRunButtonRef.current = false; }}
           >
+            <Tooltip content={isCompareMode ? undefined : backtestLimitTooltip}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -341,6 +346,7 @@ function AlgorithmCard({
                 </>
               )}
             </button>
+            </Tooltip>
           </div>
         </div>
       </div>
