@@ -34,116 +34,78 @@ export function AboutPage() {
 
         <div className="space-y-6 animate-[fadeInUp_0.8s_ease-out_0.2s_both]">
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
-            <p className="text-white/90 leading-relaxed mb-6">
-              I,{' '}
-              <ExternalLink href="https://linkedin.com/in/owensmith2006">Owen Smith</ExternalLink>,
-              built Formulus to solve a problem I kept running into: existing trading frameworks
-              either required writing thousands of lines of infrastructure code or were too
-              abstracted to handle real-world constraints like transaction costs and position
-              management. I wanted a system where I could focus on algorithm development and
-              mathematical formulation, not data pipelines and execution logic.
-            </p>
-            <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              Technical Summary
-            </h2>
             <p className="text-white/90 leading-relaxed mb-4">
-              The system is a TypeScript framework (10,000+ lines) with three main components:
+              A couple of months ago, I started to explore algorithmic trading. While there were
+              many ideas I had for strategies to explore and possibly paper trade, I recurrently ran
+              into the same issues. Finding quality tick data is expensive and non-trivial to
+              compile, &ldquo;vibe-coded&rdquo; backtests cannot be trusted, and even simple
+              strategies take hundreds of lines of code. Knowing there are thousands, perhaps tens
+              of thousands, of developers / traders dealing with the same issues, I created{' '}
+              <ExternalLink href="https://formulus.ai">formulus.ai</ExternalLink>.
             </p>
-            <ul className="text-white/90 leading-relaxed mb-4 space-y-2 list-disc list-inside ml-4">
-              <li>
-                <strong className="text-white">Backtesting engine:</strong> Simulates how strategies
-                would have performed with transaction costs and realistic market conditions
-              </li>
-              <li>
-                <strong className="text-white">Data API:</strong> Fetches and cleans stock price
-                data (tick-level and minute-level) and handles data quality issues
-              </li>
-              <li>
-                <strong className="text-white">Algorithm layer:</strong> Algorithmic creation that
-                perfectly blends simplicity and capability.
-              </li>
-              <li>
-                <strong className="text-white">SaaS platform:</strong> Expanded into{' '}
-                <ExternalLink href="https://formulus.ai">formulus.ai</ExternalLink>, which lets
-                others develop algorithms without building everything from scratch
-              </li>
-            </ul>
+            <p className="text-white/90 leading-relaxed">
+              With Formulus, these struggles no longer need to be dealt with. I sourced and cleansed
+              data from multiple trading APIs, created a high-level trading framework that supports
+              four programming languages, and built a robust backtesting engine so you don&apos;t
+              have to. With this robust system, the most complicated strategies can be created and
+              tested in minutes with fewer than 100 lines of code, allowing you to focus on ideas
+              rather than debugging syntax errors. For users that need low-level, granular control,
+              Formulus may not be for them; however, it excels at efficient experimentation and idea
+              validation.
+            </p>
           </div>
 
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
             <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
               System Architecture
             </h2>
-            <div className="space-y-4">
-              <div>
-                <strong className="text-white">Data Pipeline:</strong>
-                <p className="text-white/90 leading-relaxed mt-1">
-                  Fetches stock price data from multiple sources at tick-level and minute-level
-                  granularity. Handles common data problems like missing data points, stock splits,
-                  and different data formats from different exchanges. Stores the data in a way that
-                  makes it fast to query historical prices for backtesting.
-                </p>
-              </div>
-              <div>
-                <strong className="text-white">Backtesting Engine:</strong>
-                <p className="text-white/90 leading-relaxed mt-1">
-                  Simulates how a strategy would have performed by replaying historical market data.
-                  Accounts for transaction costs (slippage) and assumes realistic delays when
-                  placing orders. Can test strategies on different time periods to make sure they're
-                  not just overfitting to one dataset.
-                </p>
-              </div>
-              <div>
-                <strong className="text-white">Algorithm Layer:</strong>
-                <p className="text-white/90 leading-relaxed mt-1">
-                  TypeScript code that lets you write trading strategies. Handles the mechanics of
-                  position sizing, risk limits, and rebalancing so you can focus on the strategy
-                  logic. Separates the "what to trade" decision from the "how to execute it"
-                  details, with automated tests to make sure portfolio calculations are correct.
-                </p>
-              </div>
-            </div>
+            <p className="text-white/90 leading-relaxed">
+              <ExternalLink href="https://formulus.ai">formulus.ai</ExternalLink> is a SaaS
+              application that consists of a frontend, a backend, and a backtesting worker. At a
+              high level, when a user has a strategy they wish to backtest, the user submits a
+              request to the API, which adds the submission to a queue in AWS. The queue submission
+              triggers a lambda dispatcher, which then starts a worker task. The worker fetches the
+              appropriate submission from the database and then downloads the relevant tick data
+              files and indices from S3. Since the user&apos;s code is possibly malicious, the
+              worker initiates a Docker container and uploads the user&apos;s code to said container
+              via a bind mount. Note that since the worker is an ECS task, this process creates an
+              interesting docker-in-docker design. After the backtest is completed or when the user
+              code errors, the container containing the user&apos;s code is killed, and the
+              backtesting results or errors, resp., are uploaded in the database, and the ECS task
+              is terminated. Finally, on the frontend, users can view their results using the
+              performance analysis dashboard.{' '}
+              <ExternalLink href="#">Learn more</ExternalLink>
+            </p>
           </div>
 
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
             <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
               Position Management System
             </h2>
-            <p className="text-white/90 leading-relaxed mb-4">
-              Simple rebalancing—evenly dividing position sizes across different tickers—breaks down
-              when transaction costs matter. Each ticker has different slippage characteristics that
-              must be estimated using microstructure noise estimation. Because selling yields less
-              cash than a position's value and buying costs more than the target amount, the
-              rebalancing problem becomes nonlinear.
-            </p>
-            <p className="text-white/90 leading-relaxed mb-4">
-              The{' '}
+            <p className="text-white/90 leading-relaxed">
+              Position management is frequently an annoyance and often one of the most tedious,
+              time-consuming aspects of systematic trading. When simply trying to verify a strategy,
+              researchers may want to prioritize optimizing entries and exits without dealing with
+              capital allocation. What would a system look like that allows traders to ignore
+              position sizing all together? The{' '}
               <ExternalLink href="/docs/Phoenix_Trader_Position_Management_System.pdf">
                 Phoenix Trader Position Management System
-              </ExternalLink>{' '}
-              solves this by finding how much to put in each stock while accounting for transaction
-              costs and maintaining the target investment percentage. The solution involves sorting
-              your current positions, checking different ranges of position sizes, and solving a
-              linear equation to find the right amount.
-            </p>
-            <p className="text-white/90 leading-relaxed">
-              This work required both mathematical formulation (deriving the closed-form solution)
-              and careful implementation (handling floating-point precision, interval boundaries,
-              and unit conventions for slippage rates). It demonstrated the intersection of
-              mathematical rigor and software engineering in quantitative finance.
+              </ExternalLink>
+              . This system allows for quick iteration without neglect for position sizing and is
+              what governs every trade made through Formulus.
             </p>
           </div>
 
           <div className="bg-slate-900/60 rounded-2xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-[10px]">
             <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
-              A&O Quantitative
+              A&amp;O Quantitative
             </h2>
             <p className="text-white/90 leading-relaxed mb-4">
               This system is currently{' '}
               <ExternalLink href="https://linkedin.com/company/aoquantitative">
                 A&O Quantitative
               </ExternalLink>
-              's biggest project.{' '}
+              &apos;s biggest project.{' '}
               <ExternalLink href="https://linkedin.com/company/aoquantitative">
                 A&O Quantitative
               </ExternalLink>{' '}
@@ -194,7 +156,7 @@ export function AboutPage() {
                 >
                   <path d={LINKEDIN} />
                 </svg>
-                <span>A&O Quantitative LinkedIn</span>
+                <span>A&amp;O Quantitative LinkedIn</span>
               </a>
             </div>
           </div>
