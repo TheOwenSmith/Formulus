@@ -79,7 +79,9 @@ export function AboutPage() {
               is killed, and the backtesting results or errors, resp., are uploaded in the database,
               and the ECS task is terminated. Finally, on the frontend, users can view their results
               using the performance analysis dashboard.{' '}
-              <ExternalLink href="#">Learn more</ExternalLink>
+              <ExternalLink href="https://github.com/TheOwenSmith/PhoenixTrader#readme">
+                Learn more
+              </ExternalLink>
             </p>
             <div className="mt-6 overflow-hidden">
               <img
