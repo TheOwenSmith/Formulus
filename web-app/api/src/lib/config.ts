@@ -2,7 +2,7 @@ import { config as dotenvConfig } from 'dotenv';
 import { validateEnvVars } from './validate-env-vars';
 dotenvConfig();
 
-const devEnvVars = ['PORT', 'AWS_ENDPOINT_URL'] as const satisfies string[];
+const devEnvVars = ['PORT', 'AWS_ENDPOINT_URL', 'REDIS_URL'] as const satisfies string[];
 type DevEnvVar = (typeof devEnvVars)[number];
 
 const envVarsAll = [
@@ -19,7 +19,6 @@ const envVarsAll = [
   'STRIPE_API_KEY',
   'STRIPE_PRICE_ID',
   'STRIPE_WEBHOOK_SECRET',
-  'REDIS_URL',
 ] as const satisfies string[];
 
 type EnvVar = (typeof envVarsAll)[number];
