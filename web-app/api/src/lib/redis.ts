@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 import { config } from './config';
 
-const redis = new Redis(config.getKey('REDIS_URL'), {
+const redis = new Redis(config.getDevKey('REDIS_URL'), {
   enableOfflineQueue: false,
   lazyConnect: false,
   maxRetriesPerRequest: 1,
