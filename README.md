@@ -68,7 +68,22 @@ Deployments are done through a GitHub Actions CI/CD pipeline. All environment va
    cd web-app; pnpm i; cd client; pnpm i; cd ../shared; pnpm i; cd ../api; pnpm i; cd ../worker; pnpm i
    ```
 
-4. Populate environment variables (see `api/.env.sample`, `shared/.env.sample` and `worker/.env.sample`)
+4. Populate environment variables (see `api/.env.sample`, `shared/.env.sample`, `worker/.env.sample`, and `client/.env.sample`)
+
+   `api/.env.sample` leaves several values blank. The API won't start without them, so use placeholders for local dev.
+
+   | Variable                                                     | Purpose                                                         |
+   | ------------------------------------------------------------ | --------------------------------------------------------------- |
+   | `BETTER_AUTH_SECRET`                                         | Session signing for [Better Auth](https://www.better-auth.com/) |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                   | Google OAuth sign-in                                            |
+   | `STRIPE_API_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` | Stripe subscriptions and webhooks                               |
+   | `COHERE_API_KEY`                                             | LLM-generated backtest names                                    |
+
+   Generate `BETTER_AUTH_SECRET` with:
+
+   ```powershell
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
 
 **Stripe**
 

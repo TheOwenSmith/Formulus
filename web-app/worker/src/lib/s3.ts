@@ -8,10 +8,6 @@ export const s3 =
     ? new S3Client({
         region,
         endpoint: config.getDevKey('AWS_ENDPOINT_URL'),
-        credentials: {
-          accessKeyId: config.getDevKey('AWS_ACCESS_KEY_ID'),
-          secretAccessKey: config.getDevKey('AWS_SECRET_ACCESS_KEY'),
-        },
         forcePathStyle: true,
       })
     : new S3Client({ region });

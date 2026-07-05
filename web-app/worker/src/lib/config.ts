@@ -2,12 +2,7 @@ import { config as dotenvConfig } from 'dotenv';
 import { validateEnvVars } from './validate-env-vars';
 dotenvConfig();
 
-const devEnvVars = [
-  'AWS_ENDPOINT_URL',
-  'AWS_ACCESS_KEY_ID',
-  'AWS_SECRET_ACCESS_KEY',
-  'QUEUE_URL',
-] as const satisfies string[];
+const devEnvVars = ['AWS_ENDPOINT_URL', 'QUEUE_URL'] as const satisfies string[];
 type DevEnvVar = (typeof devEnvVars)[number];
 
 const envVars = [
