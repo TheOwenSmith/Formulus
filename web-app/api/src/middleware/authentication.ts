@@ -19,14 +19,14 @@ export function createUserAuthenticationProcedure(t: TRPCContext) {
     const cached = await getCachedSession(sessionToken);
     if (cached != null) {
       if (cached.expiresAt < new Date()) {
-        // Cached session has expired — evict and fall through to DB
+        // Cached session has expired, so evict and fall through to DB
         await deleteCachedSession(sessionToken);
       } else {
         return next({ ctx: { ...ctx, sessionToken, user: cached.user } });
       }
     }
 
-    // Cache miss — hit Postgres
+    // User not in cache, so query postgres
     const getSessionResponse = await fromThrowableAsync(
       () =>
         prisma.session.findUnique({

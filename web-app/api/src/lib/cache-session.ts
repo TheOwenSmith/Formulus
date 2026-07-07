@@ -1,4 +1,5 @@
 import type { UserModel } from '@shared/generated/prisma/models';
+import { fromThrowable, fromThrowableAsync, internal } from '@shared/utils/error-handling';
 import { redis } from './redis';
 
 const SESSION_CACHE_TTL_SECONDS = 30;
@@ -12,29 +13,34 @@ function key(token: string) {
 export type CachedSession = { expiresAt: Date; user: UserModel };
 
 export async function getCachedSession(token: string): Promise<CachedSession | null> {
-  try {
-    const raw = await redis.get(key(token));
-    if (raw == null) return null;
-    const { expiresAt, user } = JSON.parse(raw) as Stored;
-    return { expiresAt: new Date(expiresAt), user };
-  } catch {
-    return null;
-  }
+  const getResult = await fromThrowableAsync(
+    () => redis.get(key(token)),
+    (e) => internal(e, 'Redis get failed'),
+  );
+  if (getResult.isErr()) return null;
+  if (getResult.value == null) return null;
+
+  const parseResult = fromThrowable(
+    () => JSON.parse(getResult.value!) as Stored,
+    (e) => internal(e, 'Redis parse failed'),
+  );
+  if (parseResult.isErr()) return null;
+
+  const { expiresAt, user } = parseResult.value;
+  return { expiresAt: new Date(expiresAt), user };
 }
 
 export async function setCachedSession(token: string, data: CachedSession): Promise<void> {
-  try {
-    const payload: Stored = { expiresAt: data.expiresAt.toISOString(), user: data.user };
-    await redis.set(key(token), JSON.stringify(payload), 'EX', SESSION_CACHE_TTL_SECONDS);
-  } catch {
-    // non-fatal
-  }
+  const payload: Stored = { expiresAt: data.expiresAt.toISOString(), user: data.user };
+  await fromThrowableAsync(
+    () => redis.set(key(token), JSON.stringify(payload), 'EX', SESSION_CACHE_TTL_SECONDS),
+    (e) => internal(e, 'Redis set failed'),
+  );
 }
 
 export async function deleteCachedSession(token: string): Promise<void> {
-  try {
-    await redis.del(key(token));
-  } catch {
-    // non-fatal
-  }
+  await fromThrowableAsync(
+    () => redis.del(key(token)),
+    (e) => internal(e, 'Redis del failed'),
+  );
 }
