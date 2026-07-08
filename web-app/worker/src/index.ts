@@ -24,8 +24,7 @@ import {
   updateSubmissionStatus,
 } from './repository/db-submission';
 
-// Thrown from onProgress to abort the backtest loop when a cancellation is detected.
-// Caught immediately in processSubmission — never escapes.
+// Thrown from onProgress to abort the backtest loop when a cancellation is detected
 class BacktestCancelled {
   readonly _tag = 'BacktestCancelled' as const;
 }
@@ -35,6 +34,19 @@ function serializeErrorDetail(error: unknown): string | undefined {
   if (error instanceof Error) return error.stack ?? error.message;
   if (typeof error === 'string') return error;
   return JSON.stringify(error);
+}
+
+async function markSubmissionFailed(submissionId: string, appError: AppError): Promise<void> {
+  const { code, message, error } = appError;
+  const result = await updateSubmissionStatus(submissionId, BacktestingSubmissionStatus.ERROR, {
+    ...(config.env === 'dev' || code !== 'INTERNAL_SERVER_ERROR'
+      ? { error: message, errorDetail: serializeErrorDetail(error) }
+      : { error: "An unexpected error occurred (it's not you, it's us)" }),
+    errorCode: code,
+  });
+  if (result.isErr()) {
+    console.error(`Failed to mark submission ${submissionId} as ERROR:`, result.error);
+  }
 }
 
 async function processSubmission(submissionId: string): Promise<Result<undefined, AppError>> {
@@ -208,6 +220,7 @@ async function devLoop(): Promise<never> {
           const result = await processSubmission(submissionId);
           if (result.isErr()) {
             console.error(`Failed to process submission '${submissionId}':`, result.error);
+            await markSubmissionFailed(submissionId, result.error);
           } else {
             console.log('Submission processed successfully:', submissionId);
           }
@@ -237,6 +250,7 @@ async function main() {
     const result = await processSubmission(submissionId);
     if (result.isErr()) {
       console.error(`Failed to process submission ${submissionId}:`, result.error);
+      await markSubmissionFailed(submissionId, result.error);
       process.exit(1);
     }
     console.log('Submission processed successfully:', submissionId);

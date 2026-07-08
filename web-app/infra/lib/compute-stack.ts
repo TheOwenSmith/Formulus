@@ -18,6 +18,7 @@ export class ComputeStack extends cdk.Stack {
     id: string,
     props: cdk.StackProps & {
       workerImageRepo: ecr.IRepository;
+      runnerImageRepos: ecr.IRepository[];
       workerEnv: { ALPHA_VANTAGE_API_KEY: string; DATA_BUCKET: string; DATABASE_URL: string; NODE_ENV: string };
       clusterName?: string;
       imageTag?: string;
@@ -135,6 +136,22 @@ export class ComputeStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ['secretsmanager:GetSecretValue', 'ssm:GetParameter', 'ssm:GetParameters'],
         resources: ['*'],
+      }),
+    );
+
+    // Allow the worker to authenticate with ECR and pull runner images via Dockerode.
+    // GetAuthorizationToken is account-scoped (resource: *); pull actions are repo-scoped.
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['ecr:GetAuthorizationToken'],
+        resources: ['*'],
+      }),
+    );
+
+    taskRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage'],
+        resources: props.runnerImageRepos.map((repo) => repo.repositoryArn),
       }),
     );
 

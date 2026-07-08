@@ -85,6 +85,7 @@ if (!amplifyOnly) {
       logGroupName,
       workerEnv: workerEnvConfig,
       workerImageRepo: ecr.workerRepo,
+      runnerImageRepos: [ecr.typescriptRunnerRepo, ecr.cppRunnerRepo],
       taskDefinitionFamily: taskDefFamily,
       taskRoleName,
       executionRoleName,
