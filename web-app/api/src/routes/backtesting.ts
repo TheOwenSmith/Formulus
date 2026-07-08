@@ -58,10 +58,18 @@ export function backtestingRouter(
         }
 
         // Throttle: one submission per 10 seconds via Redis
+        console.log(`[${ctx.req.path}] pinging redis`);
         const rateLimitKey = `rate_limit:backtest:${user.id}`;
-        const acquired = await redis.set(rateLimitKey, '1', 'EX', 10, 'NX');
-        if (acquired === null) {
-          const ttl = await redis.ttl(rateLimitKey);
+        const acquiredResult = await fromThrowableAsync(
+          () => redis.set(rateLimitKey, '1', 'EX', 10, 'NX'),
+          (e) => internal(e, 'Redis rate limit check failed'),
+        );
+        if (acquiredResult.isOk() && acquiredResult.value === null) {
+          const ttlResult = await fromThrowableAsync(
+            () => redis.ttl(rateLimitKey),
+            (e) => internal(e, 'Redis TTL check failed'),
+          );
+          const ttl = ttlResult.isOk() ? ttlResult.value : 1;
           throw badRequest(`Please wait ${ttl > 0 ? ttl : 1}s before submitting another backtest`);
         }
 

@@ -3,7 +3,7 @@ import { config } from './config';
 
 const redis = new Redis(config.getKey('REDIS_URL'), {
   enableOfflineQueue: false,
-  lazyConnect: false,
+  lazyConnect: true,
   maxRetriesPerRequest: 1,
 });
 
