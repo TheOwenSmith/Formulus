@@ -4,7 +4,7 @@ import { backtestingRouter } from '@api/routes/backtesting';
 import { paymentsRouter } from '@api/routes/payments';
 import { sharingRouter } from '@api/routes/sharing';
 import { usersRouter } from '@api/routes/users';
-import { isAppError } from '@shared/utils/error-handling';
+import { isAppError, TRPC_ERROR_CODE_TO_HTTP_STATUS } from '@shared/utils/error-handling';
 import { initTRPC } from '@trpc/server';
 import { type CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import { config } from './config';
@@ -23,12 +23,14 @@ export const t = initTRPC.context<Context>().create({
       // In prod, hide stack traces completely
       data: {
         ...shape.data,
+        code: errorCode,
+        httpStatus: TRPC_ERROR_CODE_TO_HTTP_STATUS[errorCode],
         stack: config.env === 'dev' ? shape.data.stack : undefined,
       },
       message:
         shape.message !== '' &&
         shape.message !== 'INTERNAL_SERVER_ERROR' &&
-        (config.env === 'dev' || error.code !== 'INTERNAL_SERVER_ERROR')
+        (config.env === 'dev' || errorCode !== 'INTERNAL_SERVER_ERROR')
           ? shape.message
           : "An unexpected error occurred (it's not you, it's us)",
     };
