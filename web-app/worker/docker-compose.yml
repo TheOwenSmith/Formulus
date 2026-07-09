@@ -5,14 +5,12 @@ services:
       - "6379:6379"
 
   localstack:
-    image: localstack/localstack
+    build: ./localstack-init
     ports:
       - "4566:4566"
     environment:
       - SERVICES=sqs
       - AWS_DEFAULT_REGION=us-east-2
-    volumes:
-      - ${PWD}/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh
 
   postgres:
     image: postgres:16
