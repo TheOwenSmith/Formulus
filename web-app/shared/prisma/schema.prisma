@@ -31,6 +31,7 @@ model User {
   backtestingResults BacktestingResults[] @relation("UserBacktestingResults")
   backtestingShares BacktestingShare[] @relation("UserBacktestingShare")
   backtestingSubmissions BacktestingSubmission[] @relation("UserBacktestingSubmissions")
+  backtestUsageEvents BacktestUsageEvent[] @relation("UserBacktestUsageEvents")
 
   stripeCustomerId     String?  @unique
   stripeSubscriptionId String?  @unique
@@ -258,6 +259,17 @@ model BacktestingShare {
   @@index([userId])
   @@index([backtestingResultsId])
   @@map("backtesting_share")
+}
+
+model BacktestUsageEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  creator   User     @relation("UserBacktestUsageEvents", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId String
+
+  @@index([creatorId, createdAt])
+  @@map("backtest_usage_event")
 }
 
 enum BacktestingSubmissionStatus {

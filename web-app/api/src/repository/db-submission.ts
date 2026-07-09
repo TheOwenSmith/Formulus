@@ -129,12 +129,10 @@ export async function createSubmission({
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const backtestsThisMonth = await tx.backtestingSubmission.count({
+        const backtestsThisMonth = await tx.backtestUsageEvent.count({
           where: {
             creatorId,
-            createdAt: {
-              gte: startOfMonth,
-            },
+            createdAt: { gte: startOfMonth },
           },
         });
         if (backtestsThisMonth >= MAX_BACKTESTS_PER_MONTH) {
@@ -142,6 +140,8 @@ export async function createSubmission({
             `${userIsPro ? 'Pro' : 'Basic'} plan backtests per month limit of ${MAX_BACKTESTS_PER_MONTH} reached`,
           );
         }
+
+        await tx.backtestUsageEvent.create({ data: { creatorId } });
 
         return await tx.backtestingSubmission.create({
           data: {
