@@ -6,10 +6,10 @@
   "scripts": {
     "start": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "pnpm exec eslint .",
     "preview": "vite preview",
-    "prettier:write": "prettier \"**/*.{ts,js}\" --write",
-    "prettier:check": "prettier \"**/*.{ts,js}\" --check"
+    "prettier:write": "pnpm exec prettier \"**/*.{ts,js}\" --write",
+    "prettier:check": "pnpm exec prettier \"**/*.{ts,js}\" --check"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
