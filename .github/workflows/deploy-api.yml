@@ -88,6 +88,10 @@ jobs:
         working-directory: web-app/api
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        working-directory: web-app/api
+        run: pnpm run prisma:generate
+
       - name: ESLint
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
@@ -108,11 +112,6 @@ jobs:
         run: echo "::warning::Prettier and ESLint were skipped."
 
       # --- Deploy ---
-
-      - name: Generate Prisma client
-        if: env.RUN_QUALITY_CHECKS == 'true'
-        working-directory: web-app/api
-        run: pnpm run prisma:generate
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
