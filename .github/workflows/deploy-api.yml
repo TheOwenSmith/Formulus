@@ -88,6 +88,10 @@ jobs:
         working-directory: web-app/api
         run: pnpm install --frozen-lockfile
 
+      - name: Install /shared dependencies
+        working-directory: web-app/shared
+        run: pnpm install --frozen-lockfile
+
       - name: Generate Prisma client
         working-directory: web-app/api
         run: pnpm run prisma:generate
@@ -96,11 +100,6 @@ jobs:
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
         run: pnpm run lint
-
-      - name: Install /shared dependencies
-        if: env.RUN_QUALITY_CHECKS == 'true'
-        working-directory: web-app/shared
-        run: pnpm install --frozen-lockfile
 
       - name: ESLint (shared)
         if: env.RUN_QUALITY_CHECKS == 'true'
