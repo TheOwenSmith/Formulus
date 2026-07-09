@@ -9,7 +9,7 @@ const envVarsCdk = [
   'AWS_SECRET_ACCESS_KEY',
   'AWS_REGION',
 ] as const;
-const envVarsClient = [...envVarsCdk, 'VITE_SERVER_URL'] as const;
+const envVarsClient = [...envVarsCdk, 'VITE_SERVER_URL', 'VITE_ENABLE_TOOLTIPS'] as const;
 
 export const envVarsLambda = [
   'NODE_ENV',

@@ -4,6 +4,7 @@ import type { Construct } from 'constructs';
 
 export interface AmplifyStackProps extends cdk.StackProps {
   viteServerUrl: string;
+  enableTooltips: string;
   branchName: string;
   domainName: string;
   subDomain: string;
@@ -23,6 +24,7 @@ export class AmplifyStack extends cdk.Stack {
       platform: 'WEB',
       environmentVariables: [
         { name: 'VITE_SERVER_URL', value: props.viteServerUrl },
+        { name: 'VITE_ENABLE_TOOLTIPS', value: props.enableTooltips },
       ],
       customRules: [
         {

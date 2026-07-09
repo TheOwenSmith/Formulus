@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+const TOOLTIPS_ENABLED = import.meta.env.VITE_ENABLE_TOOLTIPS !== 'false';
 const TOOLTIP_OFFSET = 12;
 const TOOLTIP_DELAY_MS = 400;
 const TOOLTIP_STYLE =
@@ -56,7 +57,7 @@ export function Tooltip({
       <div
         ref={triggerRef}
         className={`relative ${className}`}
-        onMouseEnter={content == null ? undefined : (e) => {
+        onMouseEnter={content == null || !TOOLTIPS_ENABLED ? undefined : (e) => {
           pendingPositionRef.current = { x: e.clientX, y: e.clientY };
           delayRef.current = setTimeout(() => {
             delayRef.current = null;
@@ -70,18 +71,19 @@ export function Tooltip({
             }
           }, TOOLTIP_DELAY_MS);
         }}
-        onMouseMove={content == null ? undefined : (e) => {
+        onMouseMove={content == null || !TOOLTIPS_ENABLED ? undefined : (e) => {
           if (visible) {
             hide();
           } else {
             pendingPositionRef.current = { x: e.clientX, y: e.clientY };
           }
         }}
-        onMouseLeave={content == null ? undefined : hide}
+        onMouseLeave={content == null || !TOOLTIPS_ENABLED ? undefined : hide}
       >
         {children}
       </div>
-      {content != null &&
+      {TOOLTIPS_ENABLED &&
+        content != null &&
         anchor === 'above' &&
         aboveVisible &&
         aboveRect &&
@@ -100,7 +102,8 @@ export function Tooltip({
           </div>,
           document.body,
         )}
-      {content != null &&
+      {TOOLTIPS_ENABLED &&
+        content != null &&
         anchor === 'cursor' &&
         cursorPos &&
         createPortal(

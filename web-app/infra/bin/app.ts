@@ -164,6 +164,7 @@ if (!workerOnly) {
   const viteServerUrl = amplifyOnly
     ? config.getKey<ClientEnvVar>('VITE_SERVER_URL')
     : `${apiUrl!.replace(/\/$/, '')}/trpc`;
+  const enableTooltips = config.getKey<ClientEnvVar>('VITE_ENABLE_TOOLTIPS');
 
   for (const client of [
     {
@@ -182,6 +183,7 @@ if (!workerOnly) {
     new AmplifyStack(app, client.id, {
       branchName: client.branchName,
       domainName: 'formulus.ai',
+      enableTooltips,
       env,
       mapRootDomain: client.mapRootDomain,
       subDomain: client.subDomain,
