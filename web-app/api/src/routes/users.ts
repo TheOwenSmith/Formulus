@@ -75,10 +75,7 @@ export function usersRouter(
               where: {
                 creatorId: ctx.user.id,
                 status: {
-                  in: [
-                    BacktestingSubmissionStatus.PENDING,
-                    BacktestingSubmissionStatus.RUNNING,
-                  ],
+                  in: [BacktestingSubmissionStatus.PENDING, BacktestingSubmissionStatus.RUNNING],
                 },
               },
             }),

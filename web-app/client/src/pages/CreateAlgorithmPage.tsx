@@ -172,11 +172,7 @@ export function CreateAlgorithmPage() {
       ? 'Select a strategy type'
       : state.name.length < 4
         ? 'Name must be at least 4 characters'
-        : nameError != null
-          ? nameError
-          : isDuplicateName
-            ? 'You already have an algorithm with this name'
-            : undefined;
+        : nameError ?? (isDuplicateName ? 'You already have an algorithm with this name' : undefined);
 
   const step2Valid =
     state.language !== null &&

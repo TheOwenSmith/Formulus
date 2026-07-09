@@ -27,7 +27,9 @@ export function usePlanLimits() {
   const concurrentCount = stats?.concurrentBacktests ?? 0;
   const isAtConcurrentLimit = concurrentCount >= concurrentLimit;
 
-  const monthlyLimit = isPro ? PRO_PLAN_MAX_BACKTESTS_PER_MONTH : BASIC_PLAN_MAX_BACKTESTS_PER_MONTH;
+  const monthlyLimit = isPro
+    ? PRO_PLAN_MAX_BACKTESTS_PER_MONTH
+    : BASIC_PLAN_MAX_BACKTESTS_PER_MONTH;
   const startOfMonth = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
