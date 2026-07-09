@@ -18,8 +18,8 @@ import {
   type TickerValue,
   type Timestamp,
 } from '@shared/constants/trading';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -155,9 +155,28 @@ export function CreateAlgorithmPage() {
     setTimeout(() => setter(false), 400);
   }
 
+  const { data: existingAlgorithms } = useQuery(
+    trpcCredentials.algorithms.getAlgorithms.queryOptions(),
+  );
+  const existingNames = useMemo(
+    () => new Set((existingAlgorithms ?? []).map((a) => a.name)),
+    [existingAlgorithms],
+  );
+
   const nameError = state.name.length > 0 ? validateName(state.name) : null;
+  const isDuplicateName = state.name.length > 0 && existingNames.has(state.name);
   const step1Valid =
-    state.algorithmType !== null && state.name.length >= 4 && !validateName(state.name);
+    state.algorithmType !== null && state.name.length >= 4 && nameError == null && !isDuplicateName;
+  const step1DisabledReason: string | undefined =
+    state.algorithmType == null
+      ? 'Select a strategy type'
+      : state.name.length < 4
+        ? 'Name must be at least 4 characters'
+        : nameError != null
+          ? nameError
+          : isDuplicateName
+            ? 'You already have an algorithm with this name'
+            : undefined;
 
   const step2Valid =
     state.language !== null &&
@@ -196,12 +215,18 @@ export function CreateAlgorithmPage() {
       return;
     }
     setShowExamplesModal(false);
+    let name = example.name;
+    if (existingNames.has(name)) {
+      let i = 1;
+      while (existingNames.has(`${example.name} (${i})`)) i++;
+      name = `${example.name} (${i})`;
+    }
     const base = {
       aggregate: example.aggregate as Timestamp,
       contextLength: example.contextLength,
       indicators: example.indicators as Indicator[],
       language: lang,
-      name: example.name,
+      name,
       userAlgorithmImplementationCode: example.code[lang].trimStart(),
     };
     let payload: AnyUserAlgorithmType;
@@ -401,6 +426,9 @@ export function CreateAlgorithmPage() {
           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 text-white placeholder-white/25 outline-none text-base"
         />
         {nameError && <p className="mt-1 text-xs text-red-400">{nameError}</p>}
+        {!nameError && isDuplicateName && (
+          <p className="mt-1 text-xs text-red-400">You already have an algorithm with this name</p>
+        )}
       </div>
     </div>
   );
@@ -722,22 +750,24 @@ export function CreateAlgorithmPage() {
               </button>
 
               {step === 1 && (
-                <button
-                  type="button"
-                  disabled={!step1Valid}
-                  onClick={() => setStep(2)}
-                  className="flex-1 min-w-0 py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
-                >
-                  Continue
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
+                <Tooltip content={step1DisabledReason} anchor="above" className="flex-1 min-w-0 flex">
+                  <button
+                    type="button"
+                    disabled={!step1Valid}
+                    onClick={() => setStep(2)}
+                    className="w-full py-4 px-8 rounded-xl font-semibold text-base border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:-translate-y-0.5 bg-gradient-to-r from-blue-500/25 to-purple-500/25 border-blue-500/40 hover:border-blue-500/60 text-white flex items-center justify-center gap-2"
+                  >
+                    Continue
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </Tooltip>
               )}
               {step === 2 && (
                 <button
