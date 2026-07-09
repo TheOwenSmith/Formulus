@@ -79,14 +79,14 @@ jobs:
           CI: "true"
         run: pnpm install --frozen-lockfile
 
-      - name: Install /api dependencies
-        working-directory: web-app/api
-        run: pnpm install --frozen-lockfile
-
       - name: Prettier
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/api
-        run: pnpm run prettier:check
+        run: pnpm --filter ./api prettier:check
+
+      - name: Install /api dependencies
+        working-directory: web-app/api
+        run: pnpm install --frozen-lockfile
 
       - name: ESLint
         if: env.RUN_QUALITY_CHECKS == 'true'
