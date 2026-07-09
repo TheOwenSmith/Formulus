@@ -10,6 +10,7 @@ import { AlgorithmsPage } from './pages/AlgorithmsPage';
 import { BacktestPage } from './pages/BacktestPage';
 import { CreateAlgorithmPage } from './pages/CreateAlgorithmPage';
 import { ErrorPage } from './pages/ErrorPage';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { PhoenixPositionManagementPdfRedirect } from './pages/PhoenixPositionManagementPdfRedirect';
 import { ProfilePage } from './pages/ProfilePage';
@@ -87,6 +88,10 @@ export const router = createBrowserRouter([
       {
         loader: requireGuestLoader,
         children: [
+          {
+            path: '/',
+            element: <LandingPage />,
+          },
           {
             path: '/login',
             element: <LoginPage />,
