@@ -61,7 +61,7 @@ async function deleteS3ProfileImage(imageUrl: string): Promise<void> {
   if (key == null) return;
   const deleteResult = await fromThrowableAsync(
     () => s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })),
-    (e) => e,
+    (e) => internal(e, 'Failed to delete old profile image from S3'),
   );
   if (deleteResult.isErr()) {
     console.error('Failed to delete old profile image from S3:', deleteResult.error);
