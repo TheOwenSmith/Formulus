@@ -58,7 +58,6 @@ export function backtestingRouter(
         }
 
         // Throttle: one submission per 10 seconds via Redis
-        console.log(`[${ctx.req.path}] pinging redis`);
         const rateLimitKey = `rate_limit:backtest:${user.id}`;
         const acquiredResult = await fromThrowableAsync(
           () => redis.set(rateLimitKey, '1', 'EX', 10, 'NX'),

@@ -6,6 +6,7 @@ import type { TRPCContext } from '@api/lib/trpc';
 import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   type BucketLocationConstraint,
@@ -42,6 +43,31 @@ async function ensureDevBucketExists(bucket: string, region: string): Promise<vo
   if (createResult.isErr()) throw createResult.error;
 }
 
+function extractS3Key(imageUrl: string, bucket: string): string | null {
+  // Prod: https://{bucket}.s3.{region}.amazonaws.com/{key}
+  if (imageUrl.includes(`${bucket}.s3.`)) {
+    const match = /amazonaws\.com\/(.+)$/.exec(imageUrl);
+    return match?.[1] ?? null;
+  }
+  // Dev: http://localhost:4566/{bucket}/{key}
+  const devPrefix = `/${bucket}/`;
+  const idx = imageUrl.indexOf(devPrefix);
+  return idx !== -1 ? imageUrl.slice(idx + devPrefix.length) : null;
+}
+
+async function deleteS3ProfileImage(imageUrl: string): Promise<void> {
+  const bucket = config.getKey('PFP_BUCKET_NAME');
+  const key = extractS3Key(imageUrl, bucket);
+  if (key == null) return;
+  const deleteResult = await fromThrowableAsync(
+    () => s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })),
+    (e) => e,
+  );
+  if (deleteResult.isErr()) {
+    console.error('Failed to delete old profile image from S3:', deleteResult.error);
+  }
+}
+
 export function usersRouter(
   router: TRPCContext['router'],
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
@@ -51,6 +77,13 @@ export function usersRouter(
       .input(z.object({ deleteBacktests: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         await deleteCachedSession(ctx.sessionToken);
+
+        const getImageResponse = await fromThrowableAsync(
+          () => prisma.user.findUnique({ where: { id: ctx.user.id }, select: { image: true } }),
+          (e) => internal(e, 'An unexpected error occurred while retrieving the user'),
+        );
+        if (getImageResponse.isErr()) throw getImageResponse.error;
+        const oldImage = getImageResponse.value?.image;
 
         if (input.deleteBacktests) {
           const deleteResultsResponse = await fromThrowableAsync(
@@ -65,6 +98,8 @@ export function usersRouter(
           (e) => internal(e, 'An unexpected error occurred while deleting the user'),
         );
         if (deleteUserResponse.isErr()) throw deleteUserResponse.error;
+
+        if (oldImage != null) await deleteS3ProfileImage(oldImage);
         return { success: true };
       }),
     getCurrentUser: authProcedure.query(async ({ ctx }) => {
@@ -217,6 +252,14 @@ export function usersRouter(
 
         if (input.image !== undefined) {
           updateData.image = input.image;
+
+          const getImageResponse = await fromThrowableAsync(
+            () => prisma.user.findUnique({ where: { id: ctx.user.id }, select: { image: true } }),
+            (e) => internal(e, 'An unexpected error occurred while retrieving the current user'),
+          );
+          if (getImageResponse.isErr()) throw getImageResponse.error;
+          const oldImage = getImageResponse.value?.image;
+          if (oldImage != null) await deleteS3ProfileImage(oldImage);
         }
 
         const updateUserResponse = await fromThrowableAsync(

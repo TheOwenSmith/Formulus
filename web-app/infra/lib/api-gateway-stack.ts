@@ -155,7 +155,7 @@ export class ApiGatewayStack extends cdk.Stack {
 
       apiFunction.addToRolePolicy(
         new iam.PolicyStatement({
-          actions: ['s3:PutObject'],
+          actions: ['s3:PutObject', 's3:DeleteObject'],
           resources: [pfpBucket.arnForObjects('*')],
         }),
       );
