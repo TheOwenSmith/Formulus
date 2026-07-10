@@ -8,5 +8,9 @@ export const sqs =
     ? new SQSClient({
         region,
         endpoint: config.getDevKey('AWS_ENDPOINT_URL'),
+        credentials: {
+          accessKeyId: 'test',
+          secretAccessKey: 'test',
+        },
       })
     : new SQSClient({ region });

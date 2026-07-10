@@ -4,7 +4,7 @@ await build({
   entryPoints: ['./src/scripts/console.ts'],
   bundle: true,
   minify: true,
-  sourcemap: true,
+  sourcemap: 'inline',
   outfile: './dist/console.js',
   external: ['node:*'],
   banner: {

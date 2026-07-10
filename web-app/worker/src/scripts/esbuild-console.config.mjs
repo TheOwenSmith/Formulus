@@ -4,7 +4,7 @@ await build({
   entryPoints: ['./src/scripts/console.ts'],
   bundle: true,
   minify: true,
-  sourcemap: true,
+  sourcemap: 'inline',
   outfile: './dist/console.js',
   // dockerode contains native code and cannot be bundled
   external: ['node:*', 'dockerode'],
