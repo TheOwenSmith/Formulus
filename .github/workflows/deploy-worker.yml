@@ -1,5 +1,5 @@
 # Build the worker Docker image, push to ECR, and deploy all worker infrastructure stacks
-# (FormulusEcr, FormulusQueue, FormulusCompute, FormulusDispatcher).
+# (FormulusEcr, FormulusCompute, FormulusDispatcher).
 #
 # - Push worker-staging: Prettier/ESLint skipped.
 # - Push worker-prod: Prettier/ESLint block deploy on failure.
@@ -126,7 +126,7 @@ jobs:
         run: |
           pnpm exec cdk deploy FormulusEcr \
             --require-approval never \
-            -c workerOnly=true
+            -c deployWorker=true
 
       # --- Build and push Docker image ---
 
@@ -182,4 +182,4 @@ jobs:
           fi
           pnpm exec cdk deploy "$COMPUTE_STACK" "$DISPATCHER_STACK" \
             --require-approval never \
-            -c workerOnly=true
+            -c deployWorker=true

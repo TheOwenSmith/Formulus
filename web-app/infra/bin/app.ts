@@ -5,7 +5,13 @@ import {
   formulusApiLambdaBundlingShell,
 } from '@/lib/api-gateway-stack.js';
 import { ComputeStack } from '@/lib/compute-stack.js';
-import { config, envVarsLambda, type ApiEnvVar, type ClientEnvVar, type WorkerCdkEnvVar } from '@/lib/config.js';
+import {
+  config,
+  envVarsLambda,
+  type ApiEnvVar,
+  type ClientEnvVar,
+  type WorkerCdkEnvVar,
+} from '@/lib/config.js';
 import { WEB_APP_ROOT } from '@/lib/constants.js';
 import { DispatcherStack } from '@/lib/dispatcher-stack.js';
 import { EcrStack } from '@/lib/ecr-stack.js';
@@ -19,10 +25,10 @@ const env = {
   region: config.getKey('CDK_DEFAULT_REGION'),
 };
 
-// amplifyOnly: synthesize only Amplify stacks (skips API/compute, which require DB secrets).
-const amplifyOnly = app.node.tryGetContext('amplifyOnly') === 'true';
-// workerOnly: synthesize ECR + Queue + Compute + Dispatcher only (skips API + Amplify stacks).
-const workerOnly = app.node.tryGetContext('workerOnly') === 'true';
+// One of these must be set to true via CDK context (-c deployClient=true, etc.).
+const deployClient = app.node.tryGetContext('deployClient') === 'true';
+const deployApi = app.node.tryGetContext('deployApi') === 'true';
+const deployWorker = app.node.tryGetContext('deployWorker') === 'true';
 
 function baseApiEnvFromApp(): Record<string, string> {
   const ctx = app.node.tryGetContext('apiEnvJson') as unknown;
@@ -49,12 +55,8 @@ function makeQueueUrl(account: string, region: string, name: string) {
   return `https://sqs.${region}.amazonaws.com/${account}/${name}`;
 }
 
-let apiUrl: string | undefined;
-
-if (!amplifyOnly) {
+if (deployWorker) {
   const ecr = new EcrStack(app, 'FormulusEcr', { env });
-  new QueueStack(app, 'FormulusQueue', { env, queueBaseName: PROD_QUEUE });
-  new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
 
   const workerEnvConfig = {
     ALPHA_VANTAGE_API_KEY: config.getKey<WorkerCdkEnvVar>('ALPHA_VANTAGE_API_KEY'),
@@ -64,11 +66,21 @@ if (!amplifyOnly) {
   };
 
   for (const { suffix, clusterName, imageTag, logGroupName, queueBaseName } of [
-    { suffix: '', clusterName: 'formulus-backtest', imageTag: 'latest', logGroupName: '/formulus/worker', queueBaseName: PROD_QUEUE },
-    { suffix: 'Staging', clusterName: 'formulus-backtest-staging', imageTag: 'staging', logGroupName: '/formulus/worker-staging', queueBaseName: STAGING_QUEUE },
+    {
+      clusterName: 'formulus-backtest',
+      imageTag: 'latest',
+      logGroupName: '/formulus/worker',
+      queueBaseName: PROD_QUEUE,
+      suffix: '',
+    },
+    {
+      clusterName: 'formulus-backtest-staging',
+      imageTag: 'staging',
+      logGroupName: '/formulus/worker-staging',
+      queueBaseName: STAGING_QUEUE,
+      suffix: 'Staging',
+    },
   ]) {
-    // Derive known resource names from the cluster name so they can be passed as plain strings
-    // to both stacks, eliminating all CDK cross-stack CF exports between Compute and Dispatcher.
     const taskDefFamily = `${clusterName}-worker`;
     const taskRoleName = `${clusterName}-task-role`;
     const executionRoleName = `${clusterName}-exec-role`;
@@ -79,105 +91,104 @@ if (!amplifyOnly) {
     const executionRoleArn = `arn:aws:iam::${env.account}:role/${executionRoleName}`;
 
     new ComputeStack(app, `FormulusCompute${suffix}`, {
-      env,
       clusterName,
+      env,
+      executionRoleName,
       imageTag,
       logGroupName,
-      workerEnv: workerEnvConfig,
-      workerImageRepo: ecr.workerRepo,
       runnerImageRepos: [ecr.typescriptRunnerRepo, ecr.cppRunnerRepo],
       taskDefinitionFamily: taskDefFamily,
       taskRoleName,
-      executionRoleName,
+      workerEnv: workerEnvConfig,
+      workerImageRepo: ecr.workerRepo,
     });
 
     new DispatcherStack(app, `FormulusDispatcher${suffix}`, {
       clusterArn,
+      env,
+      executionRoleArn,
+      queueBaseName,
       taskDefinitionArn,
       taskRoleArn,
-      executionRoleArn,
-      env,
-      queueBaseName,
     });
-  }
-
-  if (!workerOnly) {
-    const baseApiEnv = baseApiEnvFromApp();
-
-    const corsOriginEnv = baseApiEnv['CORS_ORIGIN'] ?? '*';
-    const corsOrigins = corsOriginEnv
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
-    const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
-    const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as
-      | string
-      | undefined;
-    const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
-
-    const api = new ApiGatewayStack(app, 'FormulusApi', {
-      backtestQueueArn: makeQueueArn(env.account, env.region, PROD_QUEUE),
-      bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
-      codeRoot: WEB_APP_ROOT,
-      corsHeaders: defaultApiCorsHeaders,
-      corsOrigins,
-      env,
-      handler: 'lambda.handler',
-      lambdaEnvironment: {
-        ...baseApiEnv,
-        QUEUE_URL: makeQueueUrl(env.account, env.region, PROD_QUEUE),
-      },
-      ...(apiDomainName != null &&
-        apiSubDomain != null && {
-          domainName: apiDomainName,
-          subDomain: apiSubDomain,
-        }),
-    });
-
-    new ApiGatewayStack(app, 'FormulusApiStaging', {
-      backtestQueueArn: makeQueueArn(env.account, env.region, STAGING_QUEUE),
-      bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
-      codeRoot: WEB_APP_ROOT,
-      corsHeaders: defaultApiCorsHeaders,
-      corsOrigins,
-      env,
-      handler: 'lambda.handler',
-      lambdaEnvironment: {
-        ...baseApiEnv,
-        QUEUE_URL: makeQueueUrl(env.account, env.region, STAGING_QUEUE),
-      },
-      restApiDisplayName: 'formulus-api-staging',
-      ...(apiStagingDomainName != null &&
-        apiStagingSubDomain != null && {
-          domainName: apiStagingDomainName,
-          subDomain: apiStagingSubDomain,
-        }),
-    });
-
-    apiUrl = api.apiUrl;
   }
 }
 
-if (!workerOnly) {
-  const viteServerUrl = amplifyOnly
-    ? config.getKey<ClientEnvVar>('VITE_SERVER_URL')
-    : `${apiUrl!.replace(/\/$/, '')}/trpc`;
+if (deployApi) {
+  new QueueStack(app, 'FormulusQueue', { env, queueBaseName: PROD_QUEUE });
+  new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
+
+  const baseApiEnv = baseApiEnvFromApp();
+
+  const corsOriginEnv = baseApiEnv['CORS_ORIGIN'] ?? '*';
+  const corsOrigins = corsOriginEnv
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
+  const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
+  const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as
+    | string
+    | undefined;
+  const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
+
+  new ApiGatewayStack(app, 'FormulusApi', {
+    backtestQueueArn: makeQueueArn(env.account, env.region, PROD_QUEUE),
+    bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+    codeRoot: WEB_APP_ROOT,
+    corsHeaders: defaultApiCorsHeaders,
+    corsOrigins,
+    env,
+    handler: 'lambda.handler',
+    lambdaEnvironment: {
+      ...baseApiEnv,
+      QUEUE_URL: makeQueueUrl(env.account, env.region, PROD_QUEUE),
+    },
+    ...(apiDomainName != null &&
+      apiSubDomain != null && {
+        domainName: apiDomainName,
+        subDomain: apiSubDomain,
+      }),
+  });
+
+  new ApiGatewayStack(app, 'FormulusApiStaging', {
+    backtestQueueArn: makeQueueArn(env.account, env.region, STAGING_QUEUE),
+    bundlingCommand: ['bash', '-c', formulusApiLambdaBundlingShell()],
+    codeRoot: WEB_APP_ROOT,
+    corsHeaders: defaultApiCorsHeaders,
+    corsOrigins,
+    env,
+    handler: 'lambda.handler',
+    lambdaEnvironment: {
+      ...baseApiEnv,
+      QUEUE_URL: makeQueueUrl(env.account, env.region, STAGING_QUEUE),
+    },
+    restApiDisplayName: 'formulus-api-staging',
+    ...(apiStagingDomainName != null &&
+      apiStagingSubDomain != null && {
+        domainName: apiStagingDomainName,
+        subDomain: apiStagingSubDomain,
+      }),
+  });
+}
+
+if (deployClient) {
+  const viteServerUrl = config.getKey<ClientEnvVar>('VITE_SERVER_URL');
   const enableTooltips = config.getKey<ClientEnvVar>('VITE_ENABLE_TOOLTIPS');
 
   for (const client of [
     {
-      id: 'FormulusAmplify',
       branchName: 'client-prod',
-      subDomain: 'prod',
+      id: 'FormulusAmplify',
       mapRootDomain: true,
+      subDomain: 'prod',
     },
     {
-      id: 'FormulusAmplifyStaging',
       branchName: 'client-staging',
-      subDomain: 'staging',
+      id: 'FormulusAmplifyStaging',
       mapRootDomain: false,
+      subDomain: 'staging',
     },
   ]) {
     new AmplifyStack(app, client.id, {
