@@ -19,6 +19,32 @@ The key consideration kept in mind when determining how to migrate the project t
 
 The backtesting worker infrastructure was more complicated. If cost were not as big of an issue, having a pool of workers that accept backtest submissions from the SQS queue would be ideal. Such a system would likely scale the number of workers based on the number of submissions in the queue. However, one cannot scale to 0, and as stated previously, even one constantly running Docker container is outside the budget of this project. As a result, it was decided that a Lambda dispatcher whose sole purpose was to invoke a Docker worker would suffice. This decision comes at a cost: if there are no warm EC2 instances available, an instance must be spun up before the backtest can run. This takes ~3 minutes. That said, if the user had recently made a backtesting request, an existing instance would be warm, and the expected latency would likely be less than 5 seconds.
 
+## Codebase Statistics
+
+```
+-------------------------------------------------------------------------------
+Language                     files          blank        comment           code
+-------------------------------------------------------------------------------
+TypeScript                     180           1881           1081          20563
+YAML                            10           5000             26          19232
+Markdown                         4            199              0            577
+JavaScript                      10             30             46            545
+JSON                            19             20              0            494
+SQL                             26            171            222            363
+Prisma Schema                    1             66              9            236
+CSS                              4             39             15            225
+Python                           1             54             30             94
+Jupyter Notebook                 1              0            886             86
+Dockerfile                       4             14             11             32
+SVG                              4              0              0             30
+Bourne Shell                     1              7              0             18
+HTML                             1              0              0             13
+TOML                             1              0              2              1
+-------------------------------------------------------------------------------
+SUM:                           267           7481           2328          42509
+-------------------------------------------------------------------------------
+```
+
 ## Technologies
 
 The entire application is programmed in typescript. This was done not only out of familiarity; the `tRPC` libraries allow for strong type-checking between the frontend and backend, which proved to significantly enhance DX. Notice that TypeScript is also used for the worker code. This is because when first developing this project, the worker and API were merged together. In retrospect, they should have been separate entities from the beginning, with the API programmed in TypeScript and the worker in Python, considering the data handling that is done in the backtesting engine. Doing this would have presented less of a challenge.
