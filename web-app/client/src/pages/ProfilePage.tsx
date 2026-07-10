@@ -49,7 +49,6 @@ export function ProfilePage() {
   useEffect(() => {
     if (getUserApiResponse != undefined) {
       const { user } = getUserApiResponse;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraftName(user.name);
     }
   }, [getUserApiResponse]);
@@ -543,7 +542,10 @@ export function ProfilePage() {
                     <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                       {profileStats?.numberOfAlgorithms ?? 0}
                       <span className="text-base font-normal text-white/30 ml-0.5">
-                        /{user?.stripePlanActive ? PRO_PLAN_MAX_ALGORITHMS_COUNT : BASIC_PLAN_MAX_ALGORITHMS_COUNT}
+                        /
+                        {user?.stripePlanActive
+                          ? PRO_PLAN_MAX_ALGORITHMS_COUNT
+                          : BASIC_PLAN_MAX_ALGORITHMS_COUNT}
                       </span>
                     </p>
                   </div>
@@ -594,7 +596,10 @@ export function ProfilePage() {
                     <p className="text-3xl font-bold bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">
                       {profileStats?.backtestsThisMonth ?? 0}
                       <span className="text-base font-normal text-white/30 ml-0.5">
-                        /{user?.stripePlanActive ? PRO_PLAN_MAX_BACKTESTS_PER_MONTH : BASIC_PLAN_MAX_BACKTESTS_PER_MONTH}
+                        /
+                        {user?.stripePlanActive
+                          ? PRO_PLAN_MAX_BACKTESTS_PER_MONTH
+                          : BASIC_PLAN_MAX_BACKTESTS_PER_MONTH}
                       </span>
                     </p>
                   </div>
@@ -664,7 +669,9 @@ export function ProfilePage() {
             <div className="grid grid-cols-2 gap-3 mb-6">
               {/* Basic column */}
               <div className="rounded-xl bg-white/[0.03] border border-white/[0.07] p-4">
-                <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Basic</p>
+                <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
+                  Basic
+                </p>
                 <div className="flex flex-col gap-2.5">
                   {[
                     `${BASIC_PLAN_MAX_BACKTESTS_PER_MONTH} backtests / month`,
@@ -674,8 +681,18 @@ export function ProfilePage() {
                     'Non-refundable',
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-2">
-                      <svg className="w-3.5 h-3.5 text-white/20 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-3.5 h-3.5 text-white/20 shrink-0 mt-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                       <span className="text-white/40 text-sm">{item}</span>
                     </div>
@@ -685,7 +702,9 @@ export function ProfilePage() {
 
               {/* Pro column */}
               <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-yellow-500/5 border border-amber-500/30 p-4">
-                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">Pro</p>
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">
+                  Pro
+                </p>
                 <div className="flex flex-col gap-2.5">
                   {[
                     `${PRO_PLAN_MAX_BACKTESTS_PER_MONTH} backtests / month`,
@@ -694,18 +713,44 @@ export function ProfilePage() {
                     'Pro badge on profile',
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-2">
-                      <svg className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                       <span className="text-white/80 text-sm">{item}</span>
                     </div>
                   ))}
                   <div className="flex items-start gap-2">
-                    <svg className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                     <span className="text-white/80 text-sm">
-                      <a href="mailto:owensmith@uchicago.edu" className="underline underline-offset-2 hover:text-amber-400 transition-colors">Refundable</a> within billing period
+                      <a
+                        href="mailto:owensmith@uchicago.edu"
+                        className="underline underline-offset-2 hover:text-amber-400 transition-colors"
+                      >
+                        Refundable
+                      </a>{' '}
+                      within billing period
                     </span>
                   </div>
                 </div>
@@ -737,13 +782,34 @@ export function ProfilePage() {
                       fill="none"
                       viewBox="0 0 24 24"
                     >
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                   ) : (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
                     </svg>
                   )}
                   <span>Manage Subscription</span>
@@ -762,8 +828,19 @@ export function ProfilePage() {
                     fill="none"
                     viewBox="0 0 24 24"
                   >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                 ) : (
                   <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">

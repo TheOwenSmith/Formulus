@@ -19,7 +19,12 @@ export class ComputeStack extends cdk.Stack {
     props: cdk.StackProps & {
       workerImageRepo: ecr.IRepository;
       runnerImageRepos: ecr.IRepository[];
-      workerEnv: { ALPHA_VANTAGE_API_KEY: string; DATA_BUCKET: string; DATABASE_URL: string; NODE_ENV: string };
+      workerEnv: {
+        ALPHA_VANTAGE_API_KEY: string;
+        DATA_BUCKET: string;
+        DATABASE_URL: string;
+        NODE_ENV: string;
+      };
       clusterName?: string;
       imageTag?: string;
       logGroupName?: string;
@@ -150,7 +155,11 @@ export class ComputeStack extends cdk.Stack {
 
     taskRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: ['ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage'],
+        actions: [
+          'ecr:BatchCheckLayerAvailability',
+          'ecr:GetDownloadUrlForLayer',
+          'ecr:BatchGetImage',
+        ],
         resources: props.runnerImageRepos.map((repo) => repo.repositoryArn),
       }),
     );

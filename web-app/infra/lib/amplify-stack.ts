@@ -1,5 +1,5 @@
-import * as amplify from 'aws-cdk-lib/aws-amplify';
 import * as cdk from 'aws-cdk-lib';
+import * as amplify from 'aws-cdk-lib/aws-amplify';
 import type { Construct } from 'constructs';
 
 export interface AmplifyStackProps extends cdk.StackProps {

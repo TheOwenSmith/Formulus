@@ -26,7 +26,8 @@ export async function handler(event: SqsEvent) {
   // already has one).
   const describeResult = await ecs.send(new DescribeClustersCommand({ clusters: [clusterArn] }));
   const capacityProviderName = describeResult.clusters?.[0]?.capacityProviders?.[0];
-  if (!capacityProviderName) throw new Error(`No capacity provider found on cluster: ${clusterArn}`);
+  if (!capacityProviderName)
+    throw new Error(`No capacity provider found on cluster: ${clusterArn}`);
 
   for (const record of event.Records ?? []) {
     const msg = JSON.parse(record.body) as { submissionId?: string };

@@ -1,9 +1,9 @@
 import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
-import * as sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Construct } from 'constructs';
 import path from 'path';
 
@@ -46,7 +46,9 @@ export class DispatcherStack extends cdk.Stack {
       },
     });
 
-    fn.addEventSource(new sources.SqsEventSource(queue, { batchSize: 1, reportBatchItemFailures: false }));
+    fn.addEventSource(
+      new sources.SqsEventSource(queue, { batchSize: 1, reportBatchItemFailures: false }),
+    );
 
     fn.addToRolePolicy(
       new iam.PolicyStatement({

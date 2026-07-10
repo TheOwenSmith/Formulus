@@ -27,4 +27,3 @@ export class QueueStack extends cdk.Stack {
     });
   }
 }
-

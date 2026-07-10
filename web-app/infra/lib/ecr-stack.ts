@@ -32,4 +32,3 @@ export class EcrStack extends cdk.Stack {
     });
   }
 }
-
