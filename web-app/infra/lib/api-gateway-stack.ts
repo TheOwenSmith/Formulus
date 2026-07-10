@@ -6,6 +6,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { config, type ApiEnvVar } from './config.js';
 import { PNPM_VERSION } from './constants.js';
@@ -75,6 +76,7 @@ export type ApiGatewayStackProps = cdk.StackProps & {
   /** Same keys as `web-app/api` `.env` (plus CDK-injected `QUEUE_URL`). */
   lambdaEnvironment: Record<string, string>;
   backtestQueueArn: string;
+  pfpBucketName?: string;
   handler: string;
   /** When set with `subDomain`, provisions ACM + custom domain + Route53 alias. */
   domainName?: string;
@@ -127,6 +129,37 @@ export class ApiGatewayStack extends cdk.Stack {
         resources: [props.backtestQueueArn],
       }),
     );
+
+    if (props.pfpBucketName != null) {
+      const pfpBucket = new s3.Bucket(this, `${id}-pfp-bucket`, {
+        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+        bucketName: props.pfpBucketName,
+        cors: [
+          {
+            allowedHeaders: ['*'],
+            allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT],
+            allowedOrigins: ['*'],
+            maxAge: 3000,
+          },
+        ],
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      });
+
+      pfpBucket.addToResourcePolicy(
+        new iam.PolicyStatement({
+          actions: ['s3:GetObject'],
+          principals: [new iam.AnyPrincipal()],
+          resources: [pfpBucket.arnForObjects('*')],
+        }),
+      );
+
+      apiFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['s3:PutObject'],
+          resources: [pfpBucket.arnForObjects('*')],
+        }),
+      );
+    }
 
     this.apiFunction = apiFunction;
 

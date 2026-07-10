@@ -24,6 +24,7 @@ export const envVarsLambda = [
   'STRIPE_PRICE_ID',
   'STRIPE_WEBHOOK_SECRET',
   'REDIS_URL',
+  'PFP_BUCKET_NAME',
 ] as const satisfies string[];
 
 const envVarsApi = [...envVarsCdk, ...envVarsLambda] as const;

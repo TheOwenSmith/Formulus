@@ -48,6 +48,7 @@ jobs:
       STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
+      PFP_BUCKET_NAME: ${{ vars.PFP_BUCKET_NAME }}
       RUN_QUALITY_CHECKS: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/api-staging') && !(github.event_name == 'workflow_dispatch' && inputs.skip_quality_checks) }}
 
     steps:

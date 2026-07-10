@@ -117,8 +117,8 @@ if (deployWorker) {
 if (deployApi) {
   new QueueStack(app, 'FormulusQueue', { env, queueBaseName: PROD_QUEUE });
   new QueueStack(app, 'FormulusQueueStaging', { env, queueBaseName: STAGING_QUEUE });
-
   const baseApiEnv = baseApiEnvFromApp();
+  const pfpBucketName = config.getKey<ApiEnvVar>('PFP_BUCKET_NAME');
 
   const corsOriginEnv = baseApiEnv['CORS_ORIGIN'] ?? '*';
   const corsOrigins = corsOriginEnv
@@ -128,9 +128,7 @@ if (deployApi) {
 
   const apiDomainName = app.node.tryGetContext('apiDomainName') as string | undefined;
   const apiSubDomain = app.node.tryGetContext('apiSubDomain') as string | undefined;
-  const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as
-    | string
-    | undefined;
+  const apiStagingDomainName = app.node.tryGetContext('apiStagingDomainName') as string | undefined;
   const apiStagingSubDomain = app.node.tryGetContext('apiStagingSubDomain') as string | undefined;
 
   new ApiGatewayStack(app, 'FormulusApi', {
@@ -145,6 +143,7 @@ if (deployApi) {
       ...baseApiEnv,
       QUEUE_URL: makeQueueUrl(env.account, env.region, PROD_QUEUE),
     },
+    pfpBucketName,
     ...(apiDomainName != null &&
       apiSubDomain != null && {
         domainName: apiDomainName,
@@ -164,6 +163,7 @@ if (deployApi) {
       ...baseApiEnv,
       QUEUE_URL: makeQueueUrl(env.account, env.region, STAGING_QUEUE),
     },
+    pfpBucketName,
     restApiDisplayName: 'formulus-api-staging',
     ...(apiStagingDomainName != null &&
       apiStagingSubDomain != null && {

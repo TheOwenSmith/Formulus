@@ -44,6 +44,7 @@ export function ProfilePage() {
   const [draftName, setDraftName] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteBacktests, setDeleteBacktests] = useState(false);
+  const [isUploadingPfp, setIsUploadingPfp] = useState(false);
 
   useEffect(() => {
     if (getUserApiResponse != undefined) {
@@ -74,25 +75,21 @@ export function ProfilePage() {
     }),
   );
 
-  // Update profile picture mutation
-  const { mutateAsync: updateProfilePictureMutation, isPending: profilePictureUpdateIsPending } =
-    useMutation(
-      trpcCredentials.users.updateProfile.mutationOptions({
-        onError: (error) => {
-          console.error('Error uploading image:', error);
-          toast.error(
-            error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
-          );
-        },
-        onSuccess: ({ updatedUser }) => {
-          toast.success('Profile photo updated successfully');
-          queryClient.setQueryData(trpcCredentials.users.getCurrentUser.queryKey(), {
-            user: updatedUser,
-          });
-          setDraftName(updatedUser.name);
-        },
-      }),
-    );
+  const { mutateAsync: getUploadUrlMutation } = useMutation(
+    trpcCredentials.users.getProfileImageUploadUrl.mutationOptions(),
+  );
+
+  const { mutateAsync: updateProfilePictureMutation } = useMutation(
+    trpcCredentials.users.updateProfile.mutationOptions({
+      onSuccess: ({ updatedUser }) => {
+        toast.success('Profile photo updated successfully');
+        queryClient.setQueryData(trpcCredentials.users.getCurrentUser.queryKey(), {
+          user: updatedUser,
+        });
+        setDraftName(updatedUser.name);
+      },
+    }),
+  );
 
   // Delete account mutation
   const { mutateAsync: deleteAccountMutation, isPending: deleteAccountIsPending } = useMutation(
@@ -181,31 +178,54 @@ export function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select a valid image file');
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
+    if (!allowedTypes.includes(file.type as (typeof allowedTypes)[number])) {
+      toast.error('Please select a JPEG, PNG, GIF, or WebP image');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size must be less than 5MB');
       return;
     }
 
-    // Convert to base64 for now (in production, upload to a service like S3)
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64String = reader.result as string;
-      await updateProfilePictureMutation({
-        image: base64String,
-      });
-    };
-
-    reader.onerror = () => {
-      toast.error('Failed to read image file');
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingPfp(true);
+    try {
+      if (import.meta.env.DEV) {
+        // In dev, send the file to the API which uploads to LocalStack directly,
+        // bypassing the browser-to-LocalStack CORS restriction.
+        const fileData = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const { objectUrl } = await getUploadUrlMutation({
+          contentType: file.type as (typeof allowedTypes)[number],
+          fileData,
+        });
+        await updateProfilePictureMutation({ image: objectUrl });
+      } else {
+        const { uploadUrl, objectUrl } = await getUploadUrlMutation({
+          contentType: file.type as (typeof allowedTypes)[number],
+        });
+        if (!uploadUrl) throw new Error('No upload URL returned');
+        const uploadResponse = await fetch(uploadUrl, {
+          body: file,
+          headers: { 'Content-Type': file.type },
+          method: 'PUT',
+        });
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        }
+        await updateProfilePictureMutation({ image: objectUrl });
+      }
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      toast.error('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingPfp(false);
+    }
   };
 
   const formatDate = (dateString: string | Date | undefined) => {
@@ -285,10 +305,10 @@ export function ProfilePage() {
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
-                  disabled={profilePictureUpdateIsPending}
+                  disabled={isUploadingPfp}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                 />
-                {profilePictureUpdateIsPending && (
+                {isUploadingPfp && (
                   <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
                     <svg
                       className="animate-spin h-6 w-6 text-white"

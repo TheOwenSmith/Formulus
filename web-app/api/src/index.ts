@@ -21,7 +21,7 @@ app.use(
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
 
 if (config.env !== 'dev') {
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
 }
 
 // Better Auth
