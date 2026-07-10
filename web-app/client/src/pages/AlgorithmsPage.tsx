@@ -139,7 +139,7 @@ function AlgorithmCard({
 
   return (
     <Tooltip
-      content={tooltipContent}
+      content={isCompareMode ? undefined : tooltipContent}
       suppressRef={backtestLimitTooltip != null ? isOverRunButtonRef : undefined}
       className="w-full"
     >
@@ -191,26 +191,28 @@ function AlgorithmCard({
             {algorithm.name}
           </h3>
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleDeleteClick}
-              disabled={isDeleting}
-              title="Delete algorithm"
-              className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isDeleting ? (
-                <Spinner />
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              )}
-            </button>
+            {!isCompareMode && (
+              <button
+                type="button"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                title="Delete algorithm"
+                className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? (
+                  <Spinner />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                )}
+              </button>
+            )}
             <span
               className={`text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r border ${typeColorClass}`}
             >
@@ -255,14 +257,16 @@ function AlgorithmCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (!isCompareMode) onClick();
+              if (isCompareMode) {
+                if (!isIncompatible) onToggleSelect(algorithm.id);
+              } else {
+                onClick();
+              }
             }}
-            disabled={isCompareMode}
-            title={isCompareMode ? 'Exit compare mode to open the editor' : undefined}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer ${
               isCompareMode
-                ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed opacity-50'
-                : 'border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 cursor-pointer'
+                ? 'bg-white/[0.02] border-white/5 text-white/20 opacity-50'
+                : 'border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
             }`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,17 +294,16 @@ function AlgorithmCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRunBacktest();
+                  if (isCompareMode) {
+                    if (!isIncompatible) onToggleSelect(algorithm.id);
+                  } else {
+                    onRunBacktest();
+                  }
                 }}
-                disabled={
-                  isCompareMode ||
-                  isRunning ||
-                  cooldownSecondsLeft > 0 ||
-                  backtestLimitTooltip != null
-                }
+                disabled={!isCompareMode && (isRunning || cooldownSecondsLeft > 0 || backtestLimitTooltip != null)}
                 className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 ${
                   isCompareMode
-                    ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed opacity-50'
+                    ? 'bg-white/[0.02] border-white/5 text-white/20 cursor-pointer opacity-50'
                     : isRunning || cooldownSecondsLeft > 0 || backtestLimitTooltip != null
                       ? 'bg-white/5 border-white/10 text-white/40 cursor-not-allowed'
                       : 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border-emerald-500/25 hover:border-emerald-500/40 text-emerald-300 cursor-pointer'
