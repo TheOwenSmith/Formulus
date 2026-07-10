@@ -1,5 +1,12 @@
 # Formulus
 
+<p align="center">
+  <a href="https://youtu.be/fCSm11IbmKw">
+    <img src="https://img.youtube.com/vi/fCSm11IbmKw/maxresdefault.jpg" alt="Formulus Demo" width="600" />
+  </a>
+</p>
+<p align="center"><a href="https://youtu.be/fCSm11IbmKw">Watch the demo</a></p>
+
 [formulus.ai](https://formulus.ai) is a SaaS application that consists of a frontend, a backend, and a backtesting worker. In total, the application has over 20,000 lines of code. At a high level, when a user has a strategy they wish to backtest, the user submits a request to the API, which adds the submission to a queue in AWS. The queue submission triggers a lambda dispatcher, which then starts a worker task. The worker fetches the appropriate submission from the database and then downloads the relevant tick data files and indices from S3. Since the user's code is possibly malicious, the worker initiates a Docker container and uploads the user's code to said container via a bind mount. Note that since the worker is an ECS task, this process creates an interesting docker-in-docker design.
 
 The worker and container communicate via a stdin/stdout RPC, which is different depending on the programming language of the submitted code. After the backtest is completed or when the user code errors, the container containing the user's code is killed, and the backtesting results or errors, resp., are uploaded in the database, and the ECS task is terminated. Finally, on the frontend, users can view their results using the performance analysis dashboard.
