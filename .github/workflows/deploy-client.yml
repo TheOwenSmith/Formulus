@@ -81,7 +81,6 @@ jobs:
         run: pnpm run lint
 
       - name: Install /shared dependencies
-        if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/shared
         run: pnpm install --frozen-lockfile
 
