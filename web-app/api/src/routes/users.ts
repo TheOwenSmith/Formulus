@@ -79,7 +79,7 @@ export function usersRouter(
                 },
               },
             }),
-            prisma.backtestingSubmission.count({
+            prisma.backtestUsageEvent.count({
               where: {
                 creatorId: ctx.user.id,
                 createdAt: { gte: startOfMonth },

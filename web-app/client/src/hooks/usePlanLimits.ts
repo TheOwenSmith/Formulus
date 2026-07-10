@@ -8,12 +8,10 @@ import {
   PRO_PLAN_MAX_CONCURRENT_BACKTESTS,
 } from '@shared/constants/limits';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
 
 export function usePlanLimits() {
   const { data: userResponse } = useQuery(trpcCredentials.users.getCurrentUser.queryOptions());
   const { data: stats } = useQuery(trpcCredentials.users.getProfileStats.queryOptions());
-  const { data: submissions } = useQuery(trpcCredentials.backtesting.getSubmissions.queryOptions());
 
   const isPro = userResponse?.user.stripePlanActive ?? false;
 
@@ -30,14 +28,7 @@ export function usePlanLimits() {
   const monthlyLimit = isPro
     ? PRO_PLAN_MAX_BACKTESTS_PER_MONTH
     : BASIC_PLAN_MAX_BACKTESTS_PER_MONTH;
-  const startOfMonth = useMemo(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  }, []);
-  const monthlyCount = useMemo(() => {
-    if (!submissions) return 0;
-    return submissions.filter((s) => new Date(s.createdAt) >= startOfMonth).length;
-  }, [submissions, startOfMonth]);
+  const monthlyCount = stats?.backtestsThisMonth ?? 0;
   const isAtMonthlyLimit = monthlyCount >= monthlyLimit;
 
   return {
