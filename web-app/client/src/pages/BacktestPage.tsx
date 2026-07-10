@@ -6,11 +6,7 @@ import { trpcCredentials } from '@client/lib/trpc';
 import '@client/styles/BacktestPage.css';
 import { calculateTargetPosition } from '@client/utils/gridLayoutUtils';
 import { throttle } from '@client/utils/throttle';
-import type {
-  BacktestAlgorithmsResult,
-  Ticker,
-  Timestamp,
-} from '@shared/constants/trading';
+import type { BacktestAlgorithmsResult, Ticker, Timestamp } from '@shared/constants/trading';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useLoaderData } from 'react-router-dom';
@@ -144,6 +140,16 @@ function CopyAlgorithmModal({
   const [copyName, setCopyName] = useState(() => `Copy of ${version.name}`.slice(0, 64));
   const { isAtAlgorithmLimit, algorithmLimit, isPro } = usePlanLimits();
 
+  const { data: existingAlgorithms } = useQuery(
+    trpcCredentials.algorithms.getAlgorithms.queryOptions(),
+  );
+  const existingNames = useMemo(
+    () => new Set((existingAlgorithms ?? []).map((a) => a.name)),
+    [existingAlgorithms],
+  );
+  const trimmedName = copyName.trim();
+  const isDuplicateName = trimmedName.length > 0 && existingNames.has(trimmedName);
+
   const { mutateAsync: copyAlgorithmVersion, isPending } = useMutation(
     trpcCredentials.algorithms.copyAlgorithmVersion.mutationOptions({
       onError: (error) => {
@@ -154,7 +160,7 @@ function CopyAlgorithmModal({
 
   async function handleCopy() {
     const trimmed = copyName.trim();
-    if (!trimmed) return;
+    if (trimmed.length < 4) return;
     if (isAtAlgorithmLimit) {
       toast.error(
         `You have reached your ${isPro ? 'Pro' : 'Basic'} plan limit of ${algorithmLimit} algorithms.${isPro ? '' : ' Upgrade to Pro for up to 500 algorithms.'}`,
@@ -184,7 +190,7 @@ function CopyAlgorithmModal({
         className="w-full max-w-md rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.08)] bg-slate-900/95 backdrop-blur-[10px] border border-white/10 p-6 animate-[fadeInUp_0.2s_ease-out]"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-white mb-1">Copy algorithm version?</h2>
+        <h2 className="text-lg font-semibold text-white mb-1">Copy algorithm?</h2>
         <p className="text-white/50 text-sm mb-5">
           This will add a copy of{' '}
           <span className="text-white/80 font-medium">&quot;{version.name}&quot;</span> to your
@@ -199,8 +205,14 @@ function CopyAlgorithmModal({
             value={copyName}
             maxLength={64}
             onChange={(e) => setCopyName(e.target.value)}
-            className="w-full rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleCopy(); }}
+            className={`w-full rounded-xl bg-white/[0.06] border px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 transition-all ${isDuplicateName ? 'border-red-500/50 focus:ring-red-500/40 focus:border-red-500/40' : 'border-white/10 focus:ring-blue-500/40 focus:border-blue-500/40'}`}
           />
+          {isDuplicateName && (
+            <p className="mt-1.5 text-xs text-red-400">
+              You already have an algorithm with this name
+            </p>
+          )}
         </div>
         <div className="flex justify-end gap-3">
           <button
@@ -213,10 +225,14 @@ function CopyAlgorithmModal({
           <button
             type="button"
             onClick={() => void handleCopy()}
-            disabled={isPending || !copyName.trim() || isAtAlgorithmLimit}
+            disabled={isPending || trimmedName.length < 4 || isAtAlgorithmLimit || isDuplicateName}
             className="px-4 py-2.5 rounded-xl text-sm font-medium border border-blue-500/40 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isAtAlgorithmLimit ? `Limit reached (${algorithmLimit})` : isPending ? 'Copying…' : 'Copy to My Algorithms'}
+            {isAtAlgorithmLimit
+              ? `Limit reached (${algorithmLimit})`
+              : isPending
+                ? 'Copying…'
+                : 'Copy to Algorithms'}
           </button>
         </div>
       </div>
@@ -750,7 +766,8 @@ export function BacktestPage() {
             ref={gradientHeadingRef}
             className="text-4xl font-bold m-0 bg-clip-text text-transparent tracking-tight leading-normal pb-1 transition-all duration-300"
             style={{
-              backgroundImage: 'linear-gradient(to right, rgb(34, 211, 238), rgb(59, 130, 246), rgb(168, 85, 247))',
+              backgroundImage:
+                'linear-gradient(to right, rgb(34, 211, 238), rgb(59, 130, 246), rgb(168, 85, 247))',
             }}
           >
             Backtesting Performance Analysis
