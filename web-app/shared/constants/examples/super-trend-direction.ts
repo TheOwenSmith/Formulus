@@ -64,7 +64,7 @@ std::map<std::string, int> implementation(
     std::map<std::string, int> result;
     for (auto& [ticker, bars] : context) {
         const auto& st = indicators[ticker]["SuperTrend(10,3)"].back();
-        result[ticker] = (st.direction == Direction::UP) ? Action::BUY : Action::SELL;
+        result[ticker] = (st.at("direction") == Direction::UP) ? Action::BUY : Action::SELL;
     }
     return result;
 }

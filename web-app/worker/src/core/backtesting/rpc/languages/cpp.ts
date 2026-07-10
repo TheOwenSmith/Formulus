@@ -3,201 +3,65 @@ export const RUNNER_CPP_BATCHED_FROM_FILENAMES = (
   files?: Record<string, string>,
 ) => `
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <vector>
 #include <map>
 #include <future>
-#include <thread>
+#include <stdexcept>
 #include <sstream>
-#include <cctype>
+#include <iomanip>
+#include <ctime>
+#include <nlohmann/json.hpp>
 
-// Lightweight JSON parser - only handles what we need
-class SimpleJson {
-public:
-    enum Type { OBJECT, ARRAY, STRING, NUMBER, BOOL, NULL_VAL };
-    Type type;
-    std::map<std::string, SimpleJson> obj;
-    std::vector<SimpleJson> arr;
-    std::string str;
-    double num;
-    bool b;
-    
-    SimpleJson() : type(NULL_VAL), num(0), b(false) {}
-    
-    static SimpleJson parse(const std::string& json_str) {
-        size_t pos = 0;
-        return parseValue(json_str, pos);
-    }
-    
-    static SimpleJson parseValue(const std::string& s, size_t& pos) {
-        skipWhitespace(s, pos);
-        if (pos >= s.length()) return SimpleJson();
-        
-        if (s[pos] == '{') return parseObject(s, pos);
-        if (s[pos] == '[') return parseArray(s, pos);
-        if (s[pos] == '"') return parseString(s, pos);
-        if (s[pos] == 't' || s[pos] == 'f') return parseBool(s, pos);
-        if (s[pos] == 'n') { pos += 4; return SimpleJson(); }
-        if (std::isdigit(s[pos]) || s[pos] == '-') return parseNumber(s, pos);
-        return SimpleJson();
-    }
-    
-    static SimpleJson parseObject(const std::string& s, size_t& pos) {
-        SimpleJson obj;
-        obj.type = OBJECT;
-        pos++; // skip '{'
-        skipWhitespace(s, pos);
-        
-        while (pos < s.length() && s[pos] != '}') {
-            skipWhitespace(s, pos);
-            if (s[pos] == '}') break;
-            
-            std::string key = parseString(s, pos).str;
-            skipWhitespace(s, pos);
-            if (s[pos] != ':') break;
-            pos++; // skip ':'
-            obj.obj[key] = parseValue(s, pos);
-            skipWhitespace(s, pos);
-            if (s[pos] == ',') pos++;
-        }
-        if (pos < s.length() && s[pos] == '}') pos++;
-        return obj;
-    }
-    
-    static SimpleJson parseArray(const std::string& s, size_t& pos) {
-        SimpleJson arr;
-        arr.type = ARRAY;
-        pos++; // skip '['
-        skipWhitespace(s, pos);
-        
-        while (pos < s.length() && s[pos] != ']') {
-            skipWhitespace(s, pos);
-            if (s[pos] == ']') break;
-            arr.arr.push_back(parseValue(s, pos));
-            skipWhitespace(s, pos);
-            if (s[pos] == ',') pos++;
-        }
-        if (pos < s.length() && s[pos] == ']') pos++;
-        return arr;
-    }
-    
-    static SimpleJson parseString(const std::string& s, size_t& pos) {
-        SimpleJson str;
-        str.type = STRING;
-        pos++; // skip '"'
-        std::stringstream ss;
-        while (pos < s.length() && s[pos] != '"') {
-            if (s[pos] == '\\\\' && pos + 1 < s.length()) {
-                pos++;
-                if (s[pos] == 'n') ss << '\\n';
-                else if (s[pos] == 't') ss << '\\t';
-                else if (s[pos] == 'r') ss << '\\r';
-                else ss << s[pos];
-            } else {
-                ss << s[pos];
-            }
-            pos++;
-        }
-        if (pos < s.length() && s[pos] == '"') pos++;
-        str.str = ss.str();
-        return str;
-    }
-    
-    static SimpleJson parseNumber(const std::string& s, size_t& pos) {
-        SimpleJson num;
-        num.type = NUMBER;
-        size_t start = pos;
-        if (s[pos] == '-') pos++;
-        while (pos < s.length() && (std::isdigit(s[pos]) || s[pos] == '.')) pos++;
-        num.num = std::stod(s.substr(start, pos - start));
-        return num;
-    }
-    
-    static SimpleJson parseBool(const std::string& s, size_t& pos) {
-        SimpleJson b;
-        b.type = BOOL;
-        if (s.substr(pos, 4) == "true") {
-            b.b = true;
-            pos += 4;
-        } else if (s.substr(pos, 5) == "false") {
-            b.b = false;
-            pos += 5;
-        }
-        return b;
-    }
-    
-    static void skipWhitespace(const std::string& s, size_t& pos) {
-        while (pos < s.length() && std::isspace(s[pos])) pos++;
-    }
-    
-    SimpleJson& operator[](const std::string& key) {
-        if (type == OBJECT) return obj[key];
-        static SimpleJson null;
-        return null;
-    }
-    
-    SimpleJson& operator[](size_t idx) {
-        if (type == ARRAY && idx < arr.size()) return arr[idx];
-        static SimpleJson null;
-        return null;
-    }
-    
-    bool empty() const {
-        if (type == OBJECT) return obj.empty();
-        if (type == ARRAY) return arr.empty();
-        return true;
-    }
-    
-    std::string dump() const {
-        if (type == OBJECT) {
-            std::stringstream ss;
-            ss << "{";
-            bool first = true;
-            for (const auto& [k, v] : obj) {
-                if (!first) ss << ",";
-                first = false;
-                ss << "\\"" << escape(k) << "\\":" << v.dump();
-            }
-            ss << "}";
-            return ss.str();
-        }
-        if (type == ARRAY) {
-            std::stringstream ss;
-            ss << "[";
-            for (size_t i = 0; i < arr.size(); i++) {
-                if (i > 0) ss << ",";
-                ss << arr[i].dump();
-            }
-            ss << "]";
-            return ss.str();
-        }
-        if (type == STRING) return "\\"" + escape(str) + "\\"";
-        if (type == NUMBER) return std::to_string(num);
-        if (type == BOOL) return b ? "true" : "false";
-        return "null";
-    }
-    
-    static std::string escape(const std::string& s) {
-        std::stringstream ss;
-        for (char c : s) {
-            if (c == '"') ss << "\\\\\\"";
-            else if (c == '\\\\') ss << "\\\\\\\\";
-            else if (c == '\\n') ss << "\\\\n";
-            else ss << c;
-        }
-        return ss.str();
-    }
-    
-    std::map<std::string, SimpleJson>::iterator begin() { return obj.begin(); }
-    std::map<std::string, SimpleJson>::iterator end() { return obj.end(); }
-};
+using json = nlohmann::json;
 
-using json = SimpleJson;
+// Bar tuples are [timestamp, open, high, low, close, volume].
+// Timestamp is an ISO string in RPC JSON; C++ algorithms expect epoch milliseconds as double.
+double parseTimestampStringToEpochMs(const std::string& timestamp) {
+    std::tm tm = {};
+    std::istringstream ss(timestamp);
+
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    if (!ss.fail()) {
+        tm.tm_isdst = -1;
+        time_t time = mktime(&tm);
+        if (time == -1) {
+            throw std::runtime_error("Invalid timestamp: " + timestamp);
+        }
+        return static_cast<double>(time) * 1000.0;
+    }
+
+    ss.clear();
+    ss.str(timestamp);
+    ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+    if (!ss.fail()) {
+        tm.tm_isdst = -1;
+        time_t time = mktime(&tm);
+        if (time == -1) {
+            throw std::runtime_error("Invalid timestamp: " + timestamp);
+        }
+        return static_cast<double>(time) * 1000.0;
+    }
+
+    throw std::runtime_error("Unsupported timestamp format: " + timestamp);
+}
+
+double jsonBarValueToDouble(const json& val_json, bool is_timestamp) {
+    if (val_json.is_number()) {
+        return val_json.get<double>();
+    }
+    if (val_json.is_string()) {
+        if (is_timestamp) {
+            return parseTimestampStringToEpochMs(val_json.get<std::string>());
+        }
+        return std::stod(val_json.get<std::string>());
+    }
+    throw std::runtime_error("Bar value must be a number or string");
+}
 
 // Function pointer type for implementation functions
-// Note: Indicators are passed as json (SimpleJson) to support different structures
-using ImplementationFn = std::map<std::string, int>(*)(
+// Wrappers return JSON directly so action and score results are both supported
+using ImplementationFn = json(*)(
     std::map<std::string, std::vector<std::vector<double>>>,
     std::map<std::string, double>,
     const json&
@@ -207,7 +71,7 @@ using ImplementationFn = std::map<std::string, int>(*)(
 ${filenames
   .map((f) => {
     const baseName = f.replace(/\.cpp$/, '').replace(/[^a-zA-Z0-9]/g, '_');
-    return `extern std::map<std::string, int> implementation_${baseName}(
+    return `extern json implementation_${baseName}(
     std::map<std::string, std::vector<std::vector<double>>>,
     std::map<std::string, double>,
     const json&
@@ -235,17 +99,51 @@ std::vector<bool> isSimpleAlgorithm = {${filenames
   })
   .join(', ')}};
 
-// Helper to convert JSON to C++ types
+std::vector<std::vector<double>> jsonBarArrayToVector(const json& j) {
+    if (!j.is_array()) {
+        throw std::runtime_error("Expected bar array for simple algorithm context");
+    }
+    std::vector<std::vector<double>> bars;
+    for (const auto& bar_json : j) {
+        if (!bar_json.is_array()) {
+            throw std::runtime_error("Expected each bar to be an array");
+        }
+        std::vector<double> bar;
+        for (size_t i = 0; i < bar_json.size(); ++i) {
+            bar.push_back(jsonBarValueToDouble(bar_json.at(i), i == 0));
+        }
+        bars.push_back(bar);
+    }
+    return bars;
+}
+
+std::map<std::string, std::vector<std::vector<double>>> wrapSimpleContext(const json& j) {
+    return {{"_", jsonBarArrayToVector(j)}};
+}
+
+std::vector<double> jsonBarTupleToVector(const json& bar_json) {
+    if (!bar_json.is_array()) {
+        throw std::runtime_error("Expected bar tuple to be an array");
+    }
+    std::vector<double> bar;
+    for (size_t i = 0; i < bar_json.size(); ++i) {
+        bar.push_back(jsonBarValueToDouble(bar_json.at(i), i == 0));
+    }
+    return bar;
+}
+
 std::map<std::string, std::vector<std::vector<double>>> jsonToContext(const json& j) {
+    if (!j.is_object()) {
+        throw std::runtime_error("Expected ticker-keyed context object for market algorithm");
+    }
     std::map<std::string, std::vector<std::vector<double>>> result;
-    for (auto& [ticker, bars_json] : j.obj) {
+    for (auto& [ticker, bars_json] : j.items()) {
+        if (!bars_json.is_array()) {
+            throw std::runtime_error("Expected bars for ticker '" + ticker + "' to be an array");
+        }
         std::vector<std::vector<double>> bars;
-        for (auto& bar_json : bars_json.arr) {
-            std::vector<double> bar;
-            for (auto& val_json : bar_json.arr) {
-                bar.push_back(val_json.num);
-            }
-            bars.push_back(bar);
+        for (const auto& bar_json : bars_json) {
+            bars.push_back(jsonBarTupleToVector(bar_json));
         }
         result[ticker] = bars;
     }
@@ -253,9 +151,12 @@ std::map<std::string, std::vector<std::vector<double>>> jsonToContext(const json
 }
 
 std::map<std::string, double> jsonToPositions(const json& j) {
+    if (!j.is_object()) {
+        throw std::runtime_error("Expected ticker-keyed positions object for market algorithm");
+    }
     std::map<std::string, double> result;
-    for (auto& [ticker, pos_json] : j.obj) {
-        result[ticker] = pos_json.num;
+    for (auto& [ticker, pos_json] : j.items()) {
+        result[ticker] = pos_json.get<double>();
     }
     return result;
 }
@@ -265,14 +166,14 @@ std::map<std::string, double> jsonToPositions(const json& j) {
 
 std::map<std::string, std::map<std::string, std::vector<double>>> jsonToIndicatorsVector(const json& j) {
     std::map<std::string, std::map<std::string, std::vector<double>>> result;
-    for (auto& [ticker, indicators_json] : j.obj) {
+    for (auto& [ticker, indicators_json] : j.items()) {
         std::map<std::string, std::vector<double>> ticker_indicators;
-        for (auto& [indicator_name, values_json] : indicators_json.obj) {
+        for (auto& [indicator_name, values_json] : indicators_json.items()) {
             std::vector<double> values;
-            if (values_json.type == json::ARRAY) {
-                for (auto& val_json : values_json.arr) {
-                    if (val_json.type == json::NUMBER) {
-                        values.push_back(val_json.num);
+            if (values_json.is_array()) {
+                for (const auto& val_json : values_json) {
+                    if (val_json.is_number()) {
+                        values.push_back(val_json.get<double>());
                     }
                 }
             }
@@ -285,14 +186,14 @@ std::map<std::string, std::map<std::string, std::vector<double>>> jsonToIndicato
 
 std::map<std::string, std::map<std::string, std::map<std::string, double>>> jsonToIndicatorsObject(const json& j) {
     std::map<std::string, std::map<std::string, std::map<std::string, double>>> result;
-    for (auto& [ticker, indicators_json] : j.obj) {
+    for (auto& [ticker, indicators_json] : j.items()) {
         std::map<std::string, std::map<std::string, double>> ticker_indicators;
-        for (auto& [indicator_name, indicator_json] : indicators_json.obj) {
+        for (auto& [indicator_name, indicator_json] : indicators_json.items()) {
             std::map<std::string, double> indicator_obj;
-            if (indicator_json.type == json::OBJECT) {
-                for (auto& [key, value_json] : indicator_json.obj) {
-                    if (value_json.type == json::NUMBER) {
-                        indicator_obj[key] = value_json.num;
+            if (indicator_json.is_object()) {
+                for (auto& [key, value_json] : indicator_json.items()) {
+                    if (value_json.is_number()) {
+                        indicator_obj[key] = value_json.get<double>();
                     }
                 }
             }
@@ -305,19 +206,19 @@ std::map<std::string, std::map<std::string, std::map<std::string, double>>> json
 
 std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>> jsonToIndicatorsVectorOfObjects(const json& j) {
     std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>> result;
-    for (auto& [ticker, indicators_json] : j.obj) {
+    for (auto& [ticker, indicators_json] : j.items()) {
         std::map<std::string, std::vector<std::map<std::string, int>>> ticker_indicators;
-        for (auto& [indicator_name, indicator_json] : indicators_json.obj) {
+        for (auto& [indicator_name, indicator_json] : indicators_json.items()) {
             std::vector<std::map<std::string, int>> indicator_array;
-            if (indicator_json.type == json::ARRAY) {
-                for (auto& item_json : indicator_json.arr) {
+            if (indicator_json.is_array()) {
+                for (const auto& item_json : indicator_json) {
                     std::map<std::string, int> item_obj;
-                    if (item_json.type == json::OBJECT) {
-                        for (auto& [key, value_json] : item_json.obj) {
-                            if (value_json.type == json::NUMBER) {
-                                item_obj[key] = static_cast<int>(value_json.num);
-                            } else if (value_json.type == json::BOOL) {
-                                item_obj[key] = value_json.b ? 1 : 0;
+                    if (item_json.is_object()) {
+                        for (auto& [key, value_json] : item_json.items()) {
+                            if (value_json.is_number()) {
+                                item_obj[key] = static_cast<int>(value_json.get<double>());
+                            } else if (value_json.is_boolean()) {
+                                item_obj[key] = value_json.get<bool>() ? 1 : 0;
                             }
                         }
                     }
@@ -331,51 +232,25 @@ std::map<std::string, std::map<std::string, std::vector<std::map<std::string, in
     return result;
 }
 
-// Helper to convert C++ result to JSON
-// For simple algorithms (map with single entry), return just the action value
-// For market algorithms, always return the full object (even if single entry)
-json resultToJson(const std::map<std::string, int>& result, bool isSimple) {
-    // If result is empty, return appropriate default
+// Convert action maps to RPC JSON. Simple algorithms return a bare action value.
+json actionMapToJson(const std::map<std::string, int>& result, bool flattenSingleEntry) {
     if (result.empty()) {
-        if (isSimple) {
-            // Simple algorithm: return HOLD action
-            json j;
-            j.type = json::NUMBER;
-            j.num = 2.0; // HOLD action
-            j.b = false;
-            j.str = "";
-            j.obj.clear();
-            j.arr.clear();
-            return j;
-        } else {
-            // Market algorithm: return empty object
-            json j;
-            j.type = json::OBJECT;
-            return j;
-        }
+        return flattenSingleEntry ? json(2) : json::object();
     }
-    // For simple algorithms with single entry, return just the action value (number)
-    if (isSimple && result.size() == 1) {
-        json j;
-        j.type = json::NUMBER;
-        j.num = static_cast<double>(result.begin()->second);
-        j.b = false;
-        j.str = "";
-        j.obj.clear();
-        j.arr.clear();
-        return j;
+    if (flattenSingleEntry && result.size() == 1) {
+        return result.begin()->second;
     }
-    // For market algorithms (or simple algorithms with multiple entries), return as object
-    json j;
-    j.type = json::OBJECT;
-    for (auto& [ticker, action] : result) {
-        j.obj[ticker] = json();
-        j.obj[ticker].type = json::NUMBER;
-        j.obj[ticker].num = static_cast<double>(action);
-        j.obj[ticker].obj.clear();
-        j.obj[ticker].arr.clear();
-        j.obj[ticker].str.clear();
-        j.obj[ticker].b = false;
+    json j = json::object();
+    for (const auto& [ticker, action] : result) {
+        j[ticker] = action;
+    }
+    return j;
+}
+
+json scoreMapToJson(const std::map<std::string, double>& scores) {
+    json j = json::object();
+    for (const auto& [ticker, score] : scores) {
+        j[ticker] = score;
     }
     return j;
 }
@@ -383,117 +258,72 @@ json resultToJson(const std::map<std::string, int>& result, bool isSimple) {
 int main() {
     std::cout << "compiled" << std::endl;
     std::cout.flush();
-    
+
     std::string line;
     while (std::getline(std::cin, line)) {
         try {
             json msg = json::parse(line);
             json params_by_index = msg["args"][0];
-            
+
             if (params_by_index.empty()) {
-                json result;
-                result.type = json::OBJECT;
-                json response;
-                response.type = json::OBJECT;
-                response.obj["ok"] = json();
-                response.obj["ok"].type = json::BOOL;
-                response.obj["ok"].b = true;
-                response.obj["result"] = result;
+                json response = {{"ok", true}, {"result", json::object()}};
                 std::cout << response.dump() << std::endl;
                 std::cout.flush();
                 continue;
             }
-            
-            json result_by_index;
-            result_by_index.type = json::OBJECT;
+
+            json result_by_index = json::object();
             std::vector<std::future<json>> futures;
             std::vector<std::string> indices;
-            
-            for (auto& [index_str, params] : params_by_index.obj) {
+
+            for (auto& [index_str, params] : params_by_index.items()) {
                 int index = std::stoi(index_str);
                 if (index < 0 || index >= static_cast<int>(implementations.size())) {
                     throw std::runtime_error("Invalid algorithm index: " + index_str);
                 }
-                
+
                 indices.push_back(index_str);
                 json params_copy = params;
-                
+
                 futures.push_back(std::async(std::launch::async, [index, params_copy]() {
-                    try {
-                        json context_json = params_copy.arr[0];
-                        json positions_json = params_copy.arr[1];
-                        json indicators_json = params_copy.arr[2];
-                        
-                        auto context = jsonToContext(context_json);
-                        auto positions = jsonToPositions(positions_json);
-                        // Pass indicators as json directly - wrapper functions will convert to expected types
-                        
-                        auto result = implementations[index](context, positions, indicators_json);
-                        // Ensure index is within bounds for isSimpleAlgorithm
-                        bool isSimple = (index >= 0 && index < static_cast<int>(isSimpleAlgorithm.size())) 
-                            ? isSimpleAlgorithm[index] 
-                            : false;
-                        return resultToJson(result, isSimple);
-                    } catch (const std::exception& e) {
-                        // Return error as json object
-                        json error_json;
-                        error_json.type = json::OBJECT;
-                        error_json.obj["error"] = json();
-                        error_json.obj["error"].type = json::STRING;
-                        error_json.obj["error"].str = e.what();
-                        return error_json;
+                    if (!params_copy.is_array() || params_copy.size() < 3) {
+                        throw std::runtime_error("Expected 3 RPC parameters [context, positions, indicators]");
                     }
+
+                    json context_json = params_copy.at(0);
+                    json positions_json = params_copy.at(1);
+                    json indicators_json = params_copy.at(2);
+
+                    bool isSimple = (index >= 0 && index < static_cast<int>(isSimpleAlgorithm.size()))
+                        ? isSimpleAlgorithm[index]
+                        : false;
+
+                    std::map<std::string, std::vector<std::vector<double>>> context;
+                    std::map<std::string, double> positions;
+
+                    // Simple algorithms receive Bar[]; market algorithms receive Record<Ticker, Bar[]>
+                    if (isSimple || context_json.is_array()) {
+                        context = wrapSimpleContext(context_json);
+                        positions = {};
+                    } else {
+                        context = jsonToContext(context_json);
+                        positions = jsonToPositions(positions_json);
+                    }
+
+                    auto result = implementations[index](context, positions, indicators_json);
+                    return result;
                 }));
             }
-            
-            // Process all futures and populate result_by_index
+
             for (size_t i = 0; i < futures.size(); ++i) {
-                json result_json;
-                try {
-                    result_json = futures[i].get();
-                } catch (const std::exception& e) {
-                    // If future.get() throws, create error response
-                    result_json = json();
-                    result_json.type = json::OBJECT;
-                    result_json.obj["error"] = json();
-                    result_json.obj["error"].type = json::STRING;
-                    result_json.obj["error"].str = e.what();
-                }
-                
-                // Create a new json object and copy all fields explicitly
-                // This ensures NUMBER type and all other types are preserved
-                json new_entry;
-                new_entry.type = result_json.type;
-                new_entry.num = result_json.num;
-                new_entry.str = result_json.str;
-                new_entry.b = result_json.b;
-                new_entry.obj = result_json.obj;
-                new_entry.arr = result_json.arr;
-                
-                // Assign using operator[] - this should work correctly
-                result_by_index.obj[indices[i]] = new_entry;
+                result_by_index[indices[i]] = futures[i].get();
             }
-            
-            // Ensure result_by_index is properly set as OBJECT type
-            result_by_index.type = json::OBJECT;
-            
-            json response;
-            response.type = json::OBJECT;
-            response.obj["ok"] = json();
-            response.obj["ok"].type = json::BOOL;
-            response.obj["ok"].b = true;
-            response.obj["result"] = result_by_index;
+
+            json response = {{"ok", true}, {"result", result_by_index}};
             std::cout << response.dump() << std::endl;
             std::cout.flush();
         } catch (const std::exception& e) {
-            json error_response;
-            error_response.type = json::OBJECT;
-            error_response.obj["ok"] = json();
-            error_response.obj["ok"].type = json::BOOL;
-            error_response.obj["ok"].b = false;
-            error_response.obj["error"] = json();
-            error_response.obj["error"].type = json::STRING;
-            error_response.obj["error"].str = e.what();
+            json error_response = {{"ok", false}, {"error", e.what()}};
             std::cout << error_response.dump() << std::endl;
             std::cout.flush();
         }
@@ -548,6 +378,19 @@ export function wrapCppUserCode(filename: string, code: string): string {
   // Detect function signature
   const hasSimpleSignature = /implementation\s*\(\s*std::vector<std::vector<double>>/.test(code);
   const returnsInt = /\bint\s+implementation\s*\(/.test(code);
+  const returnsScoreMap =
+    /std::map\s*<\s*std::string\s*,\s*double\s*>[\s\S]{0,80}?\bimplementation\s*\(/.test(code);
+
+  const renameMarketImplementation = (source: string): string => {
+    const byReturnTypeOnSameLine = source.replace(
+      /std::map\s*<\s*std::string\s*,\s*(?:int|double)\s*>\s+implementation(?!_)\s*\(/g,
+      (match) => match.replace(/\bimplementation(?!_)\s*\(/, `implementation_${baseName}_impl(`),
+    );
+    return byReturnTypeOnSameLine.replace(
+      /\bimplementation(?!_)\s*\(\s*std::map\s*<\s*std::string\s*,\s*std::vector\s*<\s*std::vector\s*<\s*double\s*>\s*>\s*>/g,
+      `implementation_${baseName}_impl(std::map<std::string, std::vector<std::vector<double>>>`,
+    );
+  };
 
   // Detect indicator signature type
   // Match: std::map<std::string, std::map<std::string, std::map<std::string, double>>>
@@ -561,6 +404,28 @@ export function wrapCppUserCode(filename: string, code: string): string {
     );
 
   let wrappedCode = code;
+
+  if (wrappedCode.includes(`json implementation_${baseName}(`)) {
+    return wrappedCode;
+  }
+
+  const jsonInclude = `#include <nlohmann/json.hpp>
+using json = nlohmann::json;`;
+
+  const indicatorConversion = hasObjectIndicators
+    ? 'jsonToIndicatorsObject'
+    : hasVectorOfObjectsIndicators
+      ? 'jsonToIndicatorsVectorOfObjects'
+      : 'jsonToIndicatorsVector';
+  const indicatorType = hasObjectIndicators
+    ? 'std::map<std::string, std::map<std::string, std::map<std::string, double>>>'
+    : hasVectorOfObjectsIndicators
+      ? 'std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>>'
+      : 'std::map<std::string, std::map<std::string, std::vector<double>>>';
+
+  const indicatorExternDecl = `extern std::map<std::string, std::map<std::string, std::vector<double>>> jsonToIndicatorsVector(const json&);
+extern std::map<std::string, std::map<std::string, std::map<std::string, double>>> jsonToIndicatorsObject(const json&);
+extern std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>> jsonToIndicatorsVectorOfObjects(const json&);`;
 
   // Create wrapper function with market signature
   if (hasSimpleSignature && returnsInt) {
@@ -576,25 +441,19 @@ export function wrapCppUserCode(filename: string, code: string): string {
         `#include "utils.hpp"\n#include <map>`,
       );
     }
-    wrappedCode += `\n\n// Forward declaration for json type (defined in runner.cpp)
-class SimpleJson;
-using json = SimpleJson;
+    wrappedCode += `\n\n${jsonInclude}
 
 // Wrapper to normalize signature
-std::map<std::string, int> implementation_${baseName}(
+json implementation_${baseName}(
     std::map<std::string, std::vector<std::vector<double>>> context,
     std::map<std::string, double> _positions,
     const json& _indicators_json
 ) {
     if (context.empty()) {
-        std::map<std::string, int> result;
-        return result;
+        return json(2);
     }
     std::vector<std::vector<double>> firstContext = context.begin()->second;
-    int action = implementation_${baseName}_impl(firstContext);
-    std::map<std::string, int> result;
-    result[context.begin()->first] = action;
-    return result;
+    return json(implementation_${baseName}_impl(firstContext));
 }`;
   } else if (hasSimpleSignature) {
     // Simple algorithm returning map - rename to _impl and create wrapper
@@ -609,64 +468,54 @@ std::map<std::string, int> implementation_${baseName}(
         `#include "utils.hpp"\n#include <map>`,
       );
     }
-    wrappedCode += `\n\n// Forward declaration for json type (defined in runner.cpp)
-class SimpleJson;
-using json = SimpleJson;
+    wrappedCode += `\n\n${jsonInclude}
+extern json actionMapToJson(const std::map<std::string, int>&, bool);
 
 // Wrapper to normalize signature
-std::map<std::string, int> implementation_${baseName}(
+json implementation_${baseName}(
     std::map<std::string, std::vector<std::vector<double>>> context,
     std::map<std::string, double> _positions,
     const json& _indicators_json
 ) {
     if (context.empty()) {
-        std::map<std::string, int> result;
-        return result;
+        return json(2);
     }
     std::vector<std::vector<double>> firstContext = context.begin()->second;
-    return implementation_${baseName}_impl(firstContext);
+    return actionMapToJson(implementation_${baseName}_impl(firstContext), true);
 }`;
-  } else {
-    // Market algorithm - rename to _impl and create wrapper with json indicators
-    // First, rename the original function
-    wrappedCode = wrappedCode.replace(
-      /std::map\s*<\s*std::string\s*,\s*int\s*>\s+implementation\s*\(/g,
-      `std::map<std::string, int> implementation_${baseName}_impl(`,
-    );
-    wrappedCode = wrappedCode.replace(
-      /(std::map\s*<\s*std::string\s*,\s*int\s*>)\s*\n\s*implementation\s*\(/g,
-      `$1 implementation_${baseName}_impl(`,
-    );
-
-    // Determine which conversion function to use based on indicator signature
-    let indicatorConversion = 'jsonToIndicatorsVector';
-    let indicatorType = 'std::map<std::string, std::map<std::string, std::vector<double>>>';
-
-    if (hasObjectIndicators) {
-      indicatorConversion = 'jsonToIndicatorsObject';
-      indicatorType = 'std::map<std::string, std::map<std::string, std::map<std::string, double>>>';
-    } else if (hasVectorOfObjectsIndicators) {
-      indicatorConversion = 'jsonToIndicatorsVectorOfObjects';
-      indicatorType =
-        'std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>>';
-    }
-
-    // Generate wrapper function that converts json to expected indicator type
-    wrappedCode += `\n\n// Forward declaration for json type and conversion functions (defined in runner.cpp)
-class SimpleJson;
-using json = SimpleJson;
-extern std::map<std::string, std::map<std::string, std::vector<double>>> jsonToIndicatorsVector(const json&);
-extern std::map<std::string, std::map<std::string, std::map<std::string, double>>> jsonToIndicatorsObject(const json&);
-extern std::map<std::string, std::map<std::string, std::vector<std::map<std::string, int>>>> jsonToIndicatorsVectorOfObjects(const json&);
+  } else if (returnsScoreMap) {
+    // Top-K algorithm returning score map
+    wrappedCode = renameMarketImplementation(wrappedCode);
+    wrappedCode += `\n\n${jsonInclude}
+${indicatorExternDecl}
+extern json scoreMapToJson(const std::map<std::string, double>&);
 
 // Wrapper to convert json indicators to expected type
-std::map<std::string, int> implementation_${baseName}(
+json implementation_${baseName}(
     std::map<std::string, std::vector<std::vector<double>>> context,
     std::map<std::string, double> positions,
     const json& indicators_json
 ) {
     ${indicatorType} indicators = ${indicatorConversion}(indicators_json);
-    return implementation_${baseName}_impl(context, positions, indicators);
+    return scoreMapToJson(implementation_${baseName}_impl(context, positions, indicators));
+}`;
+  } else {
+    // Market algorithm - rename to _impl and create wrapper with json indicators
+    wrappedCode = renameMarketImplementation(wrappedCode);
+
+    // Generate wrapper function that converts json to expected indicator type
+    wrappedCode += `\n\n${jsonInclude}
+${indicatorExternDecl}
+extern json actionMapToJson(const std::map<std::string, int>&, bool);
+
+// Wrapper to convert json indicators to expected type
+json implementation_${baseName}(
+    std::map<std::string, std::vector<std::vector<double>>> context,
+    std::map<std::string, double> positions,
+    const json& indicators_json
+) {
+    ${indicatorType} indicators = ${indicatorConversion}(indicators_json);
+    return actionMapToJson(implementation_${baseName}_impl(context, positions, indicators), false);
 }`;
   }
 
