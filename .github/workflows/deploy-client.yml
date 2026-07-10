@@ -69,6 +69,7 @@ jobs:
       - name: Prettier
         if: env.RUN_QUALITY_CHECKS == 'true'
         working-directory: web-app/client
+        # --filter required otherwise CI fails with "pnpm: command not found"
         run: pnpm --filter ./client prettier:check
 
       - name: Install /client dependencies
