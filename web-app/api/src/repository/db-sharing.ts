@@ -214,7 +214,7 @@ export async function setResultPublic(
 
 export async function getResultAccessInfo(
   publicId: string,
-  userId: string,
+  userId: string | null,
 ): Promise<Result<ResultAccessInfo | null, AppError>> {
   const result = await fromThrowableAsync(
     () =>
@@ -224,7 +224,8 @@ export async function getResultAccessInfo(
           creatorId: true,
           isPublic: true,
           shares: {
-            where: { userId },
+            // '' never matches a share, so anonymous viewers get none
+            where: { userId: userId ?? '' },
             select: { allowCopy: true },
           },
           creator: { select: { name: true, image: true, stripePlanActive: true } },
@@ -236,7 +237,7 @@ export async function getResultAccessInfo(
   if (result.value == null) return ok(null);
 
   const { creatorId, isPublic, shares, creator } = result.value;
-  const isOwner = creatorId === userId;
+  const isOwner = userId != null && creatorId === userId;
   const shareEntry = shares[0];
 
   const hasAccess = isOwner || isPublic || shareEntry != null;

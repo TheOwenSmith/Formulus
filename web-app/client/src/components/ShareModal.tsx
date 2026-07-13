@@ -225,7 +225,7 @@ export function ShareModal({
               <div>
                 <p className="text-sm font-medium text-white/80">Public access</p>
                 <p className="text-xs text-white/35 mt-0.5">
-                  {isPublic ? 'Any logged-in user with the link can view' : 'Only people you share with can view'}
+                  {isPublic ? 'Anyone with the link can view' : 'Only people you share with can view'}
                 </p>
               </div>
             </div>

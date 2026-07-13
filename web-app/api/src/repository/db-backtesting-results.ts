@@ -14,7 +14,7 @@ export type BacktestingResultsWithName = BacktestAlgorithmsResult & { name: stri
 
 export async function retrieveBacktestingResultsByPublicId(
   publicId: string,
-  userId: string,
+  userId: string | null,
 ): Promise<Result<BacktestingResultsWithName | null, AppError>> {
   const getBacktestingResultsResponse = await fromThrowableAsync(
     () =>
@@ -25,7 +25,8 @@ export async function retrieveBacktestingResultsByPublicId(
         include: {
           algorithmGraphs: true,
           tickerPlots: true,
-          shares: { where: { userId }, select: { userId: true } },
+          // '' never matches a share, so anonymous viewers get none
+          shares: { where: { userId: userId ?? '' }, select: { userId: true } },
         },
       }),
     (e) => internal(e),
@@ -39,7 +40,7 @@ export async function retrieveBacktestingResultsByPublicId(
   }
 
   // Access control: owner, explicit share recipient, or public result
-  const isOwner = dbBacktestingResults.creatorId === userId;
+  const isOwner = userId != null && dbBacktestingResults.creatorId === userId;
   const hasShare = dbBacktestingResults.shares.length > 0;
   if (!isOwner && !dbBacktestingResults.isPublic && !hasShare) {
     return ok(null);

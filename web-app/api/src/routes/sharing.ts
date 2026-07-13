@@ -1,5 +1,8 @@
 import type { TRPCContext } from '@api/lib/trpc';
-import type { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import type {
+  createOptionalUserAuthenticationProcedure,
+  createUserAuthenticationProcedure,
+} from '@api/middleware/authentication';
 import {
   dismissShare,
   getResultAccessInfo,
@@ -17,6 +20,7 @@ import z from 'zod';
 export function sharingRouter(
   router: TRPCContext['router'],
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
+  optionalAuthProcedure: ReturnType<typeof createOptionalUserAuthenticationProcedure>,
 ) {
   return router({
     // Recipient dismisses a result from their shared list
@@ -29,10 +33,10 @@ export function sharingRouter(
       }),
 
     // Get the current user's access level for a result
-    getResultAccess: authProcedure
+    getResultAccess: optionalAuthProcedure
       .input(z.object({ publicId: z.string() }))
       .query(async ({ ctx, input }) => {
-        const result = await getResultAccessInfo(input.publicId, ctx.user.id);
+        const result = await getResultAccessInfo(input.publicId, ctx.user?.id ?? null);
         if (result.isErr()) throw result.error;
         if (!result.value?.hasAccess) {
           throw badRequest('Result not found');

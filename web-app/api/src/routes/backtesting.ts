@@ -4,7 +4,10 @@ import { prisma } from '@api/lib/prisma';
 import { redis } from '@api/lib/redis';
 import { sqs } from '@api/lib/sqs';
 import { type TRPCContext } from '@api/lib/trpc';
-import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import {
+  createOptionalUserAuthenticationProcedure,
+  createUserAuthenticationProcedure,
+} from '@api/middleware/authentication';
 import { retrieveBacktestingResultsByPublicId } from '@api/repository/db-backtesting-results';
 import { getResultAccessInfo } from '@api/repository/db-sharing';
 import {
@@ -24,6 +27,7 @@ import z from 'zod';
 export function backtestingRouter(
   router: TRPCContext['router'],
   authProcedure: ReturnType<typeof createUserAuthenticationProcedure>,
+  optionalAuthProcedure: ReturnType<typeof createOptionalUserAuthenticationProcedure>,
 ) {
   return router({
     backtestAlgorithms: authProcedure
@@ -155,10 +159,10 @@ export function backtestingRouter(
         return { name: name.slice(0, 64) };
       }),
 
-    getAlgorithmVersionsForResult: authProcedure
+    getAlgorithmVersionsForResult: optionalAuthProcedure
       .input(z.object({ publicId: z.string() }))
       .query(async ({ ctx, input }) => {
-        const accessResult = await getResultAccessInfo(input.publicId, ctx.user.id);
+        const accessResult = await getResultAccessInfo(input.publicId, ctx.user?.id ?? null);
         if (accessResult.isErr()) throw accessResult.error;
         if (!accessResult.value?.canCopy) return [];
         const result = await getAlgorithmVersionsByResultPublicId(input.publicId);
@@ -166,7 +170,7 @@ export function backtestingRouter(
         return result.value;
       }),
 
-    getBacktestingResults: authProcedure
+    getBacktestingResults: optionalAuthProcedure
       .input(
         z.object({
           publicId: z.string(),
@@ -175,7 +179,7 @@ export function backtestingRouter(
       .query(async ({ ctx, input }) => {
         const retrievedBacktestingResultsResponse = await retrieveBacktestingResultsByPublicId(
           input.publicId,
-          ctx.user.id,
+          ctx.user?.id ?? null,
         );
         if (retrievedBacktestingResultsResponse.isErr()) {
           throw retrievedBacktestingResultsResponse.error;

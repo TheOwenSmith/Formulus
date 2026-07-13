@@ -1,4 +1,7 @@
-import { createUserAuthenticationProcedure } from '@api/middleware/authentication';
+import {
+  createOptionalUserAuthenticationProcedure,
+  createUserAuthenticationProcedure,
+} from '@api/middleware/authentication';
 import { algorithmsRouter } from '@api/routes/algorithms';
 import { backtestingRouter } from '@api/routes/backtesting';
 import { paymentsRouter } from '@api/routes/payments';
@@ -40,14 +43,15 @@ export type TRPCContext = typeof t;
 
 const router = t.router;
 const authProcedure = createUserAuthenticationProcedure(t);
+const optionalAuthProcedure = createOptionalUserAuthenticationProcedure(t);
 
 export const appRouter = t.router({
   algorithms: algorithmsRouter(router, authProcedure),
-  backtesting: backtestingRouter(router, authProcedure),
+  backtesting: backtestingRouter(router, authProcedure, optionalAuthProcedure),
   env: t.procedure.query(() => config.env),
   heartbeat: t.procedure.query(() => true),
   payments: paymentsRouter(router, authProcedure),
-  sharing: sharingRouter(router, authProcedure),
+  sharing: sharingRouter(router, authProcedure, optionalAuthProcedure),
   thisIsAnError: t.procedure.query(() => {
     throw {
       message: 'This is an error',

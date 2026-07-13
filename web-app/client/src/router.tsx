@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate, Outlet, redirect } from 'react-router-dom';
-import { AuthenticatedLayout, RootLayout } from './layout';
+import { AuthenticatedLayout, BacktestLayout, RootLayout } from './layout';
 import { getSession } from './lib/auth-client';
 import { algorithmEditorLoader } from './loaders/algorithmEditorLoader';
 import { algorithmsLoader } from './loaders/algorithmsLoader';
@@ -56,18 +56,6 @@ export const router = createBrowserRouter([
             element: <SharedPage />,
           },
           {
-            path: '/backtest/:publicId',
-            element: <BacktestPage />,
-            loader: backtestLoader,
-            errorElement: (
-              <ErrorPage
-                title="Backtesting Results Not Found"
-                message="The backtesting results you are looking for could not be found. They may have been deleted or the link may be incorrect."
-                actionText="Go Back"
-              />
-            ),
-          },
-          {
             path: '/about',
             element: <AboutPage />,
           },
@@ -82,6 +70,25 @@ export const router = createBrowserRouter([
           {
             path: '*',
             element: <Navigate to="/algorithms" replace />,
+          },
+        ],
+      },
+      {
+        // Public backtest results: viewable without a session
+        loader: backtestSessionLoader,
+        element: <BacktestLayout />,
+        children: [
+          {
+            path: '/backtest/:publicId',
+            element: <BacktestPage />,
+            loader: backtestLoader,
+            errorElement: (
+              <ErrorPage
+                title="Backtesting Results Not Found"
+                message="The backtesting results you are looking for could not be found. They may have been deleted or the link may be incorrect."
+                actionText="Go Back"
+              />
+            ),
           },
         ],
       },
@@ -113,6 +120,11 @@ async function requireAuthLoader({ request }: { request: Request }) {
     throw redirect(`/login?redirect=${encodeURIComponent(pathname + search)}`);
   }
   return <Outlet />;
+}
+
+async function backtestSessionLoader() {
+  const { data: session } = await getSession();
+  return { isLoggedIn: session != null };
 }
 
 async function requireGuestLoader() {

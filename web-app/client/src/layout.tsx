@@ -1,6 +1,7 @@
-import { Outlet, useNavigation } from 'react-router-dom';
+import { Outlet, useLoaderData, useNavigation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { BacktestPoller } from './components/BacktestPoller';
+import { GuestHeader } from './components/GuestHeader';
 import { Header } from './components/Header';
 import { LoadingScreen } from './components/LoadingScreen';
 
@@ -26,6 +27,28 @@ export function AuthenticatedLayout() {
     <>
       <BacktestPoller />
       <Header />
+      <Outlet />
+    </>
+  );
+}
+
+// Backtest results are viewable without a session; guests get a login-only header
+export function BacktestLayout() {
+  const { isLoggedIn } = useLoaderData<{ isLoggedIn: boolean }>();
+
+  if (isLoggedIn) {
+    return (
+      <>
+        <BacktestPoller />
+        <Header />
+        <Outlet />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <GuestHeader />
       <Outlet />
     </>
   );
