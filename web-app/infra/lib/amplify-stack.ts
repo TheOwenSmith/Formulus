@@ -8,7 +8,7 @@ export interface AmplifyStackProps extends cdk.StackProps {
   branchName: string;
   domainName: string;
   subDomain: string;
-  /** Map the root domain (formulus.ai) to this branch. */
+  /** Map the root domain (formulus.ai) to this branch; www redirects to it. */
   mapRootDomain?: boolean;
 }
 
@@ -27,6 +27,15 @@ export class AmplifyStack extends cdk.Stack {
         { name: 'VITE_ENABLE_TOOLTIPS', value: props.enableTooltips },
       ],
       customRules: [
+        ...(props.mapRootDomain
+          ? [
+              {
+                source: `https://www.${props.domainName}`,
+                target: `https://${props.domainName}`,
+                status: '301',
+              },
+            ]
+          : []),
         {
           source: '/<*>',
           target: '/index.html',
@@ -47,6 +56,8 @@ export class AmplifyStack extends cdk.Stack {
     ];
     if (props.mapRootDomain) {
       subDomainSettings.push({ branchName: props.branchName, prefix: '' });
+      // www must be mapped for the www -> apex redirect rule to receive traffic
+      subDomainSettings.push({ branchName: props.branchName, prefix: 'www' });
     }
 
     const domain = new amplify.CfnDomain(this, 'Domain', {
